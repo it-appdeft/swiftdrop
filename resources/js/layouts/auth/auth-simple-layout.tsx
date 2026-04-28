@@ -8,34 +8,60 @@ interface AuthLayoutProps {
     description?: string;
 }
 
+/**
+ * Branded split-screen auth layout. Left panel plays the SwiftDrop splash
+ * reel as a muted, looping background; the static logo poster ships as a
+ * graceful fallback when the video can't autoplay (reduced-motion, slow
+ * connections, browsers that block autoplay).
+ */
 export default function AuthSimpleLayout({ children, title, description }: AuthLayoutProps) {
     return (
         <div className="bg-background relative flex min-h-svh items-stretch">
-            {/* Left — branded panel. Hidden under lg. */}
-            <aside className="bg-aurora text-foreground relative hidden flex-1 overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-10">
-                <div className="bg-grid pointer-events-none absolute inset-0 opacity-60" aria-hidden />
+            {/* Left — branded splash panel. Hidden under lg. */}
+            <aside className="relative hidden flex-1 overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-10">
+                <video
+                    className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden"
+                    poster="/brand/logo.png"
+                    src="/brand/splash.mp4"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    aria-hidden
+                />
+                {/* Static fallback for reduced-motion users */}
+                <img
+                    src="/brand/logo.png"
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 hidden h-full w-full object-cover motion-reduce:block"
+                />
+                {/* Soft overlay so the foreground copy stays legible regardless of frame */}
+                <div
+                    className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/55"
+                    aria-hidden
+                />
 
-                <div className="relative flex items-center gap-2">
-                    <span className="bg-sidebar-primary text-sidebar-primary-foreground flex size-9 items-center justify-center rounded-md shadow-sm">
-                        <AppLogoIcon className="size-5 fill-current text-white" />
+                <div className="relative flex items-center gap-2 text-white">
+                    <span className="flex size-9 items-center justify-center rounded-md bg-white/15 ring-1 ring-white/30 backdrop-blur">
+                        <AppLogoIcon className="size-5 fill-current" />
                     </span>
                     <div className="leading-tight">
                         <p className="text-sm font-semibold">SwiftDrop</p>
-                        <p className="text-muted-foreground text-xs">Operations console</p>
+                        <p className="text-[10px] font-medium tracking-[0.18em] uppercase opacity-80">
+                            Fresh food · Fast delivery
+                        </p>
                     </div>
                 </div>
 
-                <div className="relative max-w-md space-y-4">
-                    <p className="text-foreground/90 text-2xl leading-snug font-medium">
-                        “The new dashboard cut our weekly ops review from two hours to fifteen minutes.”
+                <div className="relative max-w-md space-y-4 text-white">
+                    <p className="text-2xl leading-snug font-medium drop-shadow-sm">
+                        Your favorite food, delivered <span className="text-primary-foreground bg-primary/90 inline-block rounded-md px-2 py-0.5">Swiftly</span>.
                     </p>
-                    <div className="text-muted-foreground flex items-center gap-3 text-sm">
-                        <div className="bg-foreground/10 flex size-9 items-center justify-center rounded-full font-medium">OM</div>
-                        <div className="leading-tight">
-                            <p className="text-foreground font-medium">Olivia Martinez</p>
-                            <p>VP Operations · Northwind Labs</p>
-                        </div>
-                    </div>
+                    <p className="text-sm text-white/80">
+                        Manage couriers, track live shipments, and keep partners in sync — all from one operations console.
+                    </p>
                 </div>
             </aside>
 
@@ -45,7 +71,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                     <div className="lg:hidden">
                         <Link href={route('home')} className="inline-flex items-center gap-2">
                             <span className="bg-sidebar-primary text-sidebar-primary-foreground flex size-9 items-center justify-center rounded-md shadow-sm">
-                                <AppLogoIcon className="size-5 fill-current text-white" />
+                                <AppLogoIcon className="size-5 fill-current" />
                             </span>
                             <span className="text-sm font-semibold">SwiftDrop</span>
                         </Link>
