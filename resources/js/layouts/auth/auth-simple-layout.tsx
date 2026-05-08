@@ -16,10 +16,10 @@ interface AuthLayoutProps {
  */
 export default function AuthSimpleLayout({ children, title, description }: AuthLayoutProps) {
     return (
-        <div className="bg-background relative flex min-h-svh items-stretch">
+        <div className="bg-background relative grid min-h-svh lg:grid-cols-2">
             {/* Left — branded splash panel. Hidden under lg. */}
-            <aside className="relative hidden flex-1 overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-10">
-                <video
+            <aside className="relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-10">
+                {/* <video
                     className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden"
                     poster="/brand/logo.png"
                     src="/brand/splash.mp4"
@@ -29,6 +29,12 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                     playsInline
                     preload="metadata"
                     aria-hidden
+                /> */}
+                <img
+                    className="absolute inset-0 h-full w-full object-cover motion-reduce:hidden"
+                    src="/brand/Swift-Bird.gif"
+                    alt=""
+                    aria-hidden="true"
                 />
                 {/* Static fallback for reduced-motion users */}
                 <img
@@ -66,7 +72,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
             </aside>
 
             {/* Right — form column */}
-            <main className="flex w-full flex-1 items-center justify-center px-6 py-10 sm:px-10 lg:max-w-xl">
+            <main className="flex w-full items-center justify-center px-6 py-10 sm:px-10">
                 <div className="w-full max-w-sm space-y-8">
                     <div className="lg:hidden">
                         <Link href={route('home')} className="inline-flex items-center gap-2">

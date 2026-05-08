@@ -1,8 +1,10 @@
+import { motion } from 'framer-motion';
 import * as React from 'react';
 
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ease } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
 export interface DataTableColumn<T> {
@@ -34,12 +36,8 @@ const alignClass = {
     center: 'text-center',
 } as const;
 
-/**
- * Light-weight presentational table built on the design system table primitive.
- * It deliberately stays unopinionated about sorting / filtering / pagination so
- * the data layer (TanStack Table, server state, etc.) can be plugged in later
- * without rewriting the visuals.
- */
+const MotionTableRow = motion.create(TableRow);
+
 export function DataTable<T>({
     data,
     columns,
@@ -84,8 +82,11 @@ export function DataTable<T>({
                         </TableRow>
                     ) : (
                         data.map((row, index) => (
-                            <TableRow
+                            <MotionTableRow
                                 key={rowKey ? rowKey(row, index) : index}
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.28, delay: index * 0.04, ease }}
                                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                                 className={cn(onRowClick && 'cursor-pointer')}
                             >
@@ -97,7 +98,7 @@ export function DataTable<T>({
                                         {column.cell ? column.cell(row, index) : (row as Record<string, React.ReactNode>)[column.id]}
                                     </TableCell>
                                 ))}
-                            </TableRow>
+                            </MotionTableRow>
                         ))
                     )}
                 </TableBody>

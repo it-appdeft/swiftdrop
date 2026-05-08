@@ -179,10 +179,10 @@
     --popover: hsl(0 0% 100%);
     --popover-foreground: hsl(222 47% 11%);
 
-    /* SwiftDrop brand — lime-green */
-    --primary: hsl(82 71% 38%);
+    /* SwiftDrop brand — teal-green (Figma: hsla(155, 76%, 43%, 1)) */
+    --primary: hsl(155 76% 43%);
     --primary-foreground: hsl(0 0% 100%);
-    --primary-muted: hsl(82 76% 94%);
+    --primary-muted: hsl(155 76% 94%);
 
     --secondary: hsl(220 14% 96%);
     --secondary-foreground: hsl(222 47% 11%);
@@ -190,13 +190,13 @@
     --muted: hsl(220 14% 96%);
     --muted-foreground: hsl(220 9% 46%);
 
-    --accent: hsl(82 76% 94%);
-    --accent-foreground: hsl(82 71% 25%);
+    --accent: hsl(155 76% 94%);
+    --accent-foreground: hsl(155 76% 22%);
 
-    /* Status palette — emerald for success so it stays distinct from the lime brand. */
-    --success: hsl(160 70% 38%);
+    /* Status palette — shifted to hue 142 to stay distinct from the teal brand. */
+    --success: hsl(142 70% 38%);
     --success-foreground: hsl(0 0% 100%);
-    --success-muted: hsl(160 60% 94%);
+    --success-muted: hsl(142 60% 94%);
 
     --warning: hsl(38 92% 50%);
     --warning-foreground: hsl(28 80% 12%);
@@ -212,23 +212,23 @@
 
     --border: hsl(220 13% 91%);
     --input: hsl(220 13% 88%);
-    --ring: hsl(82 71% 38%);
-    --ring-soft: hsl(82 71% 38% / 0.22);
+    --ring: hsl(155 76% 43%);
+    --ring-soft: hsl(155 76% 43% / 0.22);
 
-    --chart-1: hsl(82 71% 42%);
-    --chart-2: hsl(160 60% 42%);
+    --chart-1: hsl(155 76% 43%);
+    --chart-2: hsl(217 91% 60%);
     --chart-3: hsl(38 92% 50%);
-    --chart-4: hsl(217 91% 60%);
+    --chart-4: hsl(280 75% 60%);
     --chart-5: hsl(340 75% 55%);
 
     --sidebar-background: hsl(0 0% 100%);
     --sidebar-foreground: hsl(220 9% 36%);
-    --sidebar-primary: hsl(82 71% 38%);
+    --sidebar-primary: hsl(155 76% 43%);
     --sidebar-primary-foreground: hsl(0 0% 100%);
-    --sidebar-accent: hsl(82 76% 95%);
-    --sidebar-accent-foreground: hsl(82 71% 22%);
+    --sidebar-accent: hsl(155 76% 95%);
+    --sidebar-accent-foreground: hsl(155 76% 20%);
     --sidebar-border: hsl(220 13% 93%);
-    --sidebar-ring: hsl(82 71% 38%);
+    --sidebar-ring: hsl(155 76% 43%);
 }
 
 /* ==========================================================================
@@ -244,10 +244,10 @@
     --popover: hsl(222 47% 9%);
     --popover-foreground: hsl(210 40% 98%);
 
-    /* SwiftDrop brand — brighter lime so it pops on dark surfaces */
-    --primary: hsl(82 70% 55%);
-    --primary-foreground: hsl(82 25% 10%);
-    --primary-muted: hsl(82 50% 16%);
+    /* SwiftDrop brand — brighter teal so it pops on dark surfaces */
+    --primary: hsl(155 70% 52%);
+    --primary-foreground: hsl(155 80% 8%);
+    --primary-muted: hsl(155 50% 16%);
 
     --secondary: hsl(217 33% 14%);
     --secondary-foreground: hsl(210 40% 98%);
@@ -255,12 +255,12 @@
     --muted: hsl(217 33% 14%);
     --muted-foreground: hsl(215 20% 65%);
 
-    --accent: hsl(82 50% 18%);
-    --accent-foreground: hsl(82 70% 80%);
+    --accent: hsl(155 50% 18%);
+    --accent-foreground: hsl(155 70% 80%);
 
-    --success: hsl(160 70% 50%);
-    --success-foreground: hsl(160 80% 8%);
-    --success-muted: hsl(160 60% 14%);
+    --success: hsl(142 70% 50%);
+    --success-foreground: hsl(142 80% 8%);
+    --success-muted: hsl(142 60% 14%);
 
     --warning: hsl(38 92% 60%);
     --warning-foreground: hsl(28 80% 8%);
@@ -276,23 +276,23 @@
 
     --border: hsl(217 33% 18%);
     --input: hsl(217 33% 20%);
-    --ring: hsl(82 70% 55%);
-    --ring-soft: hsl(82 70% 55% / 0.28);
+    --ring: hsl(155 70% 52%);
+    --ring-soft: hsl(155 70% 52% / 0.28);
 
-    --chart-1: hsl(82 70% 55%);
-    --chart-2: hsl(160 60% 50%);
+    --chart-1: hsl(155 70% 52%);
+    --chart-2: hsl(217 91% 65%);
     --chart-3: hsl(38 92% 60%);
-    --chart-4: hsl(217 91% 65%);
+    --chart-4: hsl(280 75% 65%);
     --chart-5: hsl(340 75% 65%);
 
     --sidebar-background: hsl(222 47% 8%);
     --sidebar-foreground: hsl(215 20% 70%);
-    --sidebar-primary: hsl(82 70% 55%);
-    --sidebar-primary-foreground: hsl(82 25% 10%);
-    --sidebar-accent: hsl(82 50% 14%);
-    --sidebar-accent-foreground: hsl(82 70% 80%);
+    --sidebar-primary: hsl(155 70% 52%);
+    --sidebar-primary-foreground: hsl(155 80% 8%);
+    --sidebar-accent: hsl(155 50% 14%);
+    --sidebar-accent-foreground: hsl(155 70% 80%);
     --sidebar-border: hsl(217 33% 16%);
-    --sidebar-ring: hsl(82 70% 55%);
+    --sidebar-ring: hsl(155 70% 52%);
 }
 
 @layer base {

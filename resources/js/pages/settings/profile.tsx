@@ -65,7 +65,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                                 id="email"
                                 type="email"
                                 className="mt-1 block w-full"
-                                value={data.email}
+                                value={data.email ?? ''}
                                 onChange={(e) => setData('email', e.target.value)}
                                 required
                                 autoComplete="username"

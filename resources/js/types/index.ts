@@ -30,11 +30,13 @@ export interface SharedData {
 
 export interface User {
     id: number;
-    name: string;
-    email: string;
+    name: string; // computed accessor — profile name, falls back to email or mobile
+    mobile: string;
+    email: string | null;
+    status: 'active' | 'suspended' | 'pending_approval';
     avatar?: string;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;
-    [key: string]: unknown; // This allows for additional properties...
+    [key: string]: unknown;
 }
