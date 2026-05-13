@@ -10,6 +10,10 @@ interface OtpServiceInterface
 {
     public function send(string $target, ?OtpChannelEnum $channel = null): OtpCode;
 
+    public function sendForLogin(string $target, ?OtpChannelEnum $channel = null): OtpCode;
+
+    public function sendForRegistration(string $target, ?OtpChannelEnum $channel = null): OtpCode;
+
     public function verify(string $target, string $code): bool;
 
     public function verifyOrFail(string $target, string $code): void;

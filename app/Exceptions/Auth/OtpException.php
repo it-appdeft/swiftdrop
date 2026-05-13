@@ -29,6 +29,24 @@ class OtpException extends RuntimeException
         return new self('The verification code is invalid or has expired.');
     }
 
+    public static function userNotFound(): self
+    {
+        $e = new self('No account found for this number. Please register first.');
+        $e->status = 404;
+        $e->field = 'mobile';
+
+        return $e;
+    }
+
+    public static function userAlreadyExists(): self
+    {
+        $e = new self('An account with this number already exists. Please sign in instead.');
+        $e->status = 409;
+        $e->field = 'mobile';
+
+        return $e;
+    }
+
     /**
      * Render the exception. JSON for API clients (standard {success,message,errors} envelope),
      * back-with-errors for Inertia/web. Lets controllers skip try/catch boilerplate.
