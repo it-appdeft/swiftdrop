@@ -68,7 +68,7 @@ class AuthController extends Controller
         if ($user) {
             Auth::login($user, remember: true);
 
-            return redirect()->intended(route('dashboard', absolute: false));
+            return $this->redirectAfterAuth($request);
         }
 
         return redirect()
@@ -81,7 +81,7 @@ class AuthController extends Controller
         $user = $this->registration->registerCustomer($request->validated());
         Auth::login($user, remember: true);
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return $this->redirectAfterAuth($request);
     }
 
     public function registerRestaurant(RegisterRestaurantRequest $request): RedirectResponse
@@ -89,6 +89,17 @@ class AuthController extends Controller
         $user = $this->registration->registerRestaurant($request->validated());
         Auth::login($user, remember: true);
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return $this->redirectAfterAuth($request);
+    }
+
+    /**
+     * Send users to their role-specific dashboard. Never honours a previously
+     * intended URL — it may be an area the visitor doesn't have access to.
+     */
+    protected function redirectAfterAuth(Request $request): RedirectResponse
+    {
+        $request->session()->forget('url.intended');
+
+        return redirect()->route($request->user()->homeRouteName());
     }
 }

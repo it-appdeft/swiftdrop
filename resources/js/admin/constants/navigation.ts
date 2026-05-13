@@ -14,7 +14,7 @@ export const primaryNavigation: NavGroup[] = [
     {
         title: 'Overview',
         items: [
-            { title: 'Dashboard', url: '/dashboard', icon: LayoutGrid },
+            { title: 'Dashboard', url: '/admin/dashboard', icon: LayoutGrid },
             // { title: 'Analytics', url: '/analytics', icon: BarChart3 },
         ],
     },

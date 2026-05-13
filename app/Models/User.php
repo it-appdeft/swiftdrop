@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\UserRoleEnum;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,15 +39,29 @@ class User extends Authenticatable
 
     public function loadProfileRelation(): static
     {
-        if ($this->hasRole('customer')) {
+        if ($this->hasRole(UserRoleEnum::CUSTOMER->value)) {
             $this->load('customerProfile');
-        } elseif ($this->hasRole('driver')) {
+        } elseif ($this->hasRole(UserRoleEnum::DRIVER->value)) {
             $this->load('driverProfile');
-        } elseif ($this->hasRole('restaurant_owner')) {
+        } elseif ($this->hasRole(UserRoleEnum::RESTAURANT_OWNER->value)) {
             $this->load('restaurant');
         }
 
         return $this;
+    }
+
+    /**
+     * Route name for this user's role-specific landing page. Used by auth
+     * redirects so each role lands inside its own protected area.
+     */
+    public function homeRouteName(): string
+    {
+        return match (true) {
+            $this->hasRole(UserRoleEnum::ADMIN->value) => 'admin.dashboard',
+            $this->hasRole(UserRoleEnum::RESTAURANT_OWNER->value) => 'restaurant.dashboard',
+            $this->hasRole(UserRoleEnum::CUSTOMER->value) => 'customer.dashboard',
+            default => 'home',
+        };
     }
 
     public function getNameAttribute(): string

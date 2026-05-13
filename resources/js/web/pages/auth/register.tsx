@@ -6,6 +6,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AuthShell } from '../../components/auth-shell';
+import { postJson } from '../../lib/api';
 
 interface RegisterProps {
     role: 'customer' | 'restaurant';
@@ -14,27 +15,33 @@ interface RegisterProps {
 const OTP_LENGTH = 4;
 const RESEND_SECONDS = 55;
 
+type Channel = 'email' | 'sms';
+
 function formatCountdown(seconds: number) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-// Inline OTP entry block with 4 digit boxes + a Verify button on the right.
 interface OtpRowProps {
     label: string;
     helper: string;
     digits: string[];
     onDigit: (index: number, value: string) => void;
     onKeyDown: (index: number, e: React.KeyboardEvent<HTMLInputElement>) => void;
-    inputsRef: React.MutableRefObject<Array<HTMLInputElement | null>>;
+    inputsRef: React.RefObject<Array<HTMLInputElement | null>>;
     onVerify: () => void;
     verified: boolean;
+    busy: boolean;
+    error: string | null;
     resendIn: number;
     onResend: () => void;
+    visible: boolean;
 }
 
-function OtpRow({ label, helper, digits, onDigit, onKeyDown, inputsRef, onVerify, verified, resendIn, onResend }: OtpRowProps) {
+function OtpRow({ label, helper, digits, onDigit, onKeyDown, inputsRef, onVerify, verified, busy, error, resendIn, onResend, visible }: OtpRowProps) {
+    if (!visible) return null;
+
     return (
         <div className="rounded-lg border border-border bg-muted/30 p-4">
             <p className="text-xs font-semibold text-foreground">{label}</p>
@@ -67,12 +74,14 @@ function OtpRow({ label, helper, digits, onDigit, onKeyDown, inputsRef, onVerify
                     type="button"
                     size="sm"
                     onClick={onVerify}
-                    disabled={verified || digits.join('').length < OTP_LENGTH}
+                    disabled={verified || busy || digits.join('').length < OTP_LENGTH}
                     className="h-10 px-4"
                 >
-                    {verified ? 'Verified' : 'Verify'}
+                    {verified ? 'Verified' : busy ? 'Verifying…' : 'Verify'}
                 </Button>
             </div>
+
+            {error && <p className="mt-2 text-[11px] text-destructive">{error}</p>}
 
             <div className="mt-2 flex items-center justify-between text-[11px]">
                 {resendIn > 0 ? (
@@ -103,13 +112,21 @@ export default function Register({ role }: RegisterProps) {
     const emailInputsRef = useRef<Array<HTMLInputElement | null>>([]);
     const [emailDigits, setEmailDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
     const [emailVerified, setEmailVerified] = useState(false);
-    const [emailResendIn, setEmailResendIn] = useState(RESEND_SECONDS);
+    const [emailResendIn, setEmailResendIn] = useState(0);
+    const [emailOtpRequested, setEmailOtpRequested] = useState(false);
+    const [emailSending, setEmailSending] = useState(false);
+    const [emailVerifying, setEmailVerifying] = useState(false);
+    const [emailError, setEmailError] = useState<string | null>(null);
 
     // Mobile verification state
     const mobileInputsRef = useRef<Array<HTMLInputElement | null>>([]);
     const [mobileDigits, setMobileDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
     const [mobileVerified, setMobileVerified] = useState(false);
-    const [mobileResendIn, setMobileResendIn] = useState(RESEND_SECONDS);
+    const [mobileResendIn, setMobileResendIn] = useState(0);
+    const [mobileOtpRequested, setMobileOtpRequested] = useState(false);
+    const [mobileSending, setMobileSending] = useState(false);
+    const [mobileVerifying, setMobileVerifying] = useState(false);
+    const [mobileError, setMobileError] = useState<string | null>(null);
 
     useEffect(() => {
         if (emailResendIn <= 0) return;
@@ -126,7 +143,7 @@ export default function Register({ role }: RegisterProps) {
     const makeDigitHandlers = (
         digits: string[],
         setDigits: React.Dispatch<React.SetStateAction<string[]>>,
-        inputsRef: React.MutableRefObject<Array<HTMLInputElement | null>>,
+        inputsRef: React.RefObject<Array<HTMLInputElement | null>>,
     ) => ({
         onDigit: (index: number, value: string) => {
             const digit = value.replace(/\D/g, '').slice(-1);
@@ -146,6 +163,75 @@ export default function Register({ role }: RegisterProps) {
 
     const emailHandlers = makeDigitHandlers(emailDigits, setEmailDigits, emailInputsRef);
     const mobileHandlers = makeDigitHandlers(mobileDigits, setMobileDigits, mobileInputsRef);
+
+    const sendOtp = async (channel: Channel) => {
+        const body: Record<string, unknown> = { purpose: 'register', channel };
+
+        if (channel === 'email') {
+            setEmailSending(true);
+            setEmailError(null);
+            body.email = data.email;
+        } else {
+            setMobileSending(true);
+            setMobileError(null);
+            body.country_code = data.country_code;
+            body.mobile = data.mobile;
+        }
+
+        const result = await postJson('/api/auth/send-otp', body);
+
+        if (channel === 'email') {
+            setEmailSending(false);
+            if (result.success) {
+                setEmailOtpRequested(true);
+                setEmailResendIn(RESEND_SECONDS);
+            } else {
+                setEmailError(result.message);
+            }
+        } else {
+            setMobileSending(false);
+            if (result.success) {
+                setMobileOtpRequested(true);
+                setMobileResendIn(RESEND_SECONDS);
+            } else {
+                setMobileError(result.message);
+            }
+        }
+    };
+
+    const verifyOtp = async (channel: Channel) => {
+        const code = channel === 'email' ? emailDigits.join('') : mobileDigits.join('');
+        const body: Record<string, unknown> = { code };
+
+        if (channel === 'email') {
+            setEmailVerifying(true);
+            setEmailError(null);
+            body.email = data.email;
+        } else {
+            setMobileVerifying(true);
+            setMobileError(null);
+            body.country_code = data.country_code;
+            body.mobile = data.mobile;
+        }
+
+        const result = await postJson('/api/auth/verify-otp', body);
+
+        if (channel === 'email') {
+            setEmailVerifying(false);
+            if (result.success) {
+                setEmailVerified(true);
+            } else {
+                setEmailError(result.message);
+            }
+        } else {
+            setMobileVerifying(false);
+            if (result.success) {
+                setMobileVerified(true);
+            } else {
+                setMobileError(result.message);
+            }
+        }
+    };
 
     const submit: React.FormEventHandler = (e) => {
         e.preventDefault();
@@ -193,18 +279,18 @@ export default function Register({ role }: RegisterProps) {
                             placeholder="john@example.com"
                             value={data.email}
                             onChange={(e) => setData('email', e.target.value)}
-                            disabled={emailVerified}
+                            disabled={emailVerified || emailOtpRequested}
                             className="flex-1"
                         />
                         <Button
                             type="button"
                             size="sm"
                             variant={emailVerified ? 'secondary' : 'default'}
-                            disabled={emailVerified || !data.email}
-                            onClick={() => setEmailResendIn(RESEND_SECONDS)}
+                            disabled={emailVerified || emailSending || !data.email}
+                            onClick={() => sendOtp('email')}
                             className="h-10 whitespace-nowrap px-3"
                         >
-                            {emailVerified ? 'Verified' : 'Verify E-mail'}
+                            {emailVerified ? 'Verified' : emailSending ? 'Sending…' : emailOtpRequested ? 'Re-send' : 'Verify E-mail'}
                         </Button>
                     </div>
                     {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
@@ -218,9 +304,12 @@ export default function Register({ role }: RegisterProps) {
                     onKeyDown={emailHandlers.onKeyDown}
                     inputsRef={emailInputsRef}
                     verified={emailVerified}
-                    onVerify={() => setEmailVerified(true)}
+                    busy={emailVerifying}
+                    error={emailError}
+                    onVerify={() => verifyOtp('email')}
                     resendIn={emailResendIn}
-                    onResend={() => setEmailResendIn(RESEND_SECONDS)}
+                    onResend={() => sendOtp('email')}
+                    visible={emailOtpRequested || emailVerified}
                 />
 
                 <div className="space-y-1.5">
@@ -231,7 +320,7 @@ export default function Register({ role }: RegisterProps) {
                         <select
                             value={data.country_code}
                             onChange={(e) => setData('country_code', e.target.value)}
-                            disabled={mobileVerified}
+                            disabled={mobileVerified || mobileOtpRequested}
                             className="h-10 rounded-md border border-input bg-background px-2 text-sm"
                         >
                             <option value="+44">🇬🇧 +44</option>
@@ -246,18 +335,18 @@ export default function Register({ role }: RegisterProps) {
                             placeholder="7123 456789"
                             value={data.mobile}
                             onChange={(e) => setData('mobile', e.target.value)}
-                            disabled={mobileVerified}
+                            disabled={mobileVerified || mobileOtpRequested}
                             className="flex-1"
                         />
                         <Button
                             type="button"
                             size="sm"
                             variant={mobileVerified ? 'secondary' : 'default'}
-                            disabled={mobileVerified || !data.mobile}
-                            onClick={() => setMobileResendIn(RESEND_SECONDS)}
+                            disabled={mobileVerified || mobileSending || !data.mobile}
+                            onClick={() => sendOtp('sms')}
                             className="h-10 whitespace-nowrap px-3"
                         >
-                            {mobileVerified ? 'Verified' : 'Verify Mobile'}
+                            {mobileVerified ? 'Verified' : mobileSending ? 'Sending…' : mobileOtpRequested ? 'Re-send' : 'Verify Mobile'}
                         </Button>
                     </div>
                     {errors.mobile && <p className="text-xs text-destructive">{errors.mobile}</p>}
@@ -271,9 +360,12 @@ export default function Register({ role }: RegisterProps) {
                     onKeyDown={mobileHandlers.onKeyDown}
                     inputsRef={mobileInputsRef}
                     verified={mobileVerified}
-                    onVerify={() => setMobileVerified(true)}
+                    busy={mobileVerifying}
+                    error={mobileError}
+                    onVerify={() => verifyOtp('sms')}
                     resendIn={mobileResendIn}
-                    onResend={() => setMobileResendIn(RESEND_SECONDS)}
+                    onResend={() => sendOtp('sms')}
+                    visible={mobileOtpRequested || mobileVerified}
                 />
 
                 <Button

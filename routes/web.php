@@ -19,12 +19,9 @@ Route::controller(AuthController::class)->middleware('guest')->group(function ()
     Route::post('/register/restaurant', 'registerRestaurant')->name('register.restaurant');
 });
 
-Route::middleware(['auth'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
-});
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
 require __DIR__.'/admin.php';
+require __DIR__.'/customer.php';
+require __DIR__.'/restaurant.php';

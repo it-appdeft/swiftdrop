@@ -35,7 +35,14 @@ class AuthController extends Controller
             default => $this->otp->sendForLogin($target, $channel),
         };
 
-        return $this->success(message: 'OTP sent.', data: env('COMMON_OTP_CODE', '1231')); // For testing purposes, return the fixed OTP code from env
+        return $this->success(
+            message: 'OTP sent.',
+            data: [
+                'expires_in' => (int) config('services.otp.ttl_seconds', 300),
+                // Only populated in local/staging when OTP_TEST_CODE is set; null in production.
+                'test_code' => config('services.otp.test_code'),
+            ],
+        );
     }
 
     public function verifyOtp(VerifyOtpRequest $request): JsonResponse

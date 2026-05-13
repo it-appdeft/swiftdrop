@@ -31,7 +31,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        post(route('login'), {
+        post(route('admin.login'), {
             onFinish: () => reset('password'),
         });
     };
@@ -105,12 +105,6 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                 </Button>
             </form>
 
-            <p className="text-muted-foreground text-center text-sm">
-                Don&apos;t have an account?{' '}
-                <TextLink href={route('register')} tabIndex={5}>
-                    Create one
-                </TextLink>
-            </p>
         </AuthLayout>
     );
 }

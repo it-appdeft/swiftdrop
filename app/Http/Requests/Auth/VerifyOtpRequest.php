@@ -15,15 +15,26 @@ class VerifyOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'target' => ['required', 'string', 'max:255'],
+            'email' => ['required_without:mobile', 'nullable', 'email', 'max:255'],
+            'country_code' => ['required_with:mobile', 'nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
+            'mobile' => ['required_without:email', 'nullable', 'string', 'regex:/^[0-9\s\-]{6,20}$/'],
             'code' => ['required', 'string', 'regex:/^[0-9]{4,8}$/'],
         ];
     }
 
+    /**
+     * Canonical target — emails lower-cased, mobile numbers joined to E.164.
+     * Mirrors {@see SendOtpRequest::canonicalTarget()} so the same payload works for both endpoints.
+     */
     public function canonicalTarget(): string
     {
-        $target = (string) $this->input('target');
+        if ($this->filled('email')) {
+            return Str::lower(trim((string) $this->input('email')));
+        }
 
-        return Str::contains($target, '@') ? Str::lower(trim($target)) : preg_replace('/\s+/', '', $target);
+        $code = (string) $this->input('country_code', '');
+        $mobile = preg_replace('/\s+/', '', (string) $this->input('mobile'));
+
+        return Str::startsWith($mobile, '+') ? $mobile : ($code.$mobile);
     }
 }
