@@ -14,4 +14,7 @@ interface OtpCodeRepositoryInterface
     public function markUsed(OtpCode $otp): void;
 
     public function countCreatedSince(string $target, \DateTimeInterface $since): int;
+
+    /** Has the given target ever successfully completed an OTP verification? */
+    public function hasVerifiedFor(string $target): bool;
 }
