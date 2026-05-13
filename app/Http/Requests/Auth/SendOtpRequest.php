@@ -15,30 +15,32 @@ class SendOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'target' => ['required', 'string', 'max:255', function ($attribute, $value, $fail) {
-                if (Str::contains($value, '@')) {
-                    if (! filter_var($value, FILTER_VALIDATE_EMAIL)) {
-                        $fail('Enter a valid email address.');
-                    }
-
-                    return;
-                }
-
-                if (! preg_match('/^\+?[0-9\s\-]{7,20}$/', $value)) {
-                    $fail('Enter a valid mobile number.');
-                }
-            }],
+            'email' => ['required_without:mobile', 'nullable', 'email', 'max:255'],
+            'country_code' => ['required_with:mobile', 'nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
+            'mobile' => ['required_without:email', 'nullable', 'string', 'regex:/^[0-9\s\-]{6,20}$/'],
             'channel' => ['nullable', 'in:sms,email'],
+            'purpose' => ['nullable', 'in:login,register'],
         ];
     }
 
+    /** Defaults to 'login' so existing call sites that don't pass a purpose keep doing the safer check. */
+    public function purpose(): string
+    {
+        return (string) $this->input('purpose', 'login');
+    }
+
     /**
-     * Canonical target identifier — phone numbers stripped of whitespace, emails lower-cased.
+     * Canonical target identifier — emails lower-cased, phone numbers joined to E.164.
      */
     public function canonicalTarget(): string
     {
-        $target = (string) $this->input('target');
+        if ($this->filled('email')) {
+            return Str::lower(trim((string) $this->input('email')));
+        }
 
-        return Str::contains($target, '@') ? Str::lower(trim($target)) : preg_replace('/\s+/', '', $target);
+        $code = (string) $this->input('country_code', '');
+        $mobile = preg_replace('/\s+/', '', (string) $this->input('mobile'));
+
+        return Str::startsWith($mobile, '+') ? $mobile : ($code.$mobile);
     }
 }

@@ -50,11 +50,12 @@ class AuthController extends Controller
     public function sendOtp(SendOtpRequest $request): RedirectResponse
     {
         $target = $request->canonicalTarget();
+        $channel = OtpChannelEnum::tryFrom((string) $request->input('channel'));
 
-        $this->otp->send(
-            target: $target,
-            channel: OtpChannelEnum::tryFrom((string) $request->input('channel')),
-        );
+        match ($request->purpose()) {
+            'register' => $this->otp->sendForRegistration($target, $channel),
+            default => $this->otp->sendForLogin($target, $channel),
+        };
 
         return redirect()->route('otp')->with('otp.target', $target);
     }

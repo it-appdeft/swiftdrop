@@ -27,12 +27,15 @@ class AuthController extends Controller
 
     public function sendOtp(SendOtpRequest $request): JsonResponse
     {
-        $this->otp->send(
-            target: $request->canonicalTarget(),
-            channel: OtpChannelEnum::tryFrom((string) $request->input('channel')),
-        );
+        $target = $request->canonicalTarget();
+        $channel = OtpChannelEnum::tryFrom((string) $request->input('channel'));
 
-        return $this->success(message: 'OTP sent.');
+        match ($request->purpose()) {
+            'register' => $this->otp->sendForRegistration($target, $channel),
+            default => $this->otp->sendForLogin($target, $channel),
+        };
+
+        return $this->success(message: 'OTP sent.', data: env('COMMON_OTP_CODE', '1231')); // For testing purposes, return the fixed OTP code from env
     }
 
     public function verifyOtp(VerifyOtpRequest $request): JsonResponse
