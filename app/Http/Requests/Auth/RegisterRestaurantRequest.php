@@ -2,10 +2,14 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Http\Requests\Auth\Concerns\CanonicalizesTarget;
+use App\Rules\Auth\HasVerifiedOtp;
 use Illuminate\Foundation\Http\FormRequest;
 
 class RegisterRestaurantRequest extends FormRequest
 {
+    use CanonicalizesTarget;
+
     public function authorize(): bool
     {
         return true;
@@ -15,9 +19,20 @@ class RegisterRestaurantRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'min:2', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+                'unique:users,email',
+                new HasVerifiedOtp($this->canonicalEmail(), 'email'),
+            ],
             'country_code' => ['required', 'string', 'regex:/^\+[0-9]{1,4}$/'],
-            'mobile' => ['required', 'string', 'regex:/^[0-9\s\-]{6,20}$/'],
+            'mobile' => [
+                'required',
+                'string',
+                'regex:/^[0-9\s\-]{6,20}$/',
+                new HasVerifiedOtp($this->canonicalMobile(), 'mobile number'),
+            ],
             'description' => ['nullable', 'string', 'max:2000'],
             'address_line_1' => ['nullable', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],

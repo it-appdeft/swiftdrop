@@ -43,4 +43,12 @@ class OtpCodeRepository implements OtpCodeRepositoryInterface
             ->where('created_at', '>=', $since)
             ->count();
     }
+
+    public function hasVerifiedFor(string $target): bool
+    {
+        return OtpCode::query()
+            ->where('mobile_or_email', $target)
+            ->whereNotNull('used_at')
+            ->exists();
+    }
 }
