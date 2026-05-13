@@ -3,14 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OtpCode extends Model
 {
+    public const CHANNEL_SMS = 'sms';
+
+    public const CHANNEL_EMAIL = 'email';
+
     public $timestamps = false;
 
     protected $fillable = [
-        'mobile',
+        'mobile_or_email',
+        'channel',
         'code_hash',
         'expires_at',
         'used_at',

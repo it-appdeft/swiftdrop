@@ -35,4 +35,22 @@ return [
         ],
     ],
 
+    'sms' => [
+        // Active gateway driver: "twilio" or "log".
+        'default' => env('SMS_DRIVER', 'log'),
+    ],
+
+    'twilio' => [
+        'sid' => env('TWILIO_ACCOUNT_SID'),
+        'token' => env('TWILIO_AUTH_TOKEN'),
+        'from' => env('TWILIO_FROM'),
+        'messaging_service_sid' => env('TWILIO_MESSAGING_SERVICE_SID'),
+    ],
+
+    'otp' => [
+        'length' => (int) env('OTP_LENGTH', 4),
+        'ttl_seconds' => (int) env('OTP_TTL_SECONDS', 300),
+        'rate_limit_per_minute' => (int) env('OTP_RATE_LIMIT_PER_MINUTE', 3),
+    ],
+
 ];
