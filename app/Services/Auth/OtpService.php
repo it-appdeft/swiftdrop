@@ -50,24 +50,6 @@ class OtpService implements OtpServiceInterface
         return $otp;
     }
 
-    public function sendForLogin(string $target, ?OtpChannelEnum $channel = null): OtpCode
-    {
-        if (! $this->users->findByMobileOrEmail($this->normalize($target))) {
-            throw OtpException::userNotFound();
-        }
-
-        return $this->send($target, $channel);
-    }
-
-    public function sendForRegistration(string $target, ?OtpChannelEnum $channel = null): OtpCode
-    {
-        if ($this->users->findByMobileOrEmail($this->normalize($target))) {
-            throw OtpException::userAlreadyExists();
-        }
-
-        return $this->send($target, $channel);
-    }
-
     public function verify(string $target, string $code): bool
     {
         $target = $this->normalize($target);

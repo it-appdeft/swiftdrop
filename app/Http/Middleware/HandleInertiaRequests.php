@@ -38,12 +38,16 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
+        $user = $request->user()?->loadProfileRelation();
+
         return array_merge(parent::share($request), [
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user()?->loadProfileRelation(),
+                'user' => $user,
+                // Role-specific landing URL for header / post-auth redirects.
+                'home_url' => $user ? route($user->homeRouteName()) : null,
             ],
         ]);
     }

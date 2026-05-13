@@ -19,14 +19,7 @@ class SendOtpRequest extends FormRequest
             'country_code' => ['required_with:mobile', 'nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
             'mobile' => ['required_without:email', 'nullable', 'string', 'regex:/^[0-9\s\-]{6,20}$/'],
             'channel' => ['nullable', 'in:sms,email'],
-            'purpose' => ['nullable', 'in:login,register'],
         ];
-    }
-
-    /** Defaults to 'login' so existing call sites that don't pass a purpose keep doing the safer check. */
-    public function purpose(): string
-    {
-        return (string) $this->input('purpose', 'login');
     }
 
     /**

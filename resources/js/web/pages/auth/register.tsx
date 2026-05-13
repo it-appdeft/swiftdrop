@@ -165,7 +165,7 @@ export default function Register({ role }: RegisterProps) {
     const mobileHandlers = makeDigitHandlers(mobileDigits, setMobileDigits, mobileInputsRef);
 
     const sendOtp = async (channel: Channel) => {
-        const body: Record<string, unknown> = { purpose: 'register', channel };
+        const body: Record<string, unknown> = { channel };
 
         if (channel === 'email') {
             setEmailSending(true);
