@@ -30,10 +30,7 @@ class AuthController extends Controller
         $target = $request->canonicalTarget();
         $channel = OtpChannelEnum::tryFrom((string) $request->input('channel'));
 
-        match ($request->purpose()) {
-            'register' => $this->otp->sendForRegistration($target, $channel),
-            default => $this->otp->sendForLogin($target, $channel),
-        };
+        $this->otp->send($target, $channel);
 
         return $this->success(
             message: 'OTP sent.',
