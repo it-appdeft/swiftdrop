@@ -4,9 +4,19 @@ use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\DriverController;
 use App\Http\Controllers\Admin\RestaurantController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 
+Route::middleware('guest')->prefix('admin')->name('admin.')->group(function () {
+    Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
+    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+});
+
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+
+    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+
+    Route::get('dashboard', fn () => \Inertia\Inertia::render('admin/dashboard'))->name('dashboard');
 
     // Customers
     Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');

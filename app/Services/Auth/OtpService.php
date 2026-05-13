@@ -3,9 +3,11 @@
 namespace App\Services\Auth;
 
 use App\Contracts\Auth\OtpServiceInterface;
-use App\Contracts\Sms\SmsGateway;
 use App\Enums\OtpChannelEnum;
+use App\Events\OtpRequestedEvent;
 use App\Exceptions\Auth\OtpException;
+use App\Jobs\SendEmailOtpJob;
+use App\Jobs\SendOtpJob;
 use App\Models\OtpCode;
 use App\Models\User;
 use App\Repositories\Contracts\OtpCodeRepositoryInterface;
@@ -13,13 +15,11 @@ use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class OtpService implements OtpServiceInterface
 {
     public function __construct(
-        protected SmsGateway $sms,
         protected Config $config,
         protected OtpCodeRepositoryInterface $otpCodes,
         protected UserRepositoryInterface $users,
@@ -33,8 +33,8 @@ class OtpService implements OtpServiceInterface
 
         $this->ensureWithinRateLimit($target);
 
-        // $code = $this->generateCode();
-        $code = env('COMMON_OTP_CODE', '1231'); // For testing purposes, use a fixed code from env
+        $code = $this->config->get('services.otp.test_code')
+            ?: $this->generateCode();
 
         $otp = $this->otpCodes->create(
             target: $target,
@@ -43,7 +43,9 @@ class OtpService implements OtpServiceInterface
             expiresAt: Carbon::now()->addSeconds((int) $this->config->get('services.otp.ttl_seconds', 300)),
         );
 
-        $this->deliver($target, $channel, $code);
+        $this->dispatch($target, $channel, $code);
+
+        event(new OtpRequestedEvent($target, $channel));
 
         return $otp;
     }
@@ -124,18 +126,11 @@ class OtpService implements OtpServiceInterface
         }
     }
 
-    protected function deliver(string $target, OtpChannelEnum $channel, string $code): void
+    protected function dispatch(string $target, OtpChannelEnum $channel, string $code): void
     {
-        $message = "Your Swiftdrop verification code is {$code}.";
-
-        if ($channel === OtpChannelEnum::EMAIL) {
-            Mail::raw($message, function ($mail) use ($target) {
-                $mail->to($target)->subject('Your Swiftdrop verification code');
-            });
-
-            return;
-        }
-
-        $this->sms->send($target, $message);
+        match ($channel) {
+            OtpChannelEnum::EMAIL => SendEmailOtpJob::dispatch($target, $code),
+            OtpChannelEnum::SMS => SendOtpJob::dispatch($target, $code),
+        };
     }
 }

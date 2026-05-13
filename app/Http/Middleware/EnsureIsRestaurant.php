@@ -7,13 +7,12 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsureIsAdmin
+class EnsureIsRestaurant
 {
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        // Guests: bounce to the admin login page so they can authenticate.
         if (! $user) {
             if ($request->expectsJson()) {
                 return response()->json([
@@ -22,22 +21,20 @@ class EnsureIsAdmin
                 ], 401);
             }
 
-            return redirect()->guest(route('admin.login'));
+            return redirect()->guest(route('login'));
         }
 
-        // Authenticated but not an admin (customer / restaurant_owner / driver):
-        // redirect them away from the admin area to their own dashboard.
-        if (! $user->hasRole(UserRoleEnum::ADMIN->value)) {
+        if (! $user->hasRole(UserRoleEnum::RESTAURANT_OWNER->value)) {
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You do not have permission to access the admin area.',
+                    'message' => 'This area is for restaurant partner accounts only.',
                 ], 403);
             }
 
             return redirect()
                 ->route($user->homeRouteName())
-                ->with('error', 'You do not have permission to access the admin area.');
+                ->with('error', 'This area is for restaurant partner accounts only.');
         }
 
         return $next($request);
