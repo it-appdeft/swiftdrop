@@ -19,8 +19,8 @@ return new class extends Migration
             $table->unsignedBigInteger('applicable_id')->nullable();
             $table->unsignedInteger('max_uses')->nullable();
             $table->unsignedInteger('max_uses_per_user')->nullable();
-            $table->timestamp('valid_from');
-            $table->timestamp('valid_until');
+            $table->timestamp('valid_from')->nullable();
+            $table->timestamp('valid_until')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
