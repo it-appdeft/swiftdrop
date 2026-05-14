@@ -3,7 +3,9 @@
 namespace App\Http\Requests\Auth;
 
 use App\Http\Requests\Auth\Concerns\CanonicalizesTarget;
+use App\Models\User;
 use App\Rules\Auth\HasVerifiedOtp;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class RegisterRestaurantRequest extends FormRequest
@@ -43,5 +45,16 @@ class RegisterRestaurantRequest extends FormRequest
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
             'cuisine_type' => ['nullable', 'string', 'max:120'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $mobile = $this->canonicalMobile();
+
+            if ($mobile !== '' && User::where('mobile', $mobile)->exists()) {
+                $validator->errors()->add('mobile', 'This mobile number is already registered.');
+            }
+        });
     }
 }

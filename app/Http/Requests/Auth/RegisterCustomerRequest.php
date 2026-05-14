@@ -3,7 +3,9 @@
 namespace App\Http\Requests\Auth;
 
 use App\Http\Requests\Auth\Concerns\CanonicalizesTarget;
+use App\Models\User;
 use App\Rules\Auth\HasVerifiedOtp;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class RegisterCustomerRequest extends FormRequest
@@ -34,5 +36,16 @@ class RegisterCustomerRequest extends FormRequest
                 new HasVerifiedOtp($this->canonicalMobile(), 'mobile number'),
             ],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $mobile = $this->canonicalMobile();
+
+            if ($mobile !== '' && User::where('mobile', $mobile)->exists()) {
+                $validator->errors()->add('mobile', 'This mobile number is already registered.');
+            }
+        });
     }
 }

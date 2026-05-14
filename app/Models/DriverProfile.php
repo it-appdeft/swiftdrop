@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\Crypt;
 
 class DriverProfile extends Model
 {
@@ -14,10 +16,22 @@ class DriverProfile extends Model
         'first_name',
         'last_name',
         'profile_photo',
+        'date_of_birth',
         'vehicle_type',
         'vehicle_make',
         'vehicle_model',
         'vehicle_registration',
+        'vehicle_color',
+        'year_of_manufacture',
+        'insurance_type',
+        'insurance_expiry_date',
+        'mot_expiry_date',
+        'account_holder_name',
+        'account_number',
+        'sort_code',
+        'bank_name',
+        'notify_delivery_updates',
+        'notify_general',
         'availability',
         'approval_status',
         'current_lat',
@@ -27,9 +41,23 @@ class DriverProfile extends Model
     protected function casts(): array
     {
         return [
+            'date_of_birth' => 'date',
+            'insurance_expiry_date' => 'date',
+            'mot_expiry_date' => 'date',
+            'year_of_manufacture' => 'integer',
+            'notify_delivery_updates' => 'boolean',
+            'notify_general' => 'boolean',
             'current_lat' => 'decimal:8',
             'current_lng' => 'decimal:8',
         ];
+    }
+
+    protected function accountNumber(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value ? Crypt::decryptString($value) : null,
+            set: fn ($value) => $value ? Crypt::encryptString($value) : null,
+        );
     }
 
     public function user(): BelongsTo

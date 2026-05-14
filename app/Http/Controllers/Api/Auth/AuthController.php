@@ -5,24 +5,80 @@ namespace App\Http\Controllers\Api\Auth;
 use App\Contracts\Auth\OtpServiceInterface;
 use App\Contracts\Auth\RegistrationServiceInterface;
 use App\Enums\OtpChannelEnum;
+use App\Exceptions\Auth\OtpException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\RegisterRestaurantRequest;
+use App\Http\Requests\Auth\SendLoginOtpRequest;
 use App\Http\Requests\Auth\SendOtpRequest;
+use App\Http\Requests\Auth\VerifyLoginOtpRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Http\Resources\UserResource;
-use App\Models\User;
+use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Traits\ApiResponse;
+use App\Traits\IssuesTokens;
 use Illuminate\Http\JsonResponse;
 
 class AuthController extends Controller
 {
-    use ApiResponse;
+    use ApiResponse, IssuesTokens;
 
     public function __construct(
         protected OtpServiceInterface $otp,
         protected RegistrationServiceInterface $registration,
+        protected UserRepositoryInterface $users,
     ) {
+    }
+
+    /**
+     * Common mobile-only login: send OTP. Used by both customer and driver
+     * apps. Mobile must already be registered — otherwise the client is
+     * directed to the signup flow.
+     */
+    public function sendLoginOtp(SendLoginOtpRequest $request): JsonResponse
+    {
+        $mobile = $request->canonicalMobile();
+
+        if (! $this->users->findByMobile($mobile)) {
+            throw OtpException::mobileNotRegistered();
+        }
+
+        $this->otp->send($mobile, OtpChannelEnum::SMS);
+
+        return $this->success(
+            data: [
+                'target' => $mobile,
+                'expires_in' => (int) config('services.otp.ttl_seconds', 300),
+                'test_code' => config('services.otp.test_code'),
+            ],
+            message: 'OTP sent.',
+        );
+    }
+
+    /**
+     * Common mobile-only login: verify OTP and return token + user. The
+     * user is resolved from the canonical mobile, so customer and driver
+     * both flow through here — the role on the user record tells the
+     * client which app surface to load.
+     */
+    public function verifyLoginOtp(VerifyLoginOtpRequest $request): JsonResponse
+    {
+        $mobile = $request->canonicalMobile();
+
+        $user = $this->users->findByMobile($mobile);
+        if (! $user) {
+            throw OtpException::mobileNotRegistered();
+        }
+
+        $this->otp->verifyOrFail($mobile, (string) $request->input('code'));
+
+        return $this->success(
+            data: [
+                'user' => new UserResource($user->loadProfileRelation()),
+                'token' => $this->issueToken($user),
+            ],
+            message: 'Authenticated.',
+        );
     }
 
     public function sendOtp(SendOtpRequest $request): JsonResponse
@@ -97,15 +153,4 @@ class AuthController extends Controller
         );
     }
 
-    /**
-     * Returns null until Laravel Sanctum is installed and the HasApiTokens trait is added to the User model.
-     */
-    protected function issueToken(User $user): ?string
-    {
-        if (! method_exists($user, 'createToken')) {
-            return null;
-        }
-
-        return $user->createToken('mobile-app')->plainTextToken;
-    }
 }

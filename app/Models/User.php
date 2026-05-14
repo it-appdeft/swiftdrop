@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, Notifiable, HasRoles, HasApiTokens;
 
     protected $fillable = [
         'mobile',
@@ -64,15 +65,36 @@ class User extends Authenticatable
         };
     }
 
+    // public function getNameAttribute(): string
+    // {
+    //     if ($this->relationLoaded('customerProfile') && $this->customerProfile) {
+    //         return trim("{$this->customerProfile->first_name} {$this->customerProfile->last_name}");
+    //     }
+    //     if ($this->relationLoaded('driverProfile') && $this->driverProfile) {
+    //         return trim("{$this->driverProfile->first_name} {$this->driverProfile->last_name}");
+    //     }
+    //     if ($this->relationLoaded('restaurant') && $this->restaurant) {
+    //         return $this->restaurant->name;
+    //     }
+
+    //     return $this->email ?? $this->mobile;
+    // }
+
     public function getNameAttribute(): string
     {
-        if ($this->relationLoaded('customerProfile') && $this->customerProfile) {
-            return trim("{$this->customerProfile->first_name} {$this->customerProfile->last_name}");
+        if ($this->customerProfile) {
+            return trim(
+                "{$this->customerProfile->first_name} {$this->customerProfile->last_name}"
+            );
         }
-        if ($this->relationLoaded('driverProfile') && $this->driverProfile) {
-            return trim("{$this->driverProfile->first_name} {$this->driverProfile->last_name}");
+
+        if ($this->driverProfile) {
+            return trim(
+                "{$this->driverProfile->first_name} {$this->driverProfile->last_name}"
+            );
         }
-        if ($this->relationLoaded('restaurant') && $this->restaurant) {
+
+        if ($this->restaurant) {
             return $this->restaurant->name;
         }
 
