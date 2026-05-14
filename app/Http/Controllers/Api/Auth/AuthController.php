@@ -6,7 +6,7 @@ use App\Contracts\Auth\OtpServiceInterface;
 use App\Contracts\Auth\RegistrationServiceInterface;
 use App\Enums\OtpChannelEnum;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\RegisterCustomerRequest;
+use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\RegisterRestaurantRequest;
 use App\Http\Requests\Auth\SendOtpRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
@@ -63,16 +63,22 @@ class AuthController extends Controller
         );
     }
 
-    public function registerCustomer(RegisterCustomerRequest $request): JsonResponse
+    public function register(RegisterRequest $request, string $type): JsonResponse
     {
-        $user = $this->registration->registerCustomer($request->validated());
+        $allowedTypes = ['customer', 'driver'];
+
+        if (! in_array($type, $allowedTypes)) {
+            abort(404, 'Invalid registration type');
+        }
+        
+        $user = $this->registration->register($request->validated(), $type);
 
         return $this->success(
             data: [
                 'user' => new UserResource($user),
                 'token' => $this->issueToken($user),
             ],
-            message: 'Customer registered.',
+            message: ucfirst($type) . ' registered.',
             status: 201,
         );
     }

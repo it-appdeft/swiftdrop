@@ -6,7 +6,7 @@ use App\Models\User;
 
 interface RegistrationServiceInterface
 {
-    public function registerCustomer(array $data): User;
+    public function register(array $data, string $type): User;
 
     public function registerRestaurant(array $data): User;
 }

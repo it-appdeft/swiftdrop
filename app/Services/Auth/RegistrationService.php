@@ -8,6 +8,7 @@ use App\Enums\RestaurantStatusEnum;
 use App\Enums\UserRoleEnum;
 use App\Enums\UserStatusEnum;
 use App\Models\CustomerProfile;
+use App\Models\DriverProfile;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
@@ -22,9 +23,15 @@ class RegistrationService implements RegistrationServiceInterface
     ) {
     }
 
-    public function registerCustomer(array $data): User
+    protected array $profiles = [
+        'customer' => CustomerProfile::class,
+        'driver' => DriverProfile::class,
+    ];
+
+    public function register(array $data, string $type): User
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $type) {
+
             $user = $this->users->upsertByMobileOrEmail(
                 mobile: $this->canonicalMobile($data),
                 email: $data['email'] ?? null,
@@ -36,9 +43,16 @@ class RegistrationService implements RegistrationServiceInterface
                 ],
             );
 
-            $user->syncRoles([UserRoleEnum::CUSTOMER->value]);
+            $role = UserRoleEnum::from($type);
+            $user->syncRoles([$role->value]);
 
-            CustomerProfile::updateOrCreate(
+            $profileModel = $this->profiles[$type] ?? null;
+
+            if (! $profileModel) {
+                throw new \InvalidArgumentException('Invalid registration type.');
+            }
+
+            $profileModel::updateOrCreate(
                 ['user_id' => $user->id],
                 [
                     'first_name' => $this->firstName($data['name']),
