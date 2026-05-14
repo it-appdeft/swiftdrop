@@ -11,60 +11,57 @@ user to hold the `driver` role.
 
 ---
 
-## Onboarding Setup Flow
+## Onboarding Setup Flow (3 steps)
 
-### Combined One-Shot Submission (recommended for the 3-step UI)
+The flow is split into three sequential endpoints, one per UI screen.
+Each step:
 
+- Persists its data (re-submitting the same step **overwrites** the existing
+  values — used when the driver taps Back to edit an earlier screen).
+- Advances `setup_step` only forward — going back to step 1 from step 2 does
+  **not** drop progress back to 1.
+- Returns `{ step_completed, next_step, is_setup_complete }` so the client
+  knows which screen to show next.
+- Step 3 also flips `approval_status = pending` and ends the flow.
+
+`setup_step` values: `0` not started · `1` bank done · `2` vehicle done
+· `3` documents done (submitted for verification).
+
+### Standard Step Response
+
+```json
+{
+  "success": true,
+  "message": "Step 1 (Bank Details) completed. Proceed to step 2.",
+  "data": {
+    "profile": { ...DriverProfileResource... },
+    "step_completed": 1,
+    "next_step": 2,
+    "is_setup_complete": false
+  }
+}
 ```
-POST /api/driver/profile/complete-setup
+
+On step 3 the message becomes `"Step 3 (Document Upload) completed. Profile submitted for verification."`,
+`next_step` is `null`, and `is_setup_complete` is `true`.
+
+If the driver tries to skip ahead (e.g. calling step 2 before step 1 is done)
+the API returns `422`:
+```json
+{
+  "errors": { "setup_step": ["Complete Step 1 (Bank Details) before submitting vehicle details."] }
+}
 ```
-
-`Content-Type: multipart/form-data`. Submits Bank + Vehicle + Documents in
-one call and automatically marks `approval_status = pending`.
-
-Form fields:
-
-**Bank Details**
-- `account_holder_name`
-- `account_number` (6-12 digits)
-- `sort_code` (`XX-XX-XX` or `XXXXXX`)
-- `bank_name`
-
-**Vehicle Details**
-- `vehicle_type` — bicycle / motorcycle / car / van
-- `vehicle_registration`
-- `vehicle_make`
-- `vehicle_model`
-- `vehicle_color`
-- `year_of_manufacture` (integer)
-- `insurance_type` — comprehensive / third_party / third_party_fire_theft
-- `insurance_expiry_date` (`YYYY-MM-DD`, must be after today)
-- `mot_expiry_date` (optional, `YYYY-MM-DD`)
-
-**Documents** (file fields, jpg/jpeg/png/pdf, max 5MB each)
-- `documents[driving_licence_front]` (required)
-- `documents[driving_licence_back]` (required)
-- `documents[id_proof]` (required)
-- `documents[insurance_certificate]` (required)
-- `documents[vehicle_registration_certificate]` (optional)
-
-Wrapped in a single DB transaction — if any step fails, the whole submission
-rolls back so the driver retries with no partial state.
 
 ---
 
-### Per-step endpoints (for editing later)
-
-The endpoints below let drivers update one section at a time after the
-initial submission (used on the "Account Details" edit screen).
-
-### Step 1 — Bank Details
+### Step 1 of 3 — Bank Details
 
 ```
-PUT /api/driver/profile/bank-details
+POST /api/driver/profile/setup/step-1/bank-details
 ```
 
-**Request:**
+**Request (JSON):**
 ```json
 {
   "account_holder_name": "Alexandra Arnold",
@@ -77,13 +74,17 @@ PUT /api/driver/profile/bank-details
 Account number is encrypted at rest; the resource returns it masked
 (e.g. `****8712`).
 
-### Step 2 — Vehicle Details
+---
+
+### Step 2 of 3 — Vehicle Details
 
 ```
-PUT /api/driver/profile/vehicle-details
+POST /api/driver/profile/setup/step-2/vehicle-details
 ```
 
-**Request:**
+Requires step 1 to have been completed at least once.
+
+**Request (JSON):**
 ```json
 {
   "vehicle_type": "motorcycle",
@@ -103,24 +104,30 @@ PUT /api/driver/profile/vehicle-details
 `mot_expiry_date` is only required if vehicle is over 3 years old (client
 enforces).
 
-### Step 3 — Document Upload
+---
 
-Upload multiple in one request (multipart/form-data):
+### Step 3 of 3 — Document Upload
 
 ```
-POST /api/driver/profile/documents
+POST /api/driver/profile/setup/step-3/documents
 ```
 
-Form fields:
-- `documents[driving_licence_front]` (file)
-- `documents[driving_licence_back]` (file)
-- `documents[id_proof]` (file)
-- `documents[insurance_certificate]` (file)
-- `documents[vehicle_registration_certificate]` (file)
+Requires step 2 to have been completed.
+`Content-Type: multipart/form-data`.
 
-Allowed types: `jpg, jpeg, png, pdf`. Max 5MB each.
+Form fields (jpg/jpeg/png/pdf, max 5MB each):
+- `documents[driving_licence_front]` — required
+- `documents[driving_licence_back]` — required
+- `documents[id_proof]` — required
+- `documents[insurance_certificate]` — required
+- `documents[vehicle_registration_certificate]` — optional
 
-### Re-upload a Single Document
+On success, `approval_status` is set to `pending` and the client should show
+the "Document Verification In Progress" screen.
+
+---
+
+### Re-upload a Single Document (post-onboarding)
 
 ```
 POST /api/driver/profile/documents/single
@@ -133,15 +140,6 @@ Form fields:
 
 Re-uploading replaces the existing document for that type (old file is removed
 from storage).
-
-### Submit for Verification
-
-```
-POST /api/driver/profile/submit-for-verification
-```
-
-Marks `approval_status = pending` so admin can review and approve/reject.
-Shown to the driver as "Document Verification In Progress".
 
 ---
 
@@ -286,7 +284,10 @@ plus the `canonicalPhone()`, `firstName()`, `lastName()` helpers. Both
 The request classes for phone/email change reuse the existing
 `App\Http\Requests\Auth\Concerns\CanonicalizesTarget` trait.
 
-### Migration
+### Migrations
+
+`2026_05_14_175455_add_setup_step_to_driver_profiles_table.php` adds the
+`setup_step` tinyint (0-3, monotonically advancing) used by the 3-step flow.
 
 `2026_05_14_151041_add_setup_fields_to_driver_profiles_table.php` adds:
 

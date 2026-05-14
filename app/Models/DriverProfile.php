@@ -11,6 +11,12 @@ use Illuminate\Support\Facades\Crypt;
 
 class DriverProfile extends Model
 {
+    public const SETUP_STEP_NONE = 0;
+    public const SETUP_STEP_BANK = 1;
+    public const SETUP_STEP_VEHICLE = 2;
+    public const SETUP_STEP_DOCUMENTS = 3;
+    public const SETUP_TOTAL_STEPS = 3;
+
     protected $fillable = [
         'user_id',
         'first_name',
@@ -34,6 +40,7 @@ class DriverProfile extends Model
         'notify_general',
         'availability',
         'approval_status',
+        'setup_step',
         'current_lat',
         'current_lng',
     ];
@@ -47,9 +54,20 @@ class DriverProfile extends Model
             'year_of_manufacture' => 'integer',
             'notify_delivery_updates' => 'boolean',
             'notify_general' => 'boolean',
+            'setup_step' => 'integer',
             'current_lat' => 'decimal:8',
             'current_lng' => 'decimal:8',
         ];
+    }
+
+    public function isSetupComplete(): bool
+    {
+        return $this->setup_step >= self::SETUP_STEP_DOCUMENTS;
+    }
+
+    public function nextSetupStep(): ?int
+    {
+        return $this->isSetupComplete() ? null : (int) $this->setup_step + 1;
     }
 
     protected function accountNumber(): Attribute

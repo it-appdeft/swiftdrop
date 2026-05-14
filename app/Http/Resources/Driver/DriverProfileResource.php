@@ -42,6 +42,12 @@ class DriverProfileResource extends JsonResource
             ],
             'availability' => $this->availability,
             'approval_status' => $this->approval_status,
+            'setup' => [
+                'current_step' => (int) $this->setup_step,
+                'next_step' => $this->nextSetupStep(),
+                'total_steps' => \App\Models\DriverProfile::SETUP_TOTAL_STEPS,
+                'is_complete' => $this->isSetupComplete(),
+            ],
             'documents' => DriverDocumentResource::collection($this->documents),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

@@ -6,7 +6,6 @@ use App\Contracts\Profile\DriverProfileServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Driver\Profile\CompleteEmailChangeRequest;
 use App\Http\Requests\Driver\Profile\CompletePhoneChangeRequest;
-use App\Http\Requests\Driver\Profile\CompleteSetupRequest;
 use App\Http\Requests\Driver\Profile\DeleteAccountRequest;
 use App\Http\Requests\Driver\Profile\InitiateEmailChangeRequest;
 use App\Http\Requests\Driver\Profile\InitiatePhoneChangeRequest;
@@ -18,6 +17,7 @@ use App\Http\Requests\Driver\Profile\UploadDocumentsRequest;
 use App\Http\Requests\Driver\Profile\UploadSingleDocumentRequest;
 use App\Http\Resources\Driver\DriverDocumentResource;
 use App\Http\Resources\Driver\DriverProfileResource;
+use App\Models\DriverProfile;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -53,54 +53,50 @@ class DriverProfileController extends Controller
         );
     }
 
-    public function completeSetup(CompleteSetupRequest $request): JsonResponse
+    /**
+     * Step 1 of 3 — Bank Details. Resubmission overwrites; setup_step never
+     * regresses.
+     */
+    public function setupStepBank(UpdateBankDetailsRequest $request): JsonResponse
     {
         $user = auth('sanctum')->user();
-        $updatedUser = $this->profile->completeSetup(
-            $user,
-            $request->bankDetails(),
-            $request->vehicleDetails(),
-            $request->documentFiles(),
-        );
+        $updatedUser = $this->profile->setupStepBank($user, $request->validated());
 
-        return $this->success(
-            data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
-            message: 'Profile setup submitted for verification.',
-            status: 201,
-        );
-    }
-
-    public function updateBankDetails(UpdateBankDetailsRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $updatedUser = $this->profile->updateBankDetails($user, $request->validated());
-
-        return $this->success(
-            data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
-            message: 'Bank details updated.',
+        return $this->stepResponse(
+            $updatedUser->driverProfile->load('documents'),
+            DriverProfile::SETUP_STEP_BANK,
+            'Bank Details',
         );
     }
 
-    public function updateVehicleDetails(UpdateVehicleDetailsRequest $request): JsonResponse
+    /**
+     * Step 2 of 3 — Vehicle Details.
+     */
+    public function setupStepVehicle(UpdateVehicleDetailsRequest $request): JsonResponse
     {
         $user = auth('sanctum')->user();
-        $updatedUser = $this->profile->updateVehicleDetails($user, $request->validated());
+        $updatedUser = $this->profile->setupStepVehicle($user, $request->validated());
 
-        return $this->success(
-            data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
-            message: 'Vehicle details updated.',
+        return $this->stepResponse(
+            $updatedUser->driverProfile->load('documents'),
+            DriverProfile::SETUP_STEP_VEHICLE,
+            'Vehicle Details',
         );
     }
 
-    public function uploadDocuments(UploadDocumentsRequest $request): JsonResponse
+    /**
+     * Step 3 of 3 — Document Upload. Auto-marks the driver as
+     * pending-approval on first completion.
+     */
+    public function setupStepDocuments(UploadDocumentsRequest $request): JsonResponse
     {
         $user = auth('sanctum')->user();
-        $documents = $request->validatedDocuments();
-        $updatedUser = $this->profile->uploadDocuments($user, $documents);
+        $updatedUser = $this->profile->setupStepDocuments($user, $request->validatedDocuments());
 
-        return $this->success(
-            data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
-            message: 'Documents uploaded.',
+        return $this->stepResponse(
+            $updatedUser->driverProfile->load('documents'),
+            DriverProfile::SETUP_STEP_DOCUMENTS,
+            'Document Upload',
             status: 201,
         );
     }
@@ -119,17 +115,6 @@ class DriverProfileController extends Controller
             data: new DriverDocumentResource($document),
             message: 'Document uploaded.',
             status: 201,
-        );
-    }
-
-    public function submitForVerification(): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $updatedUser = $this->profile->submitForVerification($user);
-
-        return $this->success(
-            data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
-            message: 'Submitted for verification.',
         );
     }
 
@@ -215,6 +200,33 @@ class DriverProfileController extends Controller
 
         return $this->success(
             message: 'Account deleted successfully.',
+        );
+    }
+
+    /**
+     * Build the per-step success response — confirms which step just
+     * completed and tells the client which step to render next.
+     */
+    protected function stepResponse(
+        DriverProfile $profile,
+        int $stepCompleted,
+        string $stepLabel,
+        int $status = 200,
+    ): JsonResponse {
+        $isFinalStep = $stepCompleted >= DriverProfile::SETUP_STEP_DOCUMENTS;
+        $message = $isFinalStep
+            ? "Step {$stepCompleted} ({$stepLabel}) completed. Profile submitted for verification."
+            : "Step {$stepCompleted} ({$stepLabel}) completed. Proceed to step ".($stepCompleted + 1).'.';
+
+        return $this->success(
+            data: [
+                'profile' => new DriverProfileResource($profile),
+                'step_completed' => $stepCompleted,
+                'next_step' => $profile->nextSetupStep(),
+                'is_setup_complete' => $profile->isSetupComplete(),
+            ],
+            message: $message,
+            status: $status,
         );
     }
 }

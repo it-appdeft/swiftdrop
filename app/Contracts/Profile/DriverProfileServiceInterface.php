@@ -9,19 +9,18 @@ interface DriverProfileServiceInterface
 {
     public function updateProfile(User $user, array $data): User;
 
-    public function completeSetup(User $user, array $bank, array $vehicle, array $documents): User;
+    /** Step 1 of 3 — Bank Details. */
+    public function setupStepBank(User $user, array $data): User;
 
-    public function updateBankDetails(User $user, array $data): User;
+    /** Step 2 of 3 — Vehicle Details. */
+    public function setupStepVehicle(User $user, array $data): User;
 
-    public function updateVehicleDetails(User $user, array $data): User;
+    /** Step 3 of 3 — Document Upload. Auto-submits for verification. */
+    public function setupStepDocuments(User $user, array $documents): User;
 
     public function uploadDocument(User $user, string $type, $file, ?string $expiresAt = null): Document;
 
-    public function uploadDocuments(User $user, array $documents): User;
-
     public function updateNotificationSettings(User $user, array $data): User;
-
-    public function submitForVerification(User $user): User;
 
     public function initiatePhoneChange(User $user, string $newPhone, string $countryCode): void;
 
