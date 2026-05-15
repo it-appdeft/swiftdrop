@@ -21,6 +21,9 @@ interface OtpProps {
 
 export default function Otp({ target, email, country_code, mobile }: OtpProps) {
     const { data, setData, post, processing, errors } = useForm({
+        type: 'login',
+        user_type: 'customer',
+        channel: email ? 'email' : 'sms',
         email: email ?? '',
         country_code: country_code ?? '',
         mobile: mobile ?? '',
@@ -31,6 +34,7 @@ export default function Otp({ target, email, country_code, mobile }: OtpProps) {
     useEffect(() => {
         setData((current) => ({
             ...current,
+            channel: email ? 'email' : 'sms',
             email: email ?? '',
             country_code: country_code ?? '',
             mobile: mobile ?? '',
