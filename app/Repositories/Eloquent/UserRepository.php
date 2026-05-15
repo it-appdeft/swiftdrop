@@ -9,9 +9,25 @@ class UserRepository implements UserRepositoryInterface
 {
     public function findByMobileOrEmail(string $target): ?User
     {
+        $candidates = [$target];
+
+        // Tolerate legacy rows saved under the pre-fix canonicalizer, which
+        // glued the national trunk "0" between the country code and the
+        // subscriber number (e.g. "+4407911123002" instead of "+447911123002").
+        // We don't know the exact country-code length, so try each plausible
+        // split position (country codes are 1–4 digits per E.164).
+        if (str_starts_with($target, '+')) {
+            for ($i = 2; $i <= 5; $i++) {
+                if ($i < strlen($target)) {
+                    $candidates[] = substr($target, 0, $i).'0'.substr($target, $i);
+                }
+            }
+        }
+
         return User::query()
-            ->where('mobile', $target)
-            ->orWhere('email', $target)
+            ->where(function ($q) use ($candidates) {
+                $q->whereIn('mobile', $candidates)->orWhereIn('email', $candidates);
+            })
             ->first();
     }
 

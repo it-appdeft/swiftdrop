@@ -40,8 +40,13 @@ class AuthController extends Controller
 
     public function otp(Request $request): Response
     {
+        $otp = (array) $request->session()->get('otp', []);
+
         return Inertia::render('web/auth/otp', [
-            'target' => $request->session()->get('otp.target'),
+            'target' => $otp['target'] ?? null,
+            'email' => $otp['email'] ?? null,
+            'country_code' => $otp['country_code'] ?? null,
+            'mobile' => $otp['mobile'] ?? null,
         ]);
     }
 
@@ -54,13 +59,25 @@ class AuthController extends Controller
 
         $this->otp->send($target, $channel);
 
-        return redirect()->route('otp')->with('otp.target', $target);
+        // Persist the original inputs (not just the joined target) so the OTP page
+        // can resubmit them verbatim to /otp/verify — VerifyOtpRequest validates
+        // `email` OR `country_code + mobile`, not the canonical joined string.
+        $request->session()->put('otp', [
+            'target' => $target,
+            'email' => $request->input('email'),
+            'country_code' => $request->input('country_code'),
+            'mobile' => $request->input('mobile'),
+        ]);
+
+        return redirect()->route('otp');
     }
 
     public function verifyOtp(VerifyOtpRequest $request): RedirectResponse
     {
         $target = $request->canonicalTarget();
         $user = $this->otp->verifyAndFindUser($target, (string) $request->input('code'));
+
+        $request->session()->forget('otp');
 
         if ($user) {
             Auth::login($user, remember: true);
@@ -75,7 +92,7 @@ class AuthController extends Controller
 
     public function registerCustomer(RegisterCustomerRequest $request): RedirectResponse
     {
-        $user = $this->registration->registerCustomer($request->validated());
+        $user = $this->registration->register($request->validated(), 'customer');
         Auth::login($user, remember: true);
 
         return $this->redirectAfterAuth($request);
