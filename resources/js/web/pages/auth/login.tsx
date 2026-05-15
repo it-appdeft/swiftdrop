@@ -8,9 +8,11 @@ import { use } from 'react';
 
 export default function Login() {
     const { data, setData, post, processing, errors } = useForm({
+        type: 'login',
+        user_type: 'customer',
+        channel: 'sms',
         country_code: '+44',
         mobile: '',
-        channel: 'sms',
     });
 
     const mobileFormatError =
