@@ -53,13 +53,21 @@ class DriverProfileController extends Controller
         );
     }
 
-    /**
-     * Step 1 of 3 — Bank Details. Resubmission overwrites; setup_step never
-     * regresses.
-     */
-    public function setupStepBank(UpdateBankDetailsRequest $request): JsonResponse
+    public function setup(Request $request): JsonResponse
     {
+        $step = (int) $request->input('step');
         $user = auth('sanctum')->user();
+
+        return match ($step) {
+            1 => $this->handleStepBank($request, $user),
+            2 => $this->handleStepVehicle($request, $user),
+            3 => $this->handleStepDocuments($request, $user),
+            default => $this->error('Invalid step. Must be 1, 2, or 3.', 422),
+        };
+    }
+
+    private function handleStepBank(UpdateBankDetailsRequest $request, $user): JsonResponse
+    {
         $updatedUser = $this->profile->setupStepBank($user, $request->validated());
 
         return $this->stepResponse(
@@ -69,12 +77,8 @@ class DriverProfileController extends Controller
         );
     }
 
-    /**
-     * Step 2 of 3 — Vehicle Details.
-     */
-    public function setupStepVehicle(UpdateVehicleDetailsRequest $request): JsonResponse
+    private function handleStepVehicle(UpdateVehicleDetailsRequest $request, $user): JsonResponse
     {
-        $user = auth('sanctum')->user();
         $updatedUser = $this->profile->setupStepVehicle($user, $request->validated());
 
         return $this->stepResponse(
@@ -84,13 +88,8 @@ class DriverProfileController extends Controller
         );
     }
 
-    /**
-     * Step 3 of 3 — Document Upload. Auto-marks the driver as
-     * pending-approval on first completion.
-     */
-    public function setupStepDocuments(UploadDocumentsRequest $request): JsonResponse
+    private function handleStepDocuments(UploadDocumentsRequest $request, $user): JsonResponse
     {
-        $user = auth('sanctum')->user();
         $updatedUser = $this->profile->setupStepDocuments($user, $request->validatedDocuments());
 
         return $this->stepResponse(

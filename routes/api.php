@@ -46,12 +46,8 @@ Route::middleware('auth:sanctum')->prefix('driver')->group(function () {
         Route::get('/', 'show');
         Route::put('/', 'update');
         Route::delete('/', 'deleteAccount');
-
-        // 3-step onboarding flow. Each step returns step_completed + next_step.
-        // Step 3 also auto-marks the driver as pending verification.
-        Route::post('setup/step-1/bank-details', 'setupStepBank');
-        Route::post('setup/step-2/vehicle-details', 'setupStepVehicle');
-        Route::post('setup/step-3/documents', 'setupStepDocuments');
+        
+        Route::post('setup', 'setup');
 
         // Re-upload one document later (after setup is complete).
         Route::post('documents/single', 'uploadDocument');
