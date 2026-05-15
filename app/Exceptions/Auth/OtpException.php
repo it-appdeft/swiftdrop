@@ -29,6 +29,15 @@ class OtpException extends RuntimeException
         return new self('The verification code is invalid or has expired.');
     }
 
+    public static function mobileNotRegistered(): self
+    {
+        $e = new self('This mobile number is not registered. Please sign up first.');
+        $e->status = 404;
+        $e->field = 'mobile';
+
+        return $e;
+    }
+
     /**
      * Render the exception. JSON for API clients (standard {success,message,errors} envelope),
      * back-with-errors for Inertia/web. Lets controllers skip try/catch boilerplate.

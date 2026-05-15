@@ -3,7 +3,9 @@
 namespace App\Http\Requests\Auth;
 
 use App\Http\Requests\Auth\Concerns\CanonicalizesTarget;
+use App\Models\User;
 use App\Rules\Auth\HasVerifiedOtp;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class RegisterRequest extends FormRequest
@@ -17,7 +19,7 @@ class RegisterRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => ['required', 'string', 'min:2', 'max:100'],
             'email' => [
                 'required',
@@ -34,5 +36,23 @@ class RegisterRequest extends FormRequest
                 new HasVerifiedOtp($this->canonicalMobile(), 'mobile number'),
             ],
         ];
+
+        // Drivers must upload a profile photo at signup; customers don't.
+        if ($this->route('type') === 'driver') {
+            $rules['profile_photo'] = ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'];
+        }
+
+        return $rules;
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $mobile = $this->canonicalMobile();
+
+            if ($mobile !== '' && User::where('mobile', $mobile)->exists()) {
+                $validator->errors()->add('mobile', 'This mobile number is already registered.');
+            }
+        });
     }
 }

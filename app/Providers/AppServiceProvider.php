@@ -56,5 +56,14 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(OtpServiceInterface::class, OtpService::class);
         $this->app->bind(RegistrationServiceInterface::class, RegistrationService::class);
+        $this->app->bind(
+            \App\Contracts\Profile\CustomerProfileServiceInterface::class,
+            \App\Services\Profile\CustomerProfileService::class,
+        );
+        $this->app->bind(
+            \App\Contracts\Profile\DriverProfileServiceInterface::class,
+            \App\Services\Profile\DriverProfileService::class,
+        );
+        $this->app->singleton(\App\Services\Files\ImageUploadService::class);
     }
 }

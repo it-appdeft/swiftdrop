@@ -12,6 +12,7 @@ use App\Models\DriverProfile;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
+use App\Services\Files\ImageUploadService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -20,6 +21,7 @@ class RegistrationService implements RegistrationServiceInterface
 {
     public function __construct(
         protected UserRepositoryInterface $users,
+        protected ImageUploadService $imageUpload,
     ) {
     }
 
@@ -52,12 +54,22 @@ class RegistrationService implements RegistrationServiceInterface
                 throw new \InvalidArgumentException('Invalid registration type.');
             }
 
+            $profileAttributes = [
+                'first_name' => $this->firstName($data['name']),
+                'last_name' => $this->lastName($data['name']),
+            ];
+
+            // Driver-only: persist the profile photo uploaded at signup.
+            if ($type === 'driver' && isset($data['profile_photo'])) {
+                $profileAttributes['profile_photo'] = $this->imageUpload->save(
+                    $data['profile_photo'],
+                    'driver/profile',
+                );
+            }
+
             $profileModel::updateOrCreate(
                 ['user_id' => $user->id],
-                [
-                    'first_name' => $this->firstName($data['name']),
-                    'last_name' => $this->lastName($data['name']),
-                ],
+                $profileAttributes,
             );
 
             return $user->fresh()->loadProfileRelation();
