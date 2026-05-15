@@ -100,7 +100,7 @@ function OtpRow({ label, helper, digits, onDigit, onKeyDown, inputsRef, onVerify
 }
 
 export default function Register({ role }: RegisterProps) {
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, clearErrors } = useForm({
         role,
         name: '',
         email: '',
@@ -170,6 +170,7 @@ export default function Register({ role }: RegisterProps) {
         setEmailOtpRequested(false);
         setEmailResendIn(0);
         setEmailError(null);
+        clearErrors('email');
     };
 
     const resetMobileChannel = () => {
@@ -178,6 +179,7 @@ export default function Register({ role }: RegisterProps) {
         setMobileOtpRequested(false);
         setMobileResendIn(0);
         setMobileError(null);
+        clearErrors('mobile');
     };
 
     // Mobile field should be the subscriber number only — the country code is
@@ -188,7 +190,14 @@ export default function Register({ role }: RegisterProps) {
             : null;
 
     const sendOtp = async (channel: Channel) => {
-        const body: Record<string, unknown> = { channel };
+        const body: Record<string, unknown> = {
+            type: 'signup',
+            // The backend OTP validation only allows customer/driver here;
+            // restaurant owners still go through customer-channel OTPs and are
+            // upgraded to the restaurant role at the registration step.
+            user_type: role === 'restaurant' ? 'customer' : role,
+            channel,
+        };
 
         if (channel === 'email') {
             setEmailSending(true);
@@ -224,7 +233,12 @@ export default function Register({ role }: RegisterProps) {
 
     const verifyOtp = async (channel: Channel) => {
         const code = channel === 'email' ? emailDigits.join('') : mobileDigits.join('');
-        const body: Record<string, unknown> = { code };
+        const body: Record<string, unknown> = {
+            type: 'signup',
+            user_type: role === 'restaurant' ? 'customer' : role,
+            channel,
+            code,
+        };
 
         if (channel === 'email') {
             setEmailVerifying(true);
