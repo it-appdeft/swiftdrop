@@ -32,7 +32,7 @@ class RegisterRequest extends FormRequest
             'mobile' => [
                 'required',
                 'string',
-                'regex:/^[0-9\s\-]{6,20}$/',
+                'regex:/^\+?[0-9\s\-]{6,20}$/',
                 new HasVerifiedOtp($this->canonicalMobile(), 'mobile number'),
             ],
         ];

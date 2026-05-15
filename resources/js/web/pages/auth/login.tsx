@@ -13,8 +13,14 @@ export default function Login() {
         channel: 'sms',
     });
 
+    const mobileFormatError =
+        data.mobile.trim().length > 0 && /[^\d\s-]/.test(data.mobile)
+            ? 'Please enter a valid mobile number — country code is selected separately.'
+            : null;
+
     const submit: React.FormEventHandler = (e) => {
         e.preventDefault();
+        if (mobileFormatError) return;
         post(route('otp.send'));
     };
 
@@ -51,9 +57,17 @@ export default function Login() {
                             />
                         </div>
                     </div>
+                    {mobileFormatError && (
+                        <p className="text-sm text-destructive">{mobileFormatError}</p>
+                    )}
                     {errors.mobile && <p className="text-sm text-destructive">{errors.mobile}</p>}
                 </div>
-                <Button type="submit" size="lg" className="w-full" disabled={processing}>
+                <Button
+                    type="submit"
+                    size="lg"
+                    className="w-full"
+                    disabled={processing || !!mobileFormatError}
+                >
                     Get OTP
                 </Button>
             </form>

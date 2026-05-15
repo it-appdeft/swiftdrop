@@ -10,9 +10,11 @@ use App\Http\Requests\Auth\RegisterCustomerRequest;
 use App\Http\Requests\Auth\RegisterRestaurantRequest;
 use App\Http\Requests\Auth\SendOtpRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
+use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -21,6 +23,7 @@ class AuthController extends Controller
     public function __construct(
         protected OtpServiceInterface $otp,
         protected RegistrationServiceInterface $registration,
+        protected UserRepositoryInterface $users,
     ) {
     }
 
@@ -56,6 +59,17 @@ class AuthController extends Controller
     {
         $target = $request->canonicalTarget();
         $channel = OtpChannelEnum::tryFrom((string) $request->input('channel'));
+
+        // The web /otp/send endpoint is only used by the login flow. Refuse to
+        // send a code if no account is registered to the target — the user can
+        // tap "Create an account" from the same screen instead.
+        if (! $this->users->findByMobileOrEmail($target)) {
+            $field = $request->canonicalEmail() !== '' ? 'email' : 'mobile';
+
+            throw ValidationException::withMessages([
+                $field => "No account exists for this {$field}. Please register first.",
+            ]);
+        }
 
         $this->otp->send($target, $channel);
 

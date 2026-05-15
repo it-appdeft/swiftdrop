@@ -164,6 +164,29 @@ export default function Register({ role }: RegisterProps) {
     const emailHandlers = makeDigitHandlers(emailDigits, setEmailDigits, emailInputsRef);
     const mobileHandlers = makeDigitHandlers(mobileDigits, setMobileDigits, mobileInputsRef);
 
+    const resetEmailChannel = () => {
+        setEmailDigits(Array(OTP_LENGTH).fill(''));
+        setEmailVerified(false);
+        setEmailOtpRequested(false);
+        setEmailResendIn(0);
+        setEmailError(null);
+    };
+
+    const resetMobileChannel = () => {
+        setMobileDigits(Array(OTP_LENGTH).fill(''));
+        setMobileVerified(false);
+        setMobileOtpRequested(false);
+        setMobileResendIn(0);
+        setMobileError(null);
+    };
+
+    // Mobile field should be the subscriber number only — the country code is
+    // already captured by the dropdown. Surface a hint if the user types one in.
+    const mobileFormatError =
+        data.mobile.trim().length > 0 && /[^\d\s-]/.test(data.mobile)
+            ? 'Please enter a valid mobile number — country code is selected separately.'
+            : null;
+
     const sendOtp = async (channel: Channel) => {
         const body: Record<string, unknown> = { channel };
 
@@ -220,6 +243,7 @@ export default function Register({ role }: RegisterProps) {
             setEmailVerifying(false);
             if (result.success) {
                 setEmailVerified(true);
+                setEmailResendIn(0);
             } else {
                 setEmailError(result.message);
             }
@@ -227,6 +251,7 @@ export default function Register({ role }: RegisterProps) {
             setMobileVerifying(false);
             if (result.success) {
                 setMobileVerified(true);
+                setMobileResendIn(0);
             } else {
                 setMobileError(result.message);
             }
@@ -282,18 +307,33 @@ export default function Register({ role }: RegisterProps) {
                             disabled={emailVerified || emailOtpRequested}
                             className="flex-1"
                         />
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant={emailVerified ? 'secondary' : 'default'}
-                            disabled={emailVerified || emailSending || !data.email}
-                            onClick={() => sendOtp('email')}
-                            className="h-10 whitespace-nowrap px-3"
-                        >
-                            {emailVerified ? 'Verified' : emailSending ? 'Sending…' : emailOtpRequested ? 'Re-send' : 'Verify E-mail'}
-                        </Button>
+                        {emailVerified || emailOtpRequested ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={resetEmailChannel}
+                                className="h-10 whitespace-nowrap px-3"
+                            >
+                                Change
+                            </Button>
+                        ) : (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="default"
+                                disabled={emailSending || !data.email}
+                                onClick={() => sendOtp('email')}
+                                className="h-10 whitespace-nowrap px-3"
+                            >
+                                {emailSending ? 'Sending…' : 'Verify E-mail'}
+                            </Button>
+                        )}
                     </div>
                     {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+                    {!emailOtpRequested && emailError && (
+                        <p className="text-xs text-destructive">{emailError}</p>
+                    )}
                 </div>
 
                 <OtpRow
@@ -330,7 +370,8 @@ export default function Register({ role }: RegisterProps) {
                         <Input
                             id="mobile"
                             type="tel"
-                            inputMode="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             autoComplete="tel"
                             placeholder="7123 456789"
                             value={data.mobile}
@@ -338,18 +379,36 @@ export default function Register({ role }: RegisterProps) {
                             disabled={mobileVerified || mobileOtpRequested}
                             className="flex-1"
                         />
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant={mobileVerified ? 'secondary' : 'default'}
-                            disabled={mobileVerified || mobileSending || !data.mobile}
-                            onClick={() => sendOtp('sms')}
-                            className="h-10 whitespace-nowrap px-3"
-                        >
-                            {mobileVerified ? 'Verified' : mobileSending ? 'Sending…' : mobileOtpRequested ? 'Re-send' : 'Verify Mobile'}
-                        </Button>
+                        {mobileVerified || mobileOtpRequested ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={resetMobileChannel}
+                                className="h-10 whitespace-nowrap px-3"
+                            >
+                                Change
+                            </Button>
+                        ) : (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="default"
+                                disabled={mobileSending || !data.mobile || !!mobileFormatError}
+                                onClick={() => sendOtp('sms')}
+                                className="h-10 whitespace-nowrap px-3"
+                            >
+                                {mobileSending ? 'Sending…' : 'Verify Mobile'}
+                            </Button>
+                        )}
                     </div>
+                    {mobileFormatError && (
+                        <p className="text-xs text-destructive">{mobileFormatError}</p>
+                    )}
                     {errors.mobile && <p className="text-xs text-destructive">{errors.mobile}</p>}
+                    {!mobileOtpRequested && mobileError && (
+                        <p className="text-xs text-destructive">{mobileError}</p>
+                    )}
                 </div>
 
                 <OtpRow
