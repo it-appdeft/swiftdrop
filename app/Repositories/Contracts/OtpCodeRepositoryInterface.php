@@ -11,7 +11,12 @@ interface OtpCodeRepositoryInterface
 
     public function findLatestActiveFor(string $target): ?OtpCode;
 
+    /** Latest OTP for a target regardless of state (expired / used). */
+    public function findLatestFor(string $target): ?OtpCode;
+
     public function markUsed(OtpCode $otp): void;
+
+    public function incrementAttempts(OtpCode $otp): void;
 
     public function countCreatedSince(string $target, \DateTimeInterface $since): int;
 

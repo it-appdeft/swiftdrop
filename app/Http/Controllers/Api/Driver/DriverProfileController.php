@@ -4,11 +4,9 @@ namespace App\Http\Controllers\Api\Driver;
 
 use App\Contracts\Profile\DriverProfileServiceInterface;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Driver\Profile\CompleteEmailChangeRequest;
-use App\Http\Requests\Driver\Profile\CompletePhoneChangeRequest;
+use Illuminate\Http\Request;
 use App\Http\Requests\Driver\Profile\DeleteAccountRequest;
-use App\Http\Requests\Driver\Profile\InitiateEmailChangeRequest;
-use App\Http\Requests\Driver\Profile\InitiatePhoneChangeRequest;
+use App\Http\Requests\Driver\Profile\UpdateAccountDetailsRequest;
 use App\Http\Requests\Driver\Profile\UpdateBankDetailsRequest;
 use App\Http\Requests\Driver\Profile\UpdateNotificationSettingsRequest;
 use App\Http\Requests\Driver\Profile\UpdateProfileRequest;
@@ -53,13 +51,21 @@ class DriverProfileController extends Controller
         );
     }
 
-    /**
-     * Step 1 of 3 — Bank Details. Resubmission overwrites; setup_step never
-     * regresses.
-     */
-    public function setupStepBank(UpdateBankDetailsRequest $request): JsonResponse
+    public function setup(Request $request): JsonResponse
     {
+        $step = (int) $request->input('step');
         $user = auth('sanctum')->user();
+
+        return match ($step) {
+            1 => $this->handleStepBank(app(UpdateBankDetailsRequest::class), $user),
+            2 => $this->handleStepVehicle(app(UpdateVehicleDetailsRequest::class), $user),
+            3 => $this->handleStepDocuments(app(UploadDocumentsRequest::class), $user),
+            default => $this->error('Invalid step. Must be 1, 2, or 3.', 422),
+        };
+    }
+
+    private function handleStepBank(UpdateBankDetailsRequest $request, $user): JsonResponse
+    {
         $updatedUser = $this->profile->setupStepBank($user, $request->validated());
 
         return $this->stepResponse(
@@ -69,12 +75,8 @@ class DriverProfileController extends Controller
         );
     }
 
-    /**
-     * Step 2 of 3 — Vehicle Details.
-     */
-    public function setupStepVehicle(UpdateVehicleDetailsRequest $request): JsonResponse
+    private function handleStepVehicle(UpdateVehicleDetailsRequest $request, $user): JsonResponse
     {
-        $user = auth('sanctum')->user();
         $updatedUser = $this->profile->setupStepVehicle($user, $request->validated());
 
         return $this->stepResponse(
@@ -84,13 +86,8 @@ class DriverProfileController extends Controller
         );
     }
 
-    /**
-     * Step 3 of 3 — Document Upload. Auto-marks the driver as
-     * pending-approval on first completion.
-     */
-    public function setupStepDocuments(UploadDocumentsRequest $request): JsonResponse
+    private function handleStepDocuments(UploadDocumentsRequest $request, $user): JsonResponse
     {
-        $user = auth('sanctum')->user();
         $updatedUser = $this->profile->setupStepDocuments($user, $request->validatedDocuments());
 
         return $this->stepResponse(
@@ -98,6 +95,26 @@ class DriverProfileController extends Controller
             DriverProfile::SETUP_STEP_DOCUMENTS,
             'Document Upload',
             status: 201,
+        );
+    }    
+
+    /**
+     * Update bank, vehicle, and document details in one call (post-setup
+     * edit screen). Any field omitted from the request is left as-is; only
+     * the documents the driver re-uploads replace the previous files.
+     */
+    public function updateAccountDetails(UpdateAccountDetailsRequest $request): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+        $updatedUser = $this->profile->updateAccountDetails(
+            $user,
+            $request->validatedFields(),
+            $request->validatedDocuments(),
+        );
+
+        return $this->success(
+            data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
+            message: 'Account details updated successfully.',
         );
     }
 
@@ -126,70 +143,6 @@ class DriverProfileController extends Controller
         return $this->success(
             data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
             message: 'Notification settings updated.',
-        );
-    }
-
-    public function initiatePhoneChange(InitiatePhoneChangeRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $mobile = $request->canonicalMobile();
-
-        $this->profile->initiatePhoneChange($user, $request->input('mobile'), $request->input('country_code'));
-
-        return $this->success(
-            data: [
-                'target' => $mobile,
-                'expires_in' => (int) config('services.otp.ttl_seconds', 300),
-                'test_code' => config('services.otp.test_code'),
-            ],
-            message: 'OTP sent to new phone number.',
-        );
-    }
-
-    public function initiateEmailChange(InitiateEmailChangeRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $email = $request->canonicalEmail();
-
-        $this->profile->initiateEmailChange($user, $request->input('email'));
-
-        return $this->success(
-            data: [
-                'target' => $email,
-                'expires_in' => (int) config('services.otp.ttl_seconds', 300),
-                'test_code' => config('services.otp.test_code'),
-            ],
-            message: 'OTP sent to new email address.',
-        );
-    }
-
-    public function completePhoneChange(CompletePhoneChangeRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $updatedUser = $this->profile->completePhoneChange(
-            $user,
-            $request->canonicalMobile(),
-            $request->input('code'),
-        );
-
-        return $this->success(
-            data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
-            message: 'Phone number updated successfully.',
-        );
-    }
-
-    public function completeEmailChange(CompleteEmailChangeRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $updatedUser = $this->profile->completeEmailChange(
-            $user,
-            $request->canonicalEmail(),
-            $request->input('code'),
-        );
-
-        return $this->success(
-            data: new DriverProfileResource($updatedUser->driverProfile->load('documents')),
-            message: 'Email address updated successfully.',
         );
     }
 
