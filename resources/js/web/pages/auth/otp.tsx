@@ -14,13 +14,28 @@ function formatCountdown(seconds: number) {
 
 interface OtpProps {
     target?: string | null;
+    email?: string | null;
+    country_code?: string | null;
+    mobile?: string | null;
 }
 
-export default function Otp({ target }: OtpProps) {
+export default function Otp({ target, email, country_code, mobile }: OtpProps) {
     const { data, setData, post, processing, errors } = useForm({
-        target: target ?? '',
+        email: email ?? '',
+        country_code: country_code ?? '',
+        mobile: mobile ?? '',
         code: '',
     });
+
+    // Keep form state in sync if the props update (e.g. after a back-redirect).
+    useEffect(() => {
+        setData((current) => ({
+            ...current,
+            email: email ?? '',
+            country_code: country_code ?? '',
+            mobile: mobile ?? '',
+        }));
+    }, [email, country_code, mobile, setData]);
 
     const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
     const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
@@ -84,6 +99,11 @@ export default function Otp({ target }: OtpProps) {
                     ))}
                 </div>
                 {errors.code && <p className="text-center text-sm text-destructive">{errors.code}</p>}
+                {(errors.email || errors.mobile) && (
+                    <p className="text-center text-sm text-destructive">
+                        {errors.email ?? errors.mobile}
+                    </p>
+                )}
 
                 <Button
                     type="submit"

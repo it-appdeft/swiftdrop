@@ -60,7 +60,7 @@ class SendOtpRequest extends FormRequest
             'channel' => ['required', Rule::enum(OtpChannelEnum::class)],
             'email' => [Rule::requiredIf($needsEmail), 'nullable', 'email', 'max:255'],
             'country_code' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
-            'mobile' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^[0-9\s\-]{6,20}$/'],
+            'mobile' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+?[0-9\s\-]{6,20}$/'],
         ];
     }
 

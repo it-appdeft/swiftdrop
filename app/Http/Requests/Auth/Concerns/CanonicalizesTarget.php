@@ -20,7 +20,7 @@ trait CanonicalizesTarget
 
     public function canonicalMobile(): string
     {
-        $mobile = preg_replace('/\s+/', '', (string) $this->input('mobile'));
+        $mobile = preg_replace('/[\s\-]+/', '', (string) $this->input('mobile'));
 
         if ($mobile === '') {
             return '';
@@ -29,6 +29,15 @@ trait CanonicalizesTarget
         if (Str::startsWith($mobile, '+')) {
             return $mobile;
         }
+
+        // "00" is the international dialing prefix in many countries — treat as "+".
+        if (Str::startsWith($mobile, '00')) {
+            return '+'.substr($mobile, 2);
+        }
+
+        // Strip the national trunk prefix ("0") before prepending the country code,
+        // so a UK user typing "07911 123002" + "+44" → "+447911123002" (not "+4407911123002").
+        $mobile = ltrim($mobile, '0');
 
         return ((string) $this->input('country_code', '')).$mobile;
     }

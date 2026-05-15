@@ -31,7 +31,7 @@ return new class extends Migration
             $table->foreignId('delivery_id')->nullable()->constrained()->nullOnDelete();
             $table->decimal('lat', 10, 8);
             $table->decimal('lng', 11, 8);
-            $table->timestamp('recorded_at');
+            $table->timestamp('recorded_at')->nullable();
 
             $table->index(['driver_id', 'recorded_at']);
         });

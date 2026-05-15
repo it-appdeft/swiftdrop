@@ -123,9 +123,17 @@ class RegistrationService implements RegistrationServiceInterface
         }
 
         $code = $data['country_code'] ?? '';
-        $number = preg_replace('/\s+/', '', (string) $data['mobile']);
+        $number = preg_replace('/[\s\-]+/', '', (string) $data['mobile']);
 
-        return Str::startsWith($number, '+') ? $number : ($code.$number);
+        if (Str::startsWith($number, '+')) {
+            return $number;
+        }
+
+        if (Str::startsWith($number, '00')) {
+            return '+'.substr($number, 2);
+        }
+
+        return $code.ltrim($number, '0');
     }
 
     protected function firstName(string $name): string
