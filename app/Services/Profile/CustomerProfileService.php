@@ -3,6 +3,7 @@
 namespace App\Services\Profile;
 
 use App\Contracts\Profile\CustomerProfileServiceInterface;
+use App\Exceptions\ResourceNotFoundException;
 use App\Models\CustomerAddress;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +43,7 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
             $profile = $user->customerProfile;
 
             if (! $profile) {
-                throw new \InvalidArgumentException('Customer profile not found.');
+                throw ResourceNotFoundException::for('Customer profile');
             }
 
             $isDefault = $data['is_default'] ?? (! $profile->addresses()->exists());
@@ -64,7 +65,7 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
             $address = $profile->addresses()->find($addressId);
 
             if (! $address) {
-                throw new \InvalidArgumentException('Address not found.');
+                throw ResourceNotFoundException::for('Address');
             }
 
             if (($data['is_default'] ?? false) && ! $address->is_default) {
@@ -84,7 +85,7 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
             $address = $profile->addresses()->find($addressId);
 
             if (! $address) {
-                throw new \InvalidArgumentException('Address not found.');
+                throw ResourceNotFoundException::for('Address');
             }
 
             if ($address->is_default) {
@@ -108,7 +109,7 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
             $address = $profile->addresses()->find($addressId);
 
             if (! $address) {
-                throw new \InvalidArgumentException('Address not found.');
+                throw ResourceNotFoundException::for('Address');
             }
 
             $profile->addresses()->update(['is_default' => false]);

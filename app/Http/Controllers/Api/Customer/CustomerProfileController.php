@@ -5,11 +5,7 @@ namespace App\Http\Controllers\Api\Customer;
 use App\Contracts\Profile\CustomerProfileServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\Profile\AddAddressRequest;
-use App\Http\Requests\Customer\Profile\CompleteEmailChangeRequest;
-use App\Http\Requests\Customer\Profile\CompletePhoneChangeRequest;
 use App\Http\Requests\Customer\Profile\DeleteAccountRequest;
-use App\Http\Requests\Customer\Profile\InitiateEmailChangeRequest;
-use App\Http\Requests\Customer\Profile\InitiatePhoneChangeRequest;
 use App\Http\Requests\Customer\Profile\UpdateAddressRequest;
 use App\Http\Requests\Customer\Profile\UpdateProfileRequest;
 use App\Http\Resources\Customer\AddressResource;
@@ -37,77 +33,13 @@ class CustomerProfileController extends Controller
     }
 
     public function update(UpdateProfileRequest $request): JsonResponse
-    { 
+    {
         $user = auth('sanctum')->user();
         $updatedUser = $this->profile->updateProfile($user, $request->validated());
 
         return $this->success(
             data: new CustomerProfileResource($updatedUser->customerProfile),
             message: 'Profile updated.',
-        );
-    }
-
-    public function initiatePhoneChange(InitiatePhoneChangeRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $mobile = $request->canonicalMobile();
-
-        $this->profile->initiatePhoneChange($user, $request->input('mobile'), $request->input('country_code'));
-
-        return $this->success(
-            data: [
-                'target' => $mobile,
-                'expires_in' => (int) config('services.otp.ttl_seconds', 300),
-                'test_code' => config('services.otp.test_code'),
-            ],
-            message: 'OTP sent to new phone number.',
-        );
-    }
-
-    public function initiateEmailChange(InitiateEmailChangeRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $email = $request->canonicalEmail();
-
-        $this->profile->initiateEmailChange($user, $request->input('email'));
-
-        return $this->success(
-            data: [
-                'target' => $email,
-                'expires_in' => (int) config('services.otp.ttl_seconds', 300),
-                'test_code' => config('services.otp.test_code'),
-            ],
-            message: 'OTP sent to new email address.',
-        );
-    }
-
-    public function completePhoneChange(CompletePhoneChangeRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $updatedUser = $this->profile->completePhoneChange(
-            $user,
-            $request->canonicalMobile(),
-            $request->input('code'),
-        );
-
-        return $this->success(
-            data: new CustomerProfileResource($updatedUser->customerProfile),
-            message: 'Phone number updated successfully.',
-        );
-    }
-
-    public function completeEmailChange(CompleteEmailChangeRequest $request): JsonResponse
-    {
-        $user = auth('sanctum')->user();
-        $updatedUser = $this->profile->completeEmailChange(
-            $user,
-            $request->canonicalEmail(),
-            $request->input('code'),
-        );
-
-        return $this->success(
-            data: new CustomerProfileResource($updatedUser->customerProfile),
-            message: 'Email address updated successfully.',
         );
     }
 

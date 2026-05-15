@@ -3,15 +3,18 @@
 use App\Http\Controllers\Api\Auth\AuthController as ApiAuthController;
 use App\Http\Controllers\Api\Customer\CustomerProfileController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
+use App\Http\Controllers\Api\VehicleTypeController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('auth')->controller(ApiAuthController::class)->group(function () {
-    // Common mobile-only login (customer + driver). Mobile must already exist.
-    Route::post('login/send-otp', 'sendLoginOtp');
-    Route::post('login/verify-otp', 'verifyLoginOtp');
+// Reference data — needed by the driver app to populate dropdowns before
+// the user is fully signed in, so kept outside the auth group.
+Route::get('vehicle-types', [VehicleTypeController::class, 'index']);
 
-    // Registration flow — sends OTP to a (possibly new) target so it can be
-    // verified before the user record is created.
+Route::prefix('auth')->controller(ApiAuthController::class)->group(function () {
+    // Unified OTP entry points. The `type` (login | signup | update_email |
+    // update_phone), `user_type` (customer | driver) and `channel`
+    // (email | phone) drive the eligibility checks and side-effects —
+    // see App\Services\Auth\OtpFlowService.
     Route::post('send-otp', 'sendOtp');
     Route::post('verify-otp', 'verifyOtp');
     Route::post('register/{type}', 'register');
@@ -22,17 +25,8 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
         Route::get('/', 'show');
         Route::put('/', 'update');
         Route::delete('/', 'deleteAccount');
-
-        // Phone number management
-        Route::post('change-phone/initiate', 'initiatePhoneChange');
-        Route::post('change-phone/verify', 'completePhoneChange');
-
-        // Email management
-        Route::post('change-email/initiate', 'initiateEmailChange');
-        Route::post('change-email/verify', 'completeEmailChange');
     });
 
-    // Address management
     Route::controller(CustomerProfileController::class)->prefix('addresses')->group(function () {
         Route::post('/', 'addAddress');
         Route::put('{addressId}', 'updateAddress');
@@ -46,21 +40,10 @@ Route::middleware('auth:sanctum')->prefix('driver')->group(function () {
         Route::get('/', 'show');
         Route::put('/', 'update');
         Route::delete('/', 'deleteAccount');
-        
+
         Route::post('setup', 'setup');
-
-        // Re-upload one document later (after setup is complete).
+        Route::post('account-details', 'updateAccountDetails');
         Route::post('documents/single', 'uploadDocument');
-
-        // Notification settings
         Route::put('notifications', 'updateNotificationSettings');
-
-        // Phone number management
-        Route::post('change-phone/initiate', 'initiatePhoneChange');
-        Route::post('change-phone/verify', 'completePhoneChange');
-
-        // Email management
-        Route::post('change-email/initiate', 'initiateEmailChange');
-        Route::post('change-email/verify', 'completeEmailChange');
     });
 });

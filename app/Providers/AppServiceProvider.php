@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\Auth\OtpFlowServiceInterface;
 use App\Contracts\Auth\OtpServiceInterface;
 use App\Contracts\Auth\RegistrationServiceInterface;
 use App\Contracts\Sms\SmsGateway;
@@ -9,6 +10,7 @@ use App\Repositories\Contracts\OtpCodeRepositoryInterface;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Repositories\Eloquent\OtpCodeRepository;
 use App\Repositories\Eloquent\UserRepository;
+use App\Services\Auth\OtpFlowService;
 use App\Services\Auth\OtpService;
 use App\Services\Auth\RegistrationService;
 use App\Services\Sms\LogSmsGateway;
@@ -55,6 +57,7 @@ class AppServiceProvider extends ServiceProvider
     protected function bindServices(): void
     {
         $this->app->bind(OtpServiceInterface::class, OtpService::class);
+        $this->app->bind(OtpFlowServiceInterface::class, OtpFlowService::class);
         $this->app->bind(RegistrationServiceInterface::class, RegistrationService::class);
         $this->app->bind(
             \App\Contracts\Profile\CustomerProfileServiceInterface::class,

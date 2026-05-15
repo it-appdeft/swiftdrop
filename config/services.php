@@ -51,6 +51,9 @@ return [
         'length' => (int) env('OTP_LENGTH', 4),
         'ttl_seconds' => (int) env('OTP_TTL_SECONDS', 300),
         'rate_limit_per_minute' => (int) env('OTP_RATE_LIMIT_PER_MINUTE', 3),
+        // Maximum wrong-code attempts allowed per issued OTP before the user
+        // must request a new code. 0 disables the cap.
+        'max_attempts' => (int) env('OTP_MAX_ATTEMPTS', 5),
         // Set in local/staging to bypass random codes (e.g. "1231") for manual QA.
         // Leave unset (null) in production so codes are always random.
         'test_code' => env('OTP_TEST_CODE'),

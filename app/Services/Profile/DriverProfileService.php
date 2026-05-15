@@ -4,9 +4,12 @@ namespace App\Services\Profile;
 
 use App\Contracts\Profile\DriverProfileServiceInterface;
 use App\Enums\ApprovalStatusEnum;
+use App\Exceptions\InvalidInputException;
+use App\Exceptions\ResourceNotFoundException;
 use App\Models\Document;
 use App\Models\DriverProfile;
 use App\Models\User;
+use App\Models\VehicleType;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -95,6 +98,9 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
                 ]);
             }
 
+            $vehicleType = VehicleType::findActiveBySlug($data['vehicle_type'] ?? null);
+            $requiresInsurance = (bool) ($vehicleType?->requires_insurance ?? true);
+
             $profile->update([
                 'vehicle_type' => $data['vehicle_type'],
                 'vehicle_registration' => $data['vehicle_registration'],
@@ -102,8 +108,8 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
                 'vehicle_model' => $data['vehicle_model'] ?? $profile->vehicle_model,
                 'vehicle_color' => $data['vehicle_color'] ?? $profile->vehicle_color,
                 'year_of_manufacture' => $data['year_of_manufacture'] ?? $profile->year_of_manufacture,
-                'insurance_type' => $data['insurance_type'] ?? $profile->insurance_type,
-                'insurance_expiry_date' => $data['insurance_expiry_date'] ?? $profile->insurance_expiry_date,
+                'insurance_type' => $requiresInsurance ? ($data['insurance_type'] ?? $profile->insurance_type) : null,
+                'insurance_expiry_date' => $requiresInsurance ? ($data['insurance_expiry_date'] ?? $profile->insurance_expiry_date) : null,
                 'mot_expiry_date' => $data['mot_expiry_date'] ?? $profile->mot_expiry_date,
             ]);
 
@@ -143,13 +149,47 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
         });
     }
 
+    /**
+     * Update bank/vehicle fields and re-upload any documents in a single
+     * request. Missing keys are left untouched; documents not present in
+     * the payload keep their existing files.
+     */
+    public function updateAccountDetails(User $user, array $data, array $documents = []): User
+    {
+        return DB::transaction(function () use ($user, $data, $documents) {
+            $profile = $this->profileOrFail($user);
+
+            $allowed = [
+                'account_holder_name', 'account_number', 'sort_code', 'bank_name',
+                'vehicle_type', 'vehicle_registration', 'vehicle_make', 'vehicle_model',
+                'vehicle_color', 'year_of_manufacture', 'insurance_type',
+                'insurance_expiry_date', 'mot_expiry_date',
+            ];
+
+            $profileUpdate = array_intersect_key($data, array_flip($allowed));
+
+            if (! empty($profileUpdate)) {
+                $profile->update($profileUpdate);
+            }
+
+            foreach ($documents as $type => $file) {
+                if ($file === null) {
+                    continue;
+                }
+                $this->uploadDocument($user, $type, $file);
+            }
+
+            return $user->fresh()->loadProfileRelation();
+        });
+    }
+
     public function uploadDocument(User $user, string $type, $file, ?string $expiresAt = null): Document
     {
         return DB::transaction(function () use ($user, $type, $file, $expiresAt) {
             $profile = $this->profileOrFail($user);
 
             if (! in_array($type, self::DOCUMENT_TYPES, true)) {
-                throw new \InvalidArgumentException("Invalid document type: {$type}");
+                throw InvalidInputException::make("Invalid document type: {$type}", 'type');
             }
 
             $existing = $profile->documents()->where('type', $type)->first();
@@ -216,7 +256,7 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
         $profile = $user->driverProfile;
 
         if (! $profile) {
-            throw new \InvalidArgumentException('Driver profile not found.');
+            throw ResourceNotFoundException::for('Driver profile');
         }
 
         return $profile;

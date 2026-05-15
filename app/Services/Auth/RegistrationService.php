@@ -7,6 +7,7 @@ use App\Enums\ApprovalStatusEnum;
 use App\Enums\RestaurantStatusEnum;
 use App\Enums\UserRoleEnum;
 use App\Enums\UserStatusEnum;
+use App\Exceptions\InvalidInputException;
 use App\Models\CustomerProfile;
 use App\Models\DriverProfile;
 use App\Models\Restaurant;
@@ -51,7 +52,7 @@ class RegistrationService implements RegistrationServiceInterface
             $profileModel = $this->profiles[$type] ?? null;
 
             if (! $profileModel) {
-                throw new \InvalidArgumentException('Invalid registration type.');
+                throw InvalidInputException::make('Invalid registration type.', 'type');
             }
 
             $profileAttributes = [
