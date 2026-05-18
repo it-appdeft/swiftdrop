@@ -41,6 +41,30 @@ class UserRepository implements UserRepositoryInterface
         return User::query()->where('email', $email)->first();
     }
 
+    /**
+     * Same as {@see findByMobileOrEmail}, but includes soft-deleted users
+     * so callers (e.g. the OTP eligibility check) can refuse to send a
+     * code to a deactivated account.
+     */
+    public function findAnyByMobileOrEmail(string $target): ?User
+    {
+        $candidates = [$target];
+
+        if (str_starts_with($target, '+')) {
+            for ($i = 2; $i <= 5; $i++) {
+                if ($i < strlen($target)) {
+                    $candidates[] = substr($target, 0, $i).'0'.substr($target, $i);
+                }
+            }
+        }
+
+        return User::withTrashed()
+            ->where(function ($q) use ($candidates) {
+                $q->whereIn('mobile', $candidates)->orWhereIn('email', $candidates);
+            })
+            ->first();
+    }
+
     public function upsertByMobileOrEmail(?string $mobile, ?string $email, array $attributes): User
     {
         $matchKey = $mobile !== null

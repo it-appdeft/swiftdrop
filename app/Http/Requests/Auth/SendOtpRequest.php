@@ -11,9 +11,10 @@ use Illuminate\Validation\Rule;
 
 /**
  * Single request payload for /auth/send-otp covering every type
- * (login / signup / update_phone / update_email) and every channel
- * (email / phone). Field requirements are derived from `type` + `channel`
- * so the same JSON shape works for all four flows.
+ * (login / signup / update_phone / update_email / verify_current_phone /
+ * verify_current_email) and every channel (email / phone). Field
+ * requirements are derived from `type` + `channel` so the same JSON
+ * shape works for all flows.
  */
 class SendOtpRequest extends FormRequest
 {
@@ -43,17 +44,20 @@ class SendOtpRequest extends FormRequest
         $needsEmail = $channel === OtpChannelEnum::EMAIL->value;
         $needsMobile = $channel === OtpChannelEnum::SMS->value;
         $type = $this->input('type');
-        $isAccountUpdate = in_array($type, [
+        // user_type is only meaningful for the unauthenticated flows
+        // (login / signup). Any flow that operates on the currently
+        // authed user resolves identity from the sanctum token instead.
+        $isAuthedFlow = in_array($type, [
             OtpTypeEnum::UPDATE_EMAIL->value,
             OtpTypeEnum::UPDATE_PHONE->value,
+            OtpTypeEnum::VERIFY_CURRENT_PHONE->value,
+            OtpTypeEnum::VERIFY_CURRENT_EMAIL->value,
         ], true);
 
         return [
             'type' => ['required', Rule::enum(OtpTypeEnum::class)],
-            // user_type is only meaningful for login / signup. Update flows
-            // resolve the user from the auth token instead.
             'user_type' => [
-                Rule::requiredIf(! $isAccountUpdate),
+                Rule::requiredIf(! $isAuthedFlow),
                 'nullable',
                 Rule::in([UserRoleEnum::CUSTOMER->value, UserRoleEnum::DRIVER->value]),
             ],

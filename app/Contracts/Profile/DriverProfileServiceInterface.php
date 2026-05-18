@@ -28,5 +28,7 @@ interface DriverProfileServiceInterface
 
     public function updateNotificationSettings(User $user, array $data): User;
 
-    public function deleteAccount(User $user): bool;
+    public function initiateDeletion(User $user): string;
+
+    public function deleteAccount(User $user, array $data): bool;
 }

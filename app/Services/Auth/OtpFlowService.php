@@ -40,6 +40,7 @@ class OtpFlowService implements OtpFlowServiceInterface
         ?User $authUser = null,
     ): array {
         $this->assertAuthContext($type, $authUser);
+        $this->assertTargetNotSoftDeleted($target);
         $this->assertEligibleToSend($type, $channel, $target, $userType, $authUser);
 
         $this->otp->send($target, $channel);
@@ -56,6 +57,7 @@ class OtpFlowService implements OtpFlowServiceInterface
         ?User $authUser = null,
     ): array {
         $this->assertAuthContext($type, $authUser);
+        $this->assertTargetNotSoftDeleted($target);
 
         // Re-run the send-time eligibility checks so a stale OTP can't be
         // used to e.g. log into a suspended account or claim an identifier
@@ -69,7 +71,22 @@ class OtpFlowService implements OtpFlowServiceInterface
             OtpTypeEnum::SIGNUP => $this->completeSignup($target),
             OtpTypeEnum::UPDATE_PHONE => $this->completePhoneUpdate($authUser, $target),
             OtpTypeEnum::UPDATE_EMAIL => $this->completeEmailUpdate($authUser, $target),
+            OtpTypeEnum::VERIFY_CURRENT_PHONE,
+            OtpTypeEnum::VERIFY_CURRENT_EMAIL => $this->completeCurrentVerification($authUser, $type),
         };
+    }
+
+    /**
+     * Step 1 verify — no mutation, just hand back a confirmation flag so
+     * the client knows it can advance to the "enter new identifier" step.
+     */
+    protected function completeCurrentVerification(User $authUser, OtpTypeEnum $type): array
+    {
+        return [
+            'verified' => true,
+            'type' => $type->value,
+            'user' => new UserResource($authUser->loadProfileRelation()),
+        ];
     }
 
     protected function assertAuthContext(OtpTypeEnum $type, ?User $authUser): void
@@ -77,6 +94,38 @@ class OtpFlowService implements OtpFlowServiceInterface
         if ($type->requiresAuth() && ! $authUser) {
             throw OtpException::authRequired();
         }
+    }
+
+    /**
+     * Refuse to engage with credentials that match a soft-deleted user.
+     * Without this check, login would report "no account exists" and
+     * signup would happily send an OTP — only to fail at the unique-index
+     * step. Surfacing it here gives the app a single, clear error to act
+     * on so the user knows to contact admin.
+     */
+    protected function assertTargetNotSoftDeleted(string $target): void
+    {
+        $existing = $this->users->findAnyByMobileOrEmail($target);
+
+        if ($existing && $existing->trashed()) {
+            throw OtpException::accountDeleted($this->roleLabel($existing));
+        }
+    }
+
+    /**
+     * Spatie roles still resolve on a soft-deleted user, so we surface the
+     * primary role in the error message ("customer", "driver", ...). The
+     * restaurant_owner role gets a friendlier "restaurant" label.
+     */
+    protected function roleLabel(User $user): ?string
+    {
+        $role = $user->getRoleNames()->first();
+
+        if (! $role) {
+            return null;
+        }
+
+        return $role === UserRoleEnum::RESTAURANT_OWNER->value ? 'restaurant' : $role;
     }
 
     /**
@@ -96,7 +145,28 @@ class OtpFlowService implements OtpFlowServiceInterface
             OtpTypeEnum::SIGNUP => $this->assertSignupEligible($channel, $target),
             OtpTypeEnum::UPDATE_PHONE => $this->assertPhoneUpdateEligible($authUser, $target),
             OtpTypeEnum::UPDATE_EMAIL => $this->assertEmailUpdateEligible($authUser, $target),
+            OtpTypeEnum::VERIFY_CURRENT_PHONE => $this->assertCurrentPhoneTarget($authUser, $target),
+            OtpTypeEnum::VERIFY_CURRENT_EMAIL => $this->assertCurrentEmailTarget($authUser, $target),
         };
+    }
+
+    /**
+     * Step 1 of the change-phone flow: the submitted target must match the
+     * authenticated user's existing mobile number. Stops an attacker from
+     * using the verify-current endpoint to fish OTPs to arbitrary numbers.
+     */
+    protected function assertCurrentPhoneTarget(User $authUser, string $target): void
+    {
+        if (empty($authUser->mobile) || $authUser->mobile !== $target) {
+            throw OtpException::targetNotCurrent('mobile');
+        }
+    }
+
+    protected function assertCurrentEmailTarget(User $authUser, string $target): void
+    {
+        if (empty($authUser->email) || $authUser->email !== $target) {
+            throw OtpException::targetNotCurrent('email');
+        }
     }
 
     protected function assertLoginEligible(OtpChannelEnum $channel, string $target, ?UserRoleEnum $userType): void
