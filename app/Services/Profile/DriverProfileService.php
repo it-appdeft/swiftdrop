@@ -285,14 +285,14 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
 
     protected function driverMobileOrFail(User $user): string
     {
-        if (! $user->mobile) {
+        if (! $user->canonical_mobile) {
             throw new ApiException(
                 message: 'No mobile number on file to send a verification code.',
                 status: 422,
             );
         }
 
-        return $user->mobile;
+        return $user->canonical_mobile;
     }
 
     protected function profileOrFail(User $user): DriverProfile

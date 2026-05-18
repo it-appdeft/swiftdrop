@@ -19,12 +19,13 @@ class User extends Authenticatable
 
     protected $fillable = [
         'mobile',
+        'country_code',
         'email',
         'password',
         'status',
     ];
 
-    protected $appends = ['name'];
+    protected $appends = ['name', 'canonical_mobile'];
 
     protected $hidden = [
         'password',
@@ -100,6 +101,48 @@ class User extends Authenticatable
         }
 
         return $this->email ?? $this->mobile;
+    }
+
+    /**
+     * Full E.164 mobile (country_code + subscriber digits). Use this whenever
+     * something outside the user table needs to address the user by phone
+     * — OTP service, SMS gateway, audit log snapshot, etc. — so storage
+     * stays normalised (mobile = local digits, country_code = "+44") but
+     * callers don't have to glue them back together each time.
+     */
+    public function getCanonicalMobileAttribute(): ?string
+    {
+        if (! $this->mobile) {
+            return null;
+        }
+
+        return ($this->country_code ?? '').$this->mobile;
+    }
+
+    /**
+     * Best-effort split of a canonical E.164 mobile ("+447789000002") into
+     * the persisted shape [country_code, local-digits]. Shared by seeders,
+     * registration and OTP-update so storage stays consistent.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    public static function splitCanonicalMobile(?string $canonical): array
+    {
+        if ($canonical === null || $canonical === '') {
+            return [null, null];
+        }
+
+        if (! str_starts_with($canonical, '+')) {
+            return [null, $canonical];
+        }
+
+        foreach (['+44', '+91', '+1', '+234'] as $prefix) {
+            if (str_starts_with($canonical, $prefix)) {
+                return [$prefix, substr($canonical, strlen($prefix))];
+            }
+        }
+
+        return [null, $canonical];
     }
 
     public function customerProfile(): HasOne

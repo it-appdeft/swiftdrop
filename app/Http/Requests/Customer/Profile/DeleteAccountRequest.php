@@ -10,7 +10,7 @@ class DeleteAccountRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth('sanctum')->check();
+        return auth()->check() || auth('sanctum')->check();
     }
 
     public function rules(): array

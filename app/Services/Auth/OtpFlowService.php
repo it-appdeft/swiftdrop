@@ -157,7 +157,10 @@ class OtpFlowService implements OtpFlowServiceInterface
      */
     protected function assertCurrentPhoneTarget(User $authUser, string $target): void
     {
-        if (empty($authUser->mobile) || $authUser->mobile !== $target) {
+        // mobile is stored as the subscriber-only digits; country_code holds
+        // the dialling prefix. Compare against the glued-together canonical
+        // form so an incoming "+44…" target still matches.
+        if (empty($authUser->canonical_mobile) || $authUser->canonical_mobile !== $target) {
             throw OtpException::targetNotCurrent('mobile');
         }
     }
@@ -260,7 +263,15 @@ class OtpFlowService implements OtpFlowServiceInterface
     protected function completePhoneUpdate(User $authUser, string $newMobile): array
     {
         return DB::transaction(function () use ($authUser, $newMobile) {
-            $authUser->update(['mobile' => $newMobile]);
+            // Persist as country_code + subscriber digits. The shared helper
+            // on User handles the prefix lookup so seeders, registration and
+            // this flow all agree on the same split.
+            [$countryCode, $local] = User::splitCanonicalMobile($newMobile);
+
+            $authUser->update([
+                'country_code' => $countryCode,
+                'mobile' => $local,
+            ]);
             $fresh = $authUser->fresh()->loadProfileRelation();
 
             return ['user' => new UserResource($fresh)];

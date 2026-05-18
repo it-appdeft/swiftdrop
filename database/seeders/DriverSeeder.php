@@ -59,9 +59,15 @@ class DriverSeeder extends Seeder
         ];
 
         foreach ($drivers as $data) {
+            [$countryCode, $localMobile] = User::splitCanonicalMobile($data['user']['mobile']);
+
             $user = User::firstOrCreate(
-                ['mobile' => $data['user']['mobile']],
-                array_merge($data['user'], ['password' => null]),
+                ['country_code' => $countryCode, 'mobile' => $localMobile],
+                array_merge($data['user'], [
+                    'country_code' => $countryCode,
+                    'mobile' => $localMobile,
+                    'password' => null,
+                ]),
             );
 
             if (!$user->hasRole('driver')) {

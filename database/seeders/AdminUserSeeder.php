@@ -9,9 +9,13 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
+        [$countryCode, $localMobile] = User::splitCanonicalMobile('+447700000001');
+
         $admin = User::firstOrCreate(
-            ['mobile' => '+447700000001'],
+            ['country_code' => $countryCode, 'mobile' => $localMobile],
             [
+                'country_code' => $countryCode,
+                'mobile' => $localMobile,
                 'email' => 'admin@swiftdrop.co.uk',
                 'password' => bcrypt('password'),
                 'status' => 'active',
