@@ -2,14 +2,18 @@
 
 namespace App\Services\Profile;
 
+use App\Contracts\Auth\OtpServiceInterface;
 use App\Contracts\Profile\DriverProfileServiceInterface;
 use App\Enums\ApprovalStatusEnum;
+use App\Enums\OtpChannelEnum;
+use App\Exceptions\ApiException;
 use App\Exceptions\InvalidInputException;
 use App\Exceptions\ResourceNotFoundException;
 use App\Models\Document;
 use App\Models\DriverProfile;
 use App\Models\User;
 use App\Models\VehicleType;
+use App\Services\Files\ImageUploadService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -17,6 +21,13 @@ use Illuminate\Validation\ValidationException;
 
 class DriverProfileService extends BaseProfileService implements DriverProfileServiceInterface
 {
+    public function __construct(
+        ImageUploadService $imageUpload,
+        protected OtpServiceInterface $otp,
+    ) {
+        parent::__construct($imageUpload);
+    }
+
     /**
      * Document types accepted during driver onboarding.
      * Keep keys stable — clients reference them in upload payloads.
@@ -234,8 +245,27 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
         });
     }
 
-    public function deleteAccount(User $user): bool
+    /**
+     * Send the deletion OTP to the driver's mobile. Drivers always register
+     * with a phone number, so we never fall back to email here.
+     */
+    public function initiateDeletion(User $user): string
     {
+        $mobile = $this->driverMobileOrFail($user);
+
+        $this->otp->send($mobile, OtpChannelEnum::SMS);
+
+        return $mobile;
+    }
+
+    public function deleteAccount(User $user, array $data): bool
+    {
+        $mobile = $this->driverMobileOrFail($user);
+
+        // Verify before the transaction so a bad code doesn't roll back
+        // work we haven't started yet.
+        $this->otp->verifyOrFail($mobile, $data['code']);
+
         return DB::transaction(function () use ($user) {
             $profile = $user->driverProfile;
 
@@ -247,8 +277,22 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
                 $profile->delete();
             }
 
+            $user->tokens()->delete();
+
             return $user->delete();
         });
+    }
+
+    protected function driverMobileOrFail(User $user): string
+    {
+        if (! $user->mobile) {
+            throw new ApiException(
+                message: 'No mobile number on file to send a verification code.',
+                status: 422,
+            );
+        }
+
+        return $user->mobile;
     }
 
     protected function profileOrFail(User $user): DriverProfile

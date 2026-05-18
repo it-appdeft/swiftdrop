@@ -36,15 +36,17 @@ class VerifyOtpRequest extends FormRequest
         $needsEmail = $channel === OtpChannelEnum::EMAIL->value;
         $needsMobile = $channel === OtpChannelEnum::SMS->value;
         $type = $this->input('type');
-        $isAccountUpdate = in_array($type, [
+        $isAuthedFlow = in_array($type, [
             OtpTypeEnum::UPDATE_EMAIL->value,
             OtpTypeEnum::UPDATE_PHONE->value,
+            OtpTypeEnum::VERIFY_CURRENT_PHONE->value,
+            OtpTypeEnum::VERIFY_CURRENT_EMAIL->value,
         ], true);
 
         return [
             'type' => ['required', Rule::enum(OtpTypeEnum::class)],
             'user_type' => [
-                Rule::requiredIf(! $isAccountUpdate),
+                Rule::requiredIf(! $isAuthedFlow),
                 'nullable',
                 Rule::in([UserRoleEnum::CUSTOMER->value, UserRoleEnum::DRIVER->value]),
             ],

@@ -19,6 +19,9 @@ class UserResource extends JsonResource
             'status' => $this->status,
             'roles' => $this->getRoleNames(),
             'created_at' => $this->created_at,
-        ];
+            'profile' => $this->whenLoaded('customerProfile', fn() => $this->customerProfile)
+                  ?? $this->whenLoaded('driverProfile',   fn() => $this->driverProfile)
+                  ?? $this->whenLoaded('restaurant',      fn() => $this->restaurant),
+    ];
     }
 }

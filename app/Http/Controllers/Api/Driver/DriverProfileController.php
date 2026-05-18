@@ -146,10 +146,25 @@ class DriverProfileController extends Controller
         );
     }
 
+    public function initiateDeletion(): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+        $target = $this->profile->initiateDeletion($user);
+
+        return $this->success(
+            data: [
+                'target' => $target,
+                'expires_in' => (int) config('services.otp.ttl_seconds', 300),
+                'test_code' => config('services.otp.test_code'),
+            ],
+            message: 'Verification code sent.',
+        );
+    }
+
     public function deleteAccount(DeleteAccountRequest $request): JsonResponse
     {
         $user = auth('sanctum')->user();
-        $this->profile->deleteAccount($user);
+        $this->profile->deleteAccount($user, $request->validated());
 
         return $this->success(
             message: 'Account deleted successfully.',

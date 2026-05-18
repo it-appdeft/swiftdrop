@@ -100,4 +100,33 @@ class OtpException extends ApiException
             field: 'type',
         );
     }
+
+    /**
+     * The submitted target ("verify current" step) does not match the
+     * identifier on file for the authenticated user.
+     */
+    public static function targetNotCurrent(string $field): self
+    {
+        return new self(
+            message: 'The supplied '.$field.' does not match the one on your account.',
+            status: 422,
+            field: $field,
+        );
+    }
+
+    /**
+     * The credential matches a soft-deleted account. The caller should not
+     * receive an OTP — the account first has to be restored or purged by
+     * an admin.
+     */
+    public static function accountDeleted(?string $roleLabel = null): self
+    {
+        $role = $roleLabel ? trim($roleLabel) : 'this platform';
+
+        return new self(
+            message: "Your account as {$role} has been deleted. Please contact the admin to restore your account, or wait for it to be permanently deleted.",
+            status: 410,
+            field: 'target',
+        );
+    }
 }

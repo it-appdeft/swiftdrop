@@ -14,6 +14,7 @@ use App\Http\Resources\UserResource;
 use App\Traits\ApiResponse;
 use App\Traits\IssuesTokens;
 use Illuminate\Http\JsonResponse;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -77,6 +78,34 @@ class AuthController extends Controller
             ],
             message: ucfirst($type).' registered.',
             status: 201,
+        );
+    }
+
+    /**
+     * Revoke the sanctum token used on this request — works for customer,
+     * driver, restaurant and admin since they all authenticate the same
+     * way. Pass `all=true` in the body to revoke every token for the user
+     * (logs them out on every device).
+     */
+    public function logout(): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+        $logoutAll = (bool) request()->boolean('all');
+
+        if ($logoutAll) {
+            $user->tokens()->delete();
+        } else {
+            $current = $user->currentAccessToken();
+
+            // currentAccessToken() can be a TransientToken (session-auth)
+            // or null in edge cases — guard before calling delete().
+            if ($current instanceof PersonalAccessToken) {
+                $current->delete();
+            }
+        }
+
+        return $this->success(
+            message: $logoutAll ? 'Logged out on all devices.' : 'Logged out.',
         );
     }
 
