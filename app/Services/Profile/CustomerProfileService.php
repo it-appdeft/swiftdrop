@@ -172,7 +172,7 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
 
             CustomerAccountDeletionLog::create([
                 'user_id' => $user->id,
-                'mobile' => $user->mobile,
+                'mobile' => $user->canonical_mobile,
                 'email' => $user->email,
                 'first_name' => $profile?->first_name,
                 'last_name' => $profile?->last_name,
@@ -199,8 +199,9 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
      */
     protected function deletionOtpTarget(User $user): array
     {
-        if ($user->mobile) {
-            return [$user->mobile, OtpChannelEnum::SMS];
+        // canonical_mobile rebuilds the full E.164 from the split storage.
+        if ($user->canonical_mobile) {
+            return [$user->canonical_mobile, OtpChannelEnum::SMS];
         }
 
         if ($user->email) {

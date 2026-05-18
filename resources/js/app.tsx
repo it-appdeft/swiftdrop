@@ -1,11 +1,12 @@
 import '../css/app.css';
 
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 
 import { Toaster } from '@/components/ui/toast';
+import { toast } from '@/hooks/use-toast';
 import { initializeTheme } from '@/hooks/use-appearance';
 
 declare global {
@@ -51,6 +52,15 @@ createInertiaApp({
     progress: {
         color: '#65a30d',
     },
+});
+
+// Surface session flash messages from any controller redirect as a toast.
+// Controllers set them via `->with('status', '…')` or `->with('error', '…')`;
+// this fires once per successful Inertia visit.
+router.on('success', (event) => {
+    const flash = (event.detail.page.props as { flash?: { status?: string; error?: string } }).flash;
+    if (flash?.status) toast.success(flash.status);
+    if (flash?.error) toast.error(flash.error);
 });
 
 // Apply persisted theme before paint to avoid a flash.

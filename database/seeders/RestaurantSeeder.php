@@ -79,9 +79,15 @@ class RestaurantSeeder extends Seeder
         ];
 
         foreach ($restaurants as $data) {
+            [$countryCode, $localMobile] = User::splitCanonicalMobile($data['user']['mobile']);
+
             $user = User::firstOrCreate(
                 ['email' => $data['user']['email']],
-                array_merge($data['user'], ['password' => bcrypt('password'), 'mobile' => $data['user']['mobile']]),
+                array_merge($data['user'], [
+                    'password' => bcrypt('password'),
+                    'country_code' => $countryCode,
+                    'mobile' => $localMobile,
+                ]),
             );
 
             if (!$user->hasRole('restaurant_owner')) {

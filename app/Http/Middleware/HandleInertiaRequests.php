@@ -49,6 +49,12 @@ class HandleInertiaRequests extends Middleware
                 // Role-specific landing URL for header / post-auth redirects.
                 'home_url' => $user ? route($user->homeRouteName()) : null,
             ],
+            // Surface one-shot session flashes so the frontend can fire a
+            // toast on the next visit (see app.tsx → router.on('success')).
+            'flash' => [
+                'status' => fn () => $request->session()->get('status'),
+                'error' => fn () => $request->session()->get('error'),
+            ],
         ]);
     }
 }
