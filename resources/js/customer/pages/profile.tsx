@@ -1176,58 +1176,60 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
 
 function OrderCard({ order }: { order: PastOrder }) {
     return (
-        <article className="rounded-2xl border border-border bg-background p-4 shadow-sm">
-            <header className="flex items-start gap-3">
+        <article className="rounded-2xl bg-muted/40 p-5">
+            <header className="flex items-start gap-4">
                 <img
                     src={order.image}
                     alt=""
-                    className="size-12 shrink-0 rounded-lg object-cover"
+                    className="size-14 shrink-0 rounded-xl object-cover"
                     loading="lazy"
                 />
                 <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold">{order.restaurant}</h3>
-                    <p className="text-xs text-muted-foreground">{order.location}</p>
+                    <h3 className="text-base font-semibold">{order.restaurant}</h3>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{order.location}</p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                    <CheckCircle2 className="size-3" />
+                <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-emerald-700">
+                    <CheckCircle2 className="size-4 fill-emerald-700 text-white" />
                     Delivered
                 </span>
             </header>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-                {order.items.map((item, i) => (
-                    <span
-                        key={`${order.id}-${i}`}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px] font-medium text-foreground"
-                    >
-                        <span className="rounded bg-background px-1 text-[10px] font-semibold text-muted-foreground">
-                            {item.qty}x
+            <div className="mt-4 border-t border-border/70 pt-4">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {order.items.map((item, i) => (
+                        <span
+                            key={`${order.id}-${i}`}
+                            className="inline-flex items-center gap-2 text-sm font-medium text-foreground"
+                        >
+                            <span className="rounded-md border border-emerald-200 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
+                                {item.qty}x
+                            </span>
+                            {item.name}
                         </span>
-                        {item.name}
-                    </span>
-                ))}
+                    ))}
+                </div>
             </div>
 
             <button
                 type="button"
-                className="mt-3 w-full rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                className="mt-5 w-75 rounded-md bg-primary py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
             >
                 Reorder
             </button>
 
             {order.paymentFailed && (
-                <div className="mt-3 text-xs">
-                    <p className="flex items-center gap-1 font-semibold text-rose-600">
-                        <AlertCircle className="size-3.5" />
+                <div className="mt-4 space-y-1">
+                    <p className="flex items-center gap-1.5 text-sm font-semibold text-rose-600">
+                        <AlertCircle className="size-4" />
                         Payment failed
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
-                        If any amount is deducted, it will be refunded in 3–5 working days.
+                    <p className="text-xs text-muted-foreground">
+                        If any amount is deducted, it will be refunded in 3-5 Working days
                     </p>
                 </div>
             )}
 
-            <p className="mt-3 text-[11px] text-muted-foreground">{order.placedAt}</p>
+            <p className="mt-4 text-xs text-muted-foreground">Ordered {order.placedAt}</p>
         </article>
     );
 }
@@ -1243,18 +1245,18 @@ function OrderHistorySection() {
 
     return (
         <>
-            <h2 className="text-lg font-bold tracking-tight">Past Orders</h2>
-            <div className="relative mt-4">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Past Orders</h2>
+            <div className="relative mt-6">
+                <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
                 <input
                     type="search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by restaurant or dish"
-                    className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="h-12 w-full rounded-lg border-0 bg-muted/50 pl-12 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
             </div>
-            <div className="mt-4 space-y-3">
+            <div className="mt-6 space-y-4">
                 {filtered.length === 0 ? (
                     <p className="rounded-lg bg-muted/50 py-8 text-center text-sm text-muted-foreground">
                         No orders match your search.
@@ -2380,9 +2382,9 @@ function ProfileHeader({
     onEdit: () => void;
 }) {
     return (
-        <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-border bg-background p-4 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-3">
-                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+        <div className="flex flex-col items-start justify-between gap-4 rounded-2xl bg-background p-6 shadow-sm sm:flex-row sm:items-center sm:p-8">
+            <div className="flex items-center gap-5">
+                <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-lg font-semibold text-muted-foreground sm:size-24">
                     {photo ? (
                         <img src={photo} alt="" className="size-full object-cover" />
                     ) : (
@@ -2390,16 +2392,16 @@ function ProfileHeader({
                     )}
                 </div>
                 <div>
-                    <p className="text-base font-bold tracking-tight">{name}</p>
-                    {email && <p className="text-xs text-muted-foreground">{email}</p>}
+                    <p className="text-2xl font-bold tracking-tight sm:text-3xl">{name}</p>
+                    {email && <p className="mt-1 text-sm text-muted-foreground">{email}</p>}
                 </div>
             </div>
             <button
                 type="button"
                 onClick={onEdit}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90"
+                className="inline-flex h-12 items-center gap-2 rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
             >
-                <PencilLine className="size-3.5" />
+                <PencilLine className="size-4" />
                 Edit Profile
             </button>
         </div>
@@ -2457,13 +2459,13 @@ export default function CustomerProfile() {
     };
 
     return (
-        <div className="flex min-h-screen flex-col bg-muted/40">
+        <div className="flex min-h-screen flex-col bg-zinc-50">
             <Head title="Profile" />
 
             <CustomerHeader />
 
-            <main className="flex-1 py-4">
-                <div className="mx-auto max-w-[1600px] space-y-4 px-3 sm:px-4 lg:px-6">
+            <main className="flex-1 py-6 sm:py-8">
+                <div className="mx-auto max-w-[1600px] space-y-6 px-4 sm:px-6 lg:px-8">
                     <ProfileHeader
                         name={fullName || 'Customer'}
                         email={email}
@@ -2471,9 +2473,9 @@ export default function CustomerProfile() {
                         onEdit={() => setEditOpen(true)}
                     />
 
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-                        <aside className="rounded-2xl border border-border bg-background p-2 lg:sticky lg:top-20 lg:self-start">
-                            <ul className="flex flex-row overflow-x-auto lg:flex-col lg:overflow-visible">
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_1fr]">
+                        <aside className="rounded-2xl bg-background p-3 shadow-sm lg:sticky lg:top-20 lg:self-start">
+                            <ul className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:gap-1.5 lg:overflow-visible">
                                 {SIDEBAR_ITEMS.map((item) => {
                                     const Icon = item.icon;
                                     const active = section === item.key;
@@ -2486,13 +2488,13 @@ export default function CustomerProfile() {
                                                     setAddingCard(false);
                                                 }}
                                                 className={
-                                                    'flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ' +
+                                                    'flex w-full items-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-base font-medium transition ' +
                                                     (active
                                                         ? 'bg-primary/10 text-primary'
                                                         : 'text-foreground hover:bg-muted')
                                                 }
                                             >
-                                                <Icon className="size-4" />
+                                                <Icon className="size-5" />
                                                 {item.label}
                                             </button>
                                         </li>
@@ -2502,23 +2504,23 @@ export default function CustomerProfile() {
                                     <button
                                         type="button"
                                         onClick={handleLogout}
-                                        className="flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/10"
+                                        className="flex w-full items-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-base font-medium text-destructive transition hover:bg-destructive/10"
                                     >
-                                        <LogOut className="size-4" />
+                                        <LogOut className="size-5" />
                                         Logout
                                     </button>
                                 </li>
                             </ul>
                         </aside>
 
-                        <section className="rounded-2xl border border-border bg-background p-4 sm:p-6">
+                        <section className="rounded-2xl bg-background p-5 shadow-sm sm:p-8">
                             {renderSection()}
                         </section>
                     </div>
                 </div>
             </main>
 
-            <SiteFooter />
+            {/* <SiteFooter /> */}
 
             <EditProfileDialog
                 open={editOpen}

@@ -50,17 +50,19 @@ const CUISINES = [
 const PROMOS = [
     {
         title: 'Kooker',
-        subtitle: 'Special Birthday Offer up to 25%',
+        subtitle: 'Special Birthday',
+        offer: 'Offer Up To -25%',
         meta: 'Up To 3 Delivery Promo',
         accent: 'bg-pink-100',
-        image: 'https://images.unsplash.com/photo-1535141192574-5d4897c12636?w=400&h=300&fit=crop',
+        image: 'https://images.unsplash.com/photo-1535141192574-5d4897c12636?w=600&h=600&fit=crop',
     },
     {
         title: 'Kooker',
-        subtitle: 'Special Birthday Offer up to 25%',
+        subtitle: 'Special Birthday',
+        offer: 'Offer Up To -25%',
         meta: 'Up To 3 Delivery Promo',
         accent: 'bg-amber-100',
-        image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&h=300&fit=crop',
+        image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=600&h=600&fit=crop',
     },
 ];
 
@@ -84,8 +86,8 @@ const ALL_RESTAURANTS = Array.from({ length: 9 }).map((_, i) => ({
 
 function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
     return (
-        <div className="mb-3 flex items-end justify-between">
-            <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+        <div className="mb-5 flex items-end justify-between sm:mb-6">
+            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>
             {action}
         </div>
     );
@@ -100,7 +102,7 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 function Section({ tone, children }: { tone: 'white' | 'gray'; children: React.ReactNode }) {
     return (
         <section className={tone === 'gray' ? 'bg-zinc-100' : 'bg-background'}>
-            <div className="mx-auto max-w-[1600px] px-3 py-5 sm:px-4 sm:py-6 lg:px-6">{children}</div>
+            <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">{children}</div>
         </section>
     );
 }
@@ -109,17 +111,17 @@ function ExploreSection() {
     return (
         <Section tone="white">
             <SectionHeader title="Explore" />
-            <div className="flex gap-6 overflow-x-auto pb-1">
+            <div className="flex gap-8 overflow-x-auto pb-1 sm:gap-10">
                 {EXPLORE.map((item, i) => (
                     <button
                         key={`${item.label}-${i}`}
                         type="button"
-                        className="flex shrink-0 flex-col items-center gap-2 transition"
+                        className="flex shrink-0 flex-col items-center gap-2.5 transition"
                     >
-                        <span className="flex size-16 items-center justify-center rounded-full bg-amber-50 text-4xl sm:size-20 sm:text-5xl">
+                        <span className="flex size-20 items-center justify-center rounded-full bg-amber-50 text-5xl sm:size-24 sm:text-6xl">
                             {item.emoji}
                         </span>
-                        <span className="text-xs font-medium text-foreground">{item.label}</span>
+                        <span className="text-sm font-medium text-foreground">{item.label}</span>
                     </button>
                 ))}
             </div>
@@ -131,7 +133,7 @@ function TopPicksSection() {
     return (
         <Section tone="gray">
             <SectionHeader title="Top Pick's" />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
                 {TOP_PICKS.map((r) => (
                     <Link
                         key={r.name}
@@ -146,14 +148,14 @@ function TopPicksSection() {
                                 loading="lazy"
                             />
                         </div>
-                        <div className="flex items-center justify-between pt-2">
+                        <div className="flex items-center justify-between pt-3">
                             <div>
-                                <p className="text-sm font-semibold">{r.name}</p>
-                                <p className="text-[11px] text-muted-foreground">30-40 min · 1.4 mi</p>
+                                <p className="text-base font-semibold">{r.name}</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">30-40 min · 1.4 mi</p>
                             </div>
-                            <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground">
                                 <Star className="size-3 fill-current" /> {r.rating}
-                                <span className="ml-0.5 font-normal text-emerald-700/70">({r.reviews})</span>
+                                <span className="font-normal text-emerald-700/70">({r.reviews})</span>
                             </span>
                         </div>
                     </Link>
@@ -172,38 +174,39 @@ function CuisinesAndPromoSection() {
     return (
         <Section tone="white">
             <SectionHeader title="Explore Cuisines" />
-            <div className="flex gap-6 overflow-x-auto pb-1">
+            <div className="flex gap-7 overflow-x-auto pb-1 sm:gap-8">
                 {CUISINES.map((c, i) => (
                     <button
                         key={`${c.label}-${i}`}
                         type="button"
-                        className="flex shrink-0 flex-col items-center gap-2 text-center"
+                        className="flex shrink-0 flex-col items-center gap-2.5 text-center"
                     >
                         <span className="size-20 overflow-hidden rounded-full sm:size-24">
                             <img src={c.image} alt={c.label} className="h-full w-full object-cover" loading="lazy" />
                         </span>
-                        <span className="text-xs font-medium">{c.label}</span>
+                        <span className="text-sm font-medium">{c.label}</span>
                     </button>
                 ))}
             </div>
 
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {PROMOS.map((p, i) => (
                     <div
                         key={i}
-                        className={`relative overflow-hidden rounded-2xl ${p.accent} p-5`}
+                        className={`relative flex h-56 items-center overflow-hidden ${p.accent} px-8 sm:h-64`}
                     >
-                        <div className="relative z-10 max-w-[60%]">
-                            <p className="text-base font-bold">{p.title}</p>
-                            <p className="mt-1 text-xs font-medium text-foreground/80">{p.subtitle}</p>
-                            <p className="mt-3 inline-block rounded-md bg-white/70 px-2 py-1 text-[11px] font-semibold text-foreground/80">
-                                {p.meta}
-                            </p>
+                        <div className="relative z-10 flex max-w-[55%] flex-col justify-between">
+                            <div>
+                                <p className="text-2xl font-bold text-foreground">{p.title}</p>
+                                <p className="mt-2 text-base font-medium text-foreground/80">{p.subtitle}</p>
+                                <p className="text-base font-medium text-foreground/80">{p.offer}</p>
+                            </div>
+                            <p className="mt-8 text-sm font-medium text-foreground/70">{p.meta}</p>
                         </div>
                         <img
                             src={p.image}
                             alt=""
-                            className="absolute right-0 top-0 h-full w-2/5 object-cover"
+                            className="absolute right-0 top-0 h-full w-1/2 object-cover"
                             loading="lazy"
                         />
                     </div>
@@ -219,12 +222,12 @@ function AllRestaurantsSection() {
             <SectionHeader
                 title="All Restaurants"
                 action={
-                    <Link href="#" className="text-xs font-semibold text-primary hover:underline">
+                    <Link href="#" className="text-sm font-semibold text-primary hover:underline">
                         View all
                     </Link>
                 }
             />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
                 {ALL_RESTAURANTS.map((r) => (
                     <Link
                         key={r.id}
@@ -238,24 +241,17 @@ function AllRestaurantsSection() {
                                 className="h-full w-full object-cover transition group-hover:scale-105"
                                 loading="lazy"
                             />
-                            <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow">
+                            <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
                                 {r.discount}
                             </span>
-                            <button
-                                type="button"
-                                aria-label="Save"
-                                className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-full bg-white/90 text-muted-foreground transition hover:text-rose-500"
-                            >
-                                <Heart className="size-3.5" />
-                            </button>
-                            <span className="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 shadow">
-                                <Star className="size-3 fill-current" /> {r.rating}
+                            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
+                                <Star className="size-3 fill-current text-amber-500" /> {r.rating}
                             </span>
                         </div>
-                        <div className="flex items-center justify-between pt-2">
+                        <div className="flex items-center justify-between pt-3">
                             <div>
-                                <p className="text-sm font-semibold">{r.name}</p>
-                                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                <p className="text-base font-semibold">{r.name}</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
                                     {r.eta} · {r.distance}
                                 </p>
                             </div>
@@ -264,7 +260,7 @@ function AllRestaurantsSection() {
                                 aria-label="Save"
                                 className="text-muted-foreground transition hover:text-rose-500"
                             >
-                                <Heart className="size-4" />
+                                <Heart className="size-5" />
                             </button>
                         </div>
                     </Link>
@@ -290,7 +286,7 @@ export default function CustomerHome() {
                 <AllRestaurantsSection />
             </main>
 
-            <SiteFooter />
+            {/* <SiteFooter /> */}
         </div>
     );
 }

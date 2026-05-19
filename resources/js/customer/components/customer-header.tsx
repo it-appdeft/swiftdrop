@@ -35,19 +35,15 @@ export function CustomerHeader() {
     };
 
     return (
-        <header className="sticky top-0 z-30 border-b border-border bg-background">
-            <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-3 px-3 sm:gap-5 sm:px-4 lg:gap-6 lg:px-6">
-                <Link href={route('customer.dashboard')} aria-label="SwiftDrop home" className="flex shrink-0 flex-col items-center leading-none">
-                    <img src="/brand/Container.png" alt="" aria-hidden className="h-6 w-auto sm:h-7" />
-                    <span className="mt-0.5 text-[10px] font-semibold tracking-tight">
-                        {/* <span>Swift</span>
-                        <span className="text-primary">Drop</span> */}
-                    </span>
+        <header className="sticky top-0 z-30 bg-zinc-50">
+            <div className="mx-auto flex h-20 max-w-[1600px] items-center gap-4 px-4 sm:gap-8 sm:px-6 lg:gap-10 lg:px-8">
+                <Link href={route('customer.dashboard')} aria-label="SwiftDrop home" className="flex shrink-0 items-center leading-none">
+                    <img src="/brand/Container.png" alt="" aria-hidden className="h-9 w-auto sm:h-10" />
                 </Link>
 
                 <button
                     type="button"
-                    className="flex min-w-0 items-center gap-1.5 text-sm text-foreground sm:gap-2"
+                    className="flex min-w-0 items-center gap-2 text-sm text-foreground"
                 >
                     <span className="font-semibold underline underline-offset-4">Others</span>
                     <span className="hidden truncate text-muted-foreground md:inline">
@@ -56,29 +52,29 @@ export function CustomerHeader() {
                     <ChevronDown className="size-4 shrink-0 text-primary" />
                 </button>
 
-                <nav className="ml-auto flex items-center gap-3 text-sm font-medium sm:gap-5 lg:gap-7">
+                <nav className="ml-auto flex items-center gap-6 text-sm font-medium sm:gap-8 lg:gap-10">
                     <button
                         type="button"
                         aria-label="Search"
-                        className="flex items-center gap-1.5 text-foreground hover:text-primary"
+                        className="flex items-center gap-2 text-foreground hover:text-primary"
                     >
-                        <Search className="size-4" />
+                        <Search className="size-5" />
                         <span className="hidden md:inline">Search</span>
                     </button>
                     <button
                         type="button"
                         aria-label="Offers"
-                        className="flex items-center gap-1.5 text-foreground hover:text-primary"
+                        className="flex items-center gap-2 text-foreground hover:text-primary"
                     >
-                        <BadgePercent className="size-4" />
+                        <BadgePercent className="size-5" />
                         <span className="hidden md:inline">Offers</span>
                     </button>
                     <button
                         type="button"
                         aria-label="Cart"
-                        className="flex items-center gap-1.5 text-foreground hover:text-primary"
+                        className="flex items-center gap-2 text-foreground hover:text-primary"
                     >
-                        <ShoppingBag className="size-4" />
+                        <ShoppingBag className="size-5" />
                         <span className="hidden md:inline">Cart</span>
                     </button>
                     <DropdownMenu>
@@ -86,9 +82,9 @@ export function CustomerHeader() {
                             <button
                                 type="button"
                                 aria-label="Account"
-                                className="flex max-w-[160px] items-center gap-1.5 text-foreground hover:text-primary"
+                                className="flex max-w-[180px] items-center gap-2 text-foreground hover:text-primary"
                             >
-                                <UserIcon className="size-4" />
+                                <UserIcon className="size-5" />
                                 <span className="hidden truncate sm:inline">{displayName}</span>
                                 <ChevronDown className="hidden size-3.5 text-muted-foreground sm:inline" />
                             </button>
