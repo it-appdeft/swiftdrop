@@ -73,23 +73,22 @@ export default function Login() {
                     Get OTP
                 </Button>
             </form>
-            <div className="mt-6 space-y-3">
-                <p className="text-center text-sm text-muted-foreground">New to Swiftdrop? Create an account as</p>
-                <div className="grid grid-cols-2 gap-3">
-                    <Link
-                        href={`${route('register')}?as=customer`}
-                        className="flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground hover:border-primary hover:text-primary"
-                    >
-                        Customer
-                    </Link>
-                    <Link
-                        href={`${route('register')}?as=restaurant`}
-                        className="flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground hover:border-primary hover:text-primary"
-                    >
-                        Restaurant
-                    </Link>
-                </div>
-            </div>
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+                New to Swiftdrop? Create an account as{' '}
+                <Link
+                    href={`${route('register')}?as=customer`}
+                    className="font-medium text-primary hover:underline"
+                >
+                    Customer
+                </Link>{' '}
+                or{' '}
+                <Link
+                    href={`${route('register')}?as=restaurant`}
+                    className="font-medium text-primary hover:underline"
+                >
+                    Restaurant
+                </Link>
+            </p>
         </AuthShell>
     );
 }
