@@ -13,7 +13,7 @@ interface SettingsNavItem extends NavItem {
 }
 
 const sidebarNavItems: SettingsNavItem[] = [
-    { title: 'Profile',    url: '/settings/profile',    icon: User,    description: 'Name, email & avatar' },
+    { title: 'Profile',    url: '/settings/profile',    icon: User,    description: 'Email' },
     { title: 'Password',   url: '/settings/password',   icon: Shield,  description: 'Change your password' },
     { title: 'Appearance', url: '/settings/appearance', icon: Monitor, description: 'Theme preferences' },
 ];

@@ -20,9 +20,9 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
             {/* Top header — full-width brand bar spanning both columns.
                 Mirrors the customer chrome so the admin login feels like
                 part of the same product. */}
-            <header className="px-6 pt-6 sm:px-10 sm:pt-8">
+            <header className="px-4 py-2 sm:px-6 sm:py-2">
                 <Link href={route('home')} className="inline-flex w-fit items-center" aria-label="SwiftDrop">
-                    <img src="/brand/Container.png" alt="SwiftDrop" className="h-9 w-auto sm:h-10" />
+                    <img src="/brand/dark-logo-4x.png" alt="SwiftDrop" className="h-15 w-25" />
                 </Link>
             </header>
 
