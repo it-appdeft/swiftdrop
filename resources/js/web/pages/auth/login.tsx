@@ -4,7 +4,6 @@ import { Label } from '@/components/ui/label';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Phone } from 'lucide-react';
 import { AuthShell } from '../../components/auth-shell';
-import { use } from 'react';
 
 export default function Login() {
     const { data, setData, post, processing, errors } = useForm({

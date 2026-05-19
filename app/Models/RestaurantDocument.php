@@ -32,7 +32,10 @@ class RestaurantDocument extends Model
         'pan' => 'pan_card_path',
         'cancelledCheque' => 'cancelled_cheque_path',
         'ownerId' => 'owner_id_proof_path',
-        'menu' => 'menu_path',
+        // Step 4 of the new application calls this slot "Restaurant photo".
+        // The DB column stays `menu_path` to avoid a rename — the partner
+        // application has never collected a menu PDF in this flow.
+        'restaurantPhoto' => 'menu_path',
     ];
 
     public function restaurant(): BelongsTo

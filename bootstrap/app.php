@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\EnsureIsAdmin::class,
             'customer' => \App\Http\Middleware\EnsureIsCustomer::class,
             'restaurant' => \App\Http\Middleware\EnsureIsRestaurant::class,
+            'restaurant.onboarded' => \App\Http\Middleware\EnsureRestaurantOnboarded::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

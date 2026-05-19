@@ -283,7 +283,9 @@ export default function Register({ role }: RegisterProps) {
         <AuthShell>
             <Head title={role === 'restaurant' ? 'Register your restaurant' : 'Create your account'} />
 
-            <h1 className="text-2xl font-bold tracking-tight">Create Your Account</h1>
+            <h1 className="text-2xl font-bold tracking-tight">
+                Create Your {role === 'restaurant' ? 'Restaurant' : 'Customer'} Account
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
                 Join the elite network of urban food connoisseurs.
             </p>
@@ -465,6 +467,16 @@ export default function Register({ role }: RegisterProps) {
             </p>
 
             <p className="mt-3 text-center text-sm text-muted-foreground">
+                {role === 'restaurant' ? 'Want to order food instead?' : 'Are you a restaurant?'}{' '}
+                <Link
+                    href={`${route('register')}?as=${role === 'restaurant' ? 'customer' : 'restaurant'}`}
+                    className="font-medium text-primary hover:underline"
+                >
+                    Register as {role === 'restaurant' ? 'Customer' : 'Restaurant'}
+                </Link>
+            </p>
+
+            <p className="mt-2 text-center text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <Link href={route('login')} className="font-medium text-primary hover:underline">
                     Login

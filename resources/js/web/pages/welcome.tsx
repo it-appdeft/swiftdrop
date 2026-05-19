@@ -4,14 +4,38 @@ import { SiteFooter } from '../components/site-footer';
 import { SiteHeader } from '../components/site-header';
 
 const CUISINES = [
-    { label: 'Pizza', emoji: '🍕' },
-    { label: 'Burger', emoji: '🍔' },
-    { label: 'Sushi', emoji: '🍣' },
-    { label: 'Sandwich', emoji: '🥪' },
-    { label: 'Pasta', emoji: '🍝' },
-    { label: 'Ramen', emoji: '🍜' },
-    { label: 'Salad', emoji: '🥗' },
-    { label: 'Dessert', emoji: '🍰' },
+    {
+        label: 'Pizza',
+        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=240&h=240&fit=crop',
+    },
+    {
+        label: 'Burger',
+        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=240&h=240&fit=crop',
+    },
+    {
+        label: 'Sushi',
+        image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=240&h=240&fit=crop',
+    },
+    {
+        label: 'Sandwich',
+        image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=240&h=240&fit=crop',
+    },
+    {
+        label: 'Pasta',
+        image: 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=240&h=240&fit=crop',
+    },
+    {
+        label: 'Ramen',
+        image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=240&h=240&fit=crop',
+    },
+    {
+        label: 'Salad',
+        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=240&h=240&fit=crop',
+    },
+    {
+        label: 'Dessert',
+        image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=240&h=240&fit=crop',
+    },
 ];
 
 const RESTAURANTS = [
@@ -226,13 +250,13 @@ export default function Welcome() {
                             <span className="text-white">Discover best restaurants. Swiftdrop it!</span>
                         </h1>
 
-                        <div className="mx-auto mt-8 grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="mx-auto mt-8 grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr]">
                             <div className="relative">
-                                <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground" />
+                                <MapPin className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-foreground" />
                                 <input
                                     type="text"
                                     placeholder="Enter your delivery location"
-                                    className="h-11 w-full rounded-lg bg-white pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                    className="h-12 w-full rounded-lg bg-white pl-10 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                                 <ChevronDown className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-foreground" />
                             </div>
@@ -240,7 +264,7 @@ export default function Welcome() {
                                 <input
                                     type="text"
                                     placeholder="Search restaurant or dishes"
-                                    className="h-11 w-full rounded-lg bg-white pl-3 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                    className="h-12 w-full rounded-lg bg-white pl-4 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                                 <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-foreground" />
                             </div>
@@ -259,8 +283,13 @@ export default function Welcome() {
                                     type="button"
                                     className="group flex flex-col items-center gap-2 transition hover:opacity-80"
                                 >
-                                    <span className="flex size-16 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm transition group-hover:shadow-md sm:size-[72px] sm:text-4xl">
-                                        {c.emoji}
+                                    <span className="flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm transition group-hover:shadow-md sm:size-[72px]">
+                                        <img
+                                            src={c.image}
+                                            alt={c.label}
+                                            loading="lazy"
+                                            className="size-full object-cover"
+                                        />
                                     </span>
                                     <span className="text-xs font-medium text-foreground sm:text-sm">{c.label}</span>
                                 </button>

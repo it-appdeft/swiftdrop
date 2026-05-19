@@ -24,6 +24,8 @@ class Restaurant extends Model
         'branches',
         'seating_capacity',
         'full_address',
+        'city',
+        'pin_code',
         'lat',
         'lng',
         // Operational state (lifecycle after onboarding).
@@ -39,9 +41,6 @@ class Restaurant extends Model
         'application_step',
         'terms_accepted_at',
         'application_submitted_at',
-        // Onboarding progress.
-        'onboarding_step',
-        'onboarding_completed_at',
     ];
 
     protected function casts(): array
@@ -54,21 +53,14 @@ class Restaurant extends Model
             'branches' => 'integer',
             'seating_capacity' => 'integer',
             'application_step' => 'integer',
-            'onboarding_step' => 'integer',
             'terms_accepted_at' => 'datetime',
             'application_submitted_at' => 'datetime',
-            'onboarding_completed_at' => 'datetime',
         ];
     }
 
     public function hasSubmittedApplication(): bool
     {
         return $this->application_submitted_at !== null;
-    }
-
-    public function hasCompletedOnboarding(): bool
-    {
-        return $this->onboarding_completed_at !== null;
     }
 
     public function user(): BelongsTo
@@ -119,6 +111,12 @@ class Restaurant extends Model
     public function menuItems(): HasMany
     {
         return $this->hasMany(MenuItem::class);
+    }
+
+    /** Starter dishes captured during the partner application (Step 5). */
+    public function starterMenuItems(): HasMany
+    {
+        return $this->hasMany(RestaurantMenuItem::class)->orderBy('sort_order');
     }
 
     public function orders(): HasMany

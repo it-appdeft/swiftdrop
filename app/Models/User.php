@@ -60,21 +60,13 @@ class User extends Authenticatable
     public function homeRouteName(): string
     {
         if ($this->hasRole(UserRoleEnum::RESTAURANT_OWNER->value)) {
-            // Restaurant owners go through three stages after registration:
-            //   1. Partner application (steps 1–4)           → partner.apply
-            //   2. Setup / onboarding (steps 1–8)            → restaurant.onboarding
-            //   3. Live dashboard                            → restaurant.dashboard
+            // Restaurant owners complete the unified 8-step partner application
+            // (registration → /partner/apply → restaurant.dashboard).
             $restaurant = $this->restaurant ?? $this->restaurant()->first();
 
-            if (! $restaurant || ! $restaurant->hasSubmittedApplication()) {
-                return 'partner.apply';
-            }
-
-            if (! $restaurant->hasCompletedOnboarding()) {
-                return 'restaurant.onboarding';
-            }
-
-            return 'restaurant.dashboard';
+            return $restaurant && $restaurant->hasSubmittedApplication()
+                ? 'restaurant.dashboard'
+                : 'partner.apply';
         }
 
         return match (true) {
