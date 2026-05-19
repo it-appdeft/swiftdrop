@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { ChevronDown, Clock, Heart, MapPin, Search, Star } from 'lucide-react';
 import { SiteFooter } from '../components/site-footer';
 import { SiteHeader } from '../components/site-header';
+import { SwiftdropWordmark } from '../components/swiftdrop-wordmark';
 
 const CUISINES = [
     {
@@ -387,9 +388,21 @@ export default function Welcome() {
                 <section className="bg-background py-10 sm:py-14">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                         <div className="relative overflow-hidden rounded-3xl bg-primary px-6 py-10 text-primary-foreground sm:px-10 md:h-[360px] md:px-14 md:py-12 lg:h-[400px]">
+                            {/* Black frame around the phones-only half (right side
+                                of the card) — matches the figma where the border
+                                hugs the phone artwork, not the whole promo card.
+                                Rounded only on the right; the left edge stays
+                                square as the interior divider. `z-10` lifts the
+                                frame above the phones image so the stroke renders
+                                on top. */}
+                            <div
+                                aria-hidden
+                                className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-1/2 rounded-r-3xl border-2 border-black md:block"
+                            />
                             <div className="grid items-center gap-8 md:grid-cols-[1.2fr_1fr]">
                                 <div>
-                                    <h2 className="text-2xl pt-14 font-bold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
+                                    <SwiftdropWordmark color="light" className="mb-4" />
+                                    <h2 className="text-2xl font-bold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
                                         Elevate Your Dining Experience
                                     </h2>
                                     <p className="mt-3 max-w-sm text-sm text-primary-foreground/90">
@@ -404,11 +417,11 @@ export default function Welcome() {
                                         >
                                             <svg
                                                 className="size-6"
-                                                viewBox="0 0 24 24"
+                                                viewBox="0 0 384 512"
                                                 fill="currentColor"
                                                 aria-hidden
                                             >
-                                                <path d="M17.05 12.04c-.03-2.66 2.17-3.94 2.27-4-1.24-1.81-3.17-2.06-3.85-2.09-1.64-.17-3.21.96-4.04.96-.85 0-2.12-.94-3.49-.91-1.79.03-3.44 1.04-4.36 2.64-1.87 3.25-.48 8.04 1.34 10.67.88 1.29 1.93 2.74 3.31 2.69 1.33-.05 1.83-.86 3.44-.86s2.07.86 3.49.83c1.44-.02 2.35-1.31 3.23-2.6 1.02-1.49 1.44-2.94 1.46-3.02-.03-.01-2.79-1.07-2.82-4.27zM14.5 4.34c.73-.89 1.22-2.12 1.08-3.34-1.05.04-2.32.7-3.07 1.58-.67.78-1.27 2.03-1.11 3.23 1.17.09 2.37-.59 3.1-1.47z" />
+                                                <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zM262.1 104.5c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
                                             </svg>
                                             <span className="flex flex-col items-start leading-tight">
                                                 <span className="text-[9px] uppercase tracking-wide">
@@ -424,14 +437,25 @@ export default function Welcome() {
                                         >
                                             <svg
                                                 className="size-6"
-                                                viewBox="0 0 24 24"
-                                                fill="currentColor"
+                                                viewBox="0 0 256 256"
                                                 aria-hidden
                                             >
-                                                <path d="M3.6 2.27c-.32.34-.5.86-.5 1.55v16.36c0 .69.18 1.21.5 1.55l.06.06 9.16-9.16v-.22L3.66 2.2l-.06.07z" />
-                                                <path d="M15.81 14.63l-3.05-3.05v-.22l3.05-3.05.07.04 3.62 2.06c1.03.59 1.03 1.55 0 2.14l-3.62 2.06-.07.02z" />
-                                                <path d="M15.88 14.61l-3.12-3.12L3.6 20.66c.34.36.9.4 1.53.04l10.75-6.09" />
-                                                <path d="M15.88 8.37L5.13 2.28c-.63-.36-1.19-.32-1.53.04l9.16 9.17 3.12-3.12z" />
+                                                <path
+                                                    fill="#00D7FE"
+                                                    d="M11.5 14.3C8.9 17 7.5 21.3 7.5 26.8v202.4c0 5.5 1.4 9.8 4 12.5L139.6 128 11.5 14.3z"
+                                                />
+                                                <path
+                                                    fill="#FFCE00"
+                                                    d="m177.6 166-38-38 38-38 50.4 28.6c14.4 8.2 14.4 21.6 0 29.9L177.6 166z"
+                                                />
+                                                <path
+                                                    fill="#FF3A44"
+                                                    d="M178.7 165 139.6 128 11.5 241.7c5 5.4 13.3 6 22.7.7L178.7 165z"
+                                                />
+                                                <path
+                                                    fill="#00F076"
+                                                    d="M178.7 91 34.2 13.6C24.8 8.3 16.5 8.9 11.5 14.3L139.6 128l39.1-37z"
+                                                />
                                             </svg>
                                             <span className="flex flex-col items-start leading-tight">
                                                 <span className="text-[9px] uppercase tracking-wide">Get it on</span>
