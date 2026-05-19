@@ -6,22 +6,16 @@ interface SwiftdropWordmarkProps {
 }
 
 export function SwiftdropWordmark({ className, color = 'dark' }: SwiftdropWordmarkProps) {
+    const isLight = color === 'light';
+
     return (
         <div className={cn('inline-flex items-center gap-2', className)}>
-            <svg viewBox="0 0 24 24" className="size-7" fill="none" aria-hidden>
-                <path
-                    d="M12 2 L20 8 L17 21 L7 21 L4 8 Z"
-                    className={color === 'light' ? 'fill-white' : 'fill-primary'}
-                />
-            </svg>
-            <span
-                className={cn(
-                    'text-lg font-semibold tracking-tight',
-                    color === 'light' ? 'text-white' : 'text-foreground',
-                )}
-            >
-                swiftdrop
-            </span>
+            <img
+                src="/brand/dark-logo.png"
+                alt=""
+                aria-hidden
+                className={cn('h-10 w-auto', isLight && 'brightness-0 invert')}
+            />
         </div>
     );
 }

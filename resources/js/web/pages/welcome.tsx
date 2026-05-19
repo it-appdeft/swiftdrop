@@ -1,7 +1,5 @@
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Head, Link } from '@inertiajs/react';
-import { MapPin, Package, Search, Sparkles, Zap } from 'lucide-react';
+import { ChevronDown, Clock, Heart, MapPin, Search, Star } from 'lucide-react';
 import { SiteFooter } from '../components/site-footer';
 import { SiteHeader } from '../components/site-header';
 
@@ -13,32 +11,195 @@ const CUISINES = [
     { label: 'Pasta', emoji: '🍝' },
     { label: 'Ramen', emoji: '🍜' },
     { label: 'Salad', emoji: '🥗' },
-    { label: 'Dessert', emoji: '🧁' },
+    { label: 'Dessert', emoji: '🍰' },
 ];
 
 const RESTAURANTS = [
-    { name: 'The Mocha Grill', location: '20-25 min', distance: '1.2 mi', emoji: '🍕' },
-    { name: 'My World Pizza', location: '15-20 min', distance: '0.8 mi', emoji: '🍝' },
-    { name: 'Smash Burger Co.', location: '25-30 min', distance: '2.1 mi', emoji: '🍔' },
+    {
+        name: 'The Marble Grill',
+        eta: '20-30 min',
+        distance: '4.9 mi',
+        discount: '60% OFF select items',
+        rating: 4.5,
+        image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=900&h=720&fit=crop',
+    },
+    {
+        name: 'My World Pizza',
+        eta: '20-30 min',
+        distance: '5.9 mi',
+        discount: '20% OFF select items',
+        rating: 4.6,
+        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=900&h=720&fit=crop',
+    },
+    {
+        name: 'My World Pizza',
+        eta: '20-30 min',
+        distance: '5.9 mi',
+        discount: '20% OFF select items',
+        rating: 4.6,
+        image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=900&h=720&fit=crop',
+    },
 ];
 
 const STEPS = [
     {
-        icon: Sparkles,
         title: 'Selection',
-        description: 'Choose from a curated list of top restaurants in your area, powered by local data.',
+        description:
+            'Choose from an exclusive list of top-tier restaurants and artisanal kitchens.',
+        icon: (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-6">
+                <rect x="4" y="3" width="16" height="18" rx="2" />
+                <path d="M8 8h8M8 12h8M8 16h5" />
+                <path d="m15 14 2 2 3-3" />
+            </svg>
+        ),
     },
     {
-        icon: Zap,
         title: 'Priority Transit',
-        description: 'Our riders prioritize your food and route freshness with smart dispatching.',
+        description:
+            "Our dedicated couriers ensure your meal arrives in peak condition with white-glove care.",
+        icon: (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-6">
+                <circle cx="6" cy="17" r="3" />
+                <circle cx="18" cy="17" r="3" />
+                <path d="M8 17h7l-2-5h3l2 3" />
+                <path d="M5 12h4l-1-3H6" />
+            </svg>
+        ),
     },
     {
-        icon: Package,
         title: 'Enjoy Fresh',
-        description: 'Track every step from kitchen to doorstep and enjoy a hot, fresh delivery.',
+        description:
+            'Savor the restaurant experience from the comfort and privacy of your home.',
+        icon: (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-6">
+                <path d="M3 11h18" />
+                <path d="M5 11a7 7 0 0 1 14 0" />
+                <path d="M3 15h18" />
+                <path d="M8 7V4M12 7V3M16 7V4" />
+            </svg>
+        ),
     },
 ];
+
+const HERO_IMAGE = '/assets/images/landing-home-banner.png';
+
+// Inline iPhone mockups — Tailwind + Unsplash food photos. Designed for the
+// "Elevate Your Dining Experience" CTA: two phones tilted slightly outward,
+// each showing a different app screen.
+
+const PHONE_FOOD_A = 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=240&h=180&fit=crop';
+const PHONE_FOOD_B = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=240&h=180&fit=crop';
+const PHONE_FOOD_C = 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=240&h=180&fit=crop';
+const PHONE_FOOD_D = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=240&h=180&fit=crop';
+
+function PhoneFrame({
+    rotation,
+    className,
+    children,
+}: {
+    rotation: string;
+    className?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div
+            className={`relative overflow-hidden rounded-[2rem] border-[6px] border-zinc-900 bg-zinc-900 shadow-2xl ${rotation} ${className ?? ''}`}
+        >
+            {/* Notch */}
+            <div className="pointer-events-none absolute left-1/2 top-1.5 z-10 h-2 w-10 -translate-x-1/2 rounded-full bg-zinc-900" />
+            <div className="size-full overflow-hidden rounded-[1.5rem] bg-white">
+                {children}
+            </div>
+        </div>
+    );
+}
+
+// Left phone — "Discover" screen: location, cuisine row, Top Picks grid.
+function PhoneScreenA() {
+    return (
+        <div className="flex h-full flex-col bg-white">
+            <div className="flex items-center gap-1.5 bg-white px-3 pt-4 pb-1.5">
+                <MapPin className="size-2.5 text-emerald-600" />
+                <span className="text-[7px] font-semibold text-zinc-900">West Coker, Yelovil, UK</span>
+            </div>
+            <div className="px-3 pb-2">
+                <div className="flex h-4 items-center rounded-md bg-zinc-100 px-1.5 text-[6px] text-zinc-500">
+                    Search dishes & restaurants
+                </div>
+            </div>
+            <div className="flex justify-between gap-1.5 px-3 pb-2">
+                {[
+                    { label: 'Pizza', color: 'bg-orange-200' },
+                    { label: 'Momo', color: 'bg-rose-200' },
+                    { label: 'Drinks', color: 'bg-amber-200' },
+                    { label: 'Sandwich', color: 'bg-lime-200' },
+                ].map((c) => (
+                    <div key={c.label} className="flex flex-col items-center gap-0.5">
+                        <span className={`size-5 rounded-full ${c.color}`} />
+                        <span className="text-[5px] font-medium text-zinc-700">{c.label}</span>
+                    </div>
+                ))}
+            </div>
+            <div className="bg-amber-50 px-3 pt-2">
+                <p className="text-[8px] font-bold text-zinc-900">Top Pick's</p>
+            </div>
+            <div className="grid flex-1 grid-cols-2 gap-1.5 bg-amber-50 px-3 pb-3 pt-1.5">
+                <div className="overflow-hidden rounded-md">
+                    <img src={PHONE_FOOD_A} alt="" className="size-full object-cover" loading="lazy" />
+                </div>
+                <div className="overflow-hidden rounded-md">
+                    <img src={PHONE_FOOD_B} alt="" className="size-full object-cover" loading="lazy" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Right phone — restaurant menu screen with Restaurants/Dishes tabs.
+function PhoneScreenB() {
+    const dishes = [
+        { name: 'The Marble Grill', sub: 'Margherita Ultimate Cheese Pizza', price: '£8.23', img: PHONE_FOOD_C },
+        { name: 'World Pizza', sub: 'Margherita Pizza Giant Slice', price: '£8.23', img: PHONE_FOOD_D },
+        { name: 'Sweet Corn Pizza', sub: 'Margherita Pizza Giant Slice', price: '£8.23', img: PHONE_FOOD_A },
+    ];
+
+    return (
+        <div className="flex h-full flex-col bg-white">
+            <div className="flex items-center justify-between border-b border-zinc-100 px-3 pt-4 pb-1.5">
+                <span className="inline-flex items-center gap-1 text-[7px] font-semibold text-zinc-900">
+                    <Search className="size-2.5 text-emerald-600" />
+                    Pizza
+                </span>
+                <span className="text-[6px] text-zinc-500">highest rated</span>
+            </div>
+            <div className="border-b border-zinc-100 px-3 pt-1.5 pb-1">
+                <p className="text-[7px] font-semibold text-zinc-900">Search dishes & restaurants</p>
+            </div>
+            <div className="flex gap-3 border-b border-zinc-100 px-3 py-1.5 text-[6px] font-semibold">
+                <span className="text-zinc-400">Restaurants</span>
+                <span className="border-b-2 border-emerald-600 pb-0.5 text-zinc-900">Dishes</span>
+            </div>
+            <div className="flex-1 space-y-2 px-3 py-2">
+                {dishes.map((d) => (
+                    <div key={d.name} className="flex items-center gap-2">
+                        <div className="relative size-9 shrink-0 overflow-hidden rounded-md">
+                            <img src={d.img} alt="" className="size-full object-cover" loading="lazy" />
+                            <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 rounded-sm border border-emerald-600 bg-white px-1 text-[5px] font-semibold text-emerald-600">
+                                ADD
+                            </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[7px] font-semibold text-zinc-900">{d.name}</p>
+                            <p className="text-[5px] leading-tight text-zinc-500">{d.sub}</p>
+                            <p className="mt-0.5 text-[6px] font-semibold text-zinc-900">{d.price}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export default function Welcome() {
     return (
@@ -48,161 +209,225 @@ export default function Welcome() {
             <div className="flex min-h-screen flex-col bg-background">
                 <SiteHeader />
 
-                {/* Hero */}
-                <section className="relative isolate overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-950 to-slate-900 text-white">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(16,185,129,0.25),transparent_55%)]" />
-                    <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
-                        <div className="mx-auto max-w-3xl text-center">
-                            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-                                Order food. Discover best restaurants.{' '}
-                                <span className="text-emerald-400">Swiftdrop it!</span>
-                            </h1>
-                        </div>
+                {/* Hero ------------------------------------------------------------- */}
+                <section className="relative isolate overflow-hidden text-white">
+                    <img
+                        src={HERO_IMAGE}
+                        alt=""
+                        aria-hidden
+                        className="absolute inset-0 -z-20 size-full object-cover"
+                    />
+                    {/* Dark green tint for headline contrast over banner image. */}
+                    <div className="absolute inset-0 -z-10 bg-emerald-950/40" />
 
-                        <div className="mx-auto mt-10 max-w-3xl">
-                            <div className="flex flex-col gap-3 rounded-2xl bg-white p-3 shadow-2xl sm:flex-row sm:items-center">
-                                <div className="relative flex-1">
-                                    <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        type="text"
-                                        placeholder="Enter your delivery location"
-                                        className="border-0 pl-9 text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
-                                    />
-                                </div>
-                                <div className="relative flex-1 border-t border-border pt-2 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
-                                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground sm:left-6" />
-                                    <Input
-                                        type="text"
-                                        placeholder="Search restaurants or cuisine"
-                                        className="border-0 pl-9 text-foreground placeholder:text-muted-foreground focus-visible:ring-0 sm:pl-12"
-                                    />
-                                </div>
-                                <Button size="lg" className="h-11 px-8">
-                                    Find food
-                                </Button>
+                    <div className="mx-auto flex min-h-[480px] max-w-7xl flex-col justify-center px-4 py-16 sm:min-h-[560px] sm:px-6 sm:py-20 lg:min-h-[640px] lg:px-8 lg:py-28">
+                        <h1 className="mx-auto max-w-3xl text-center text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-[56px] lg:leading-[1.1]">
+                            <span className="text-emerald-300">Order food.</span>{' '}
+                            <span className="text-white">Discover best restaurants. Swiftdrop it!</span>
+                        </h1>
+
+                        <div className="mx-auto mt-8 grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="relative">
+                                <MapPin className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground" />
+                                <input
+                                    type="text"
+                                    placeholder="Enter your delivery location"
+                                    className="h-11 w-full rounded-lg bg-white pl-9 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                />
+                                <ChevronDown className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-foreground" />
+                            </div>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Search restaurant or dishes"
+                                    className="h-11 w-full rounded-lg bg-white pl-3 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                />
+                                <Search className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-foreground" />
                             </div>
                         </div>
                     </div>
                 </section>
 
-                {/* Explore Cuisines */}
-                <section className="bg-background py-14">
+                {/* Explore Cuisines ------------------------------------------------- */}
+                <section className="bg-zinc-50 py-10 sm:py-12">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <h2 className="text-2xl font-bold tracking-tight">Explore Cuisines</h2>
-                        <div className="mt-6 flex gap-4 overflow-x-auto pb-2">
-                            {CUISINES.map((c) => (
+                        <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Explore Cuisines</h2>
+                        <div className="mt-6 grid grid-cols-4 gap-3 sm:grid-cols-6 sm:gap-4 md:grid-cols-8">
+                            {CUISINES.map((c, i) => (
                                 <button
-                                    key={c.label}
+                                    key={`${c.label}-${i}`}
                                     type="button"
-                                    className="flex shrink-0 flex-col items-center gap-2 rounded-xl border border-border bg-card px-5 py-4 text-sm font-medium transition hover:border-primary hover:shadow-md"
+                                    className="group flex flex-col items-center gap-2 transition hover:opacity-80"
                                 >
-                                    <span className="text-3xl">{c.emoji}</span>
-                                    <span>{c.label}</span>
+                                    <span className="flex size-16 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm transition group-hover:shadow-md sm:size-[72px] sm:text-4xl">
+                                        {c.emoji}
+                                    </span>
+                                    <span className="text-xs font-medium text-foreground sm:text-sm">{c.label}</span>
                                 </button>
                             ))}
                         </div>
                     </div>
                 </section>
 
-                {/* All Restaurants */}
-                <section className="bg-background py-14">
+                {/* All Restaurants -------------------------------------------------- */}
+                <section className="bg-background py-10 sm:py-12">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="flex items-end justify-between">
+                        <div className="flex flex-wrap items-end justify-between gap-2">
                             <div>
-                                <h2 className="text-2xl font-bold tracking-tight">All Restaurants</h2>
-                                <p className="mt-1 text-sm text-muted-foreground">Discover all the restaurants in your area</p>
+                                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">All Restaurants</h2>
+                                <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                                    Explore all restaurants available near you.
+                                </p>
                             </div>
-                            <Link href="#" className="text-sm font-medium text-primary hover:underline">
-                                View all
+                            <Link
+                                href="#"
+                                className="shrink-0 text-sm font-semibold italic text-primary underline-offset-4 hover:underline"
+                            >
+                                View all →
                             </Link>
                         </div>
-                        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                            {RESTAURANTS.map((r) => (
-                                <Link
-                                    key={r.name}
-                                    href="#"
-                                    className="group overflow-hidden rounded-2xl border border-border bg-card transition hover:shadow-lg"
-                                >
-                                    <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-orange-100 to-amber-200 text-7xl">
-                                        {r.emoji}
+                        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                            {RESTAURANTS.map((r, i) => (
+                                <div key={`${r.name}-${i}`} className="overflow-hidden">
+                                    <Link href="#" className="group block">
+                                        <div className="relative aspect-[16/10] overflow-hidden rounded-2xl">
+                                            <img
+                                                src={r.image}
+                                                alt={r.name}
+                                                loading="lazy"
+                                                className="size-full object-cover transition group-hover:scale-105"
+                                            />
+                                            <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow">
+                                                {r.discount}
+                                            </span>
+                                            <span className="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-md bg-white/95 px-2 py-0.5 text-[11px] font-semibold text-amber-600 shadow-sm">
+                                                <Star className="size-3 fill-current" />
+                                                {r.rating}
+                                            </span>
+                                        </div>
+                                    </Link>
+                                    <div className="flex items-start justify-between gap-2 px-1 pt-3">
+                                        <div>
+                                            <p className="text-sm font-semibold">{r.name}</p>
+                                            <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground sm:text-xs">
+                                                <Clock className="size-3 text-emerald-600" />
+                                                {r.eta}
+                                                <span className="px-0.5">|</span>
+                                                {r.distance}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            aria-label="Save"
+                                            className="text-muted-foreground transition hover:text-rose-500"
+                                        >
+                                            <Heart className="size-5" />
+                                        </button>
                                     </div>
-                                    <div className="p-4">
-                                        <h3 className="font-semibold">{r.name}</h3>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            {r.location} · {r.distance}
-                                        </p>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-
-                {/* How It Works */}
-                <section className="bg-background py-14">
-                    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-                        <h2 className="text-center text-2xl font-bold tracking-tight">How It Works</h2>
-                        <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-muted-foreground">
-                            The seamless journey from the chef's hands to your table, powered by lithe logistics.
-                        </p>
-                        <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3">
-                            {STEPS.map((step) => (
-                                <div key={step.title} className="text-center">
-                                    <div className="mx-auto flex size-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                                        <step.icon className="size-7" />
-                                    </div>
-                                    <h3 className="mt-4 text-base font-semibold">{step.title}</h3>
-                                    <p className="mt-2 text-sm text-muted-foreground">{step.description}</p>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </section>
 
-                {/* CTA — Elevate Your Dining Experience */}
-                <section className="bg-background pb-14">
+                {/* How It Works ----------------------------------------------------- */}
+                <section className="bg-zinc-50 py-12 sm:py-16">
+                    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+                        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">How It Works</h2>
+                        <p className="mx-auto mt-3 max-w-xl text-center text-sm text-muted-foreground">
+                            The seamless journey from the chef's hands to your table, powered by elite
+                            logistics.
+                        </p>
+                        <div className="mt-10 grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-6 md:gap-8">
+                            {STEPS.map((step) => (
+                                <div key={step.title} className="flex flex-col items-center text-center">
+                                    <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                                        {step.icon}
+                                    </div>
+                                    <h3 className="mt-4 text-base font-semibold">{step.title}</h3>
+                                    <p className="mt-2 max-w-[280px] text-xs text-muted-foreground sm:text-sm">
+                                        {step.description}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* App Promo -------------------------------------------------------- */}
+                <section className="bg-background py-10 sm:py-14">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-emerald-600 px-8 py-12 text-white sm:px-12">
-                            <div className="grid items-center gap-8 md:grid-cols-2">
+                        <div className="relative overflow-hidden rounded-3xl bg-primary px-6 py-10 text-primary-foreground sm:px-10 md:h-[360px] md:px-14 md:py-12 lg:h-[400px]">
+                            <div className="grid items-center gap-8 md:grid-cols-[1.2fr_1fr]">
                                 <div>
-                                    <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                                    <h2 className="text-2xl pt-14 font-bold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
                                         Elevate Your Dining Experience
                                     </h2>
-                                    <p className="mt-3 max-w-md text-sm text-emerald-50">
-                                        Get the Swiftdrop app to unlock faster ordering, real-time tracking and exclusive
-                                        offers on every delivery.
+                                    <p className="mt-3 max-w-sm text-sm text-primary-foreground/90">
+                                        Get real-time tracking, exclusive partner rewards, and tailored
+                                        recommendations with the Swift Drop app.
                                     </p>
                                     <div className="mt-6 flex flex-wrap gap-3">
                                         <a
                                             href="#"
-                                            className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium"
+                                            aria-label="Download on the App Store"
+                                            className="inline-flex items-center gap-2 rounded-lg bg-black px-3 py-2 text-white"
                                         >
-                                            <span className="text-xl">🍎</span>
+                                            <svg
+                                                className="size-6"
+                                                viewBox="0 0 24 24"
+                                                fill="currentColor"
+                                                aria-hidden
+                                            >
+                                                <path d="M17.05 12.04c-.03-2.66 2.17-3.94 2.27-4-1.24-1.81-3.17-2.06-3.85-2.09-1.64-.17-3.21.96-4.04.96-.85 0-2.12-.94-3.49-.91-1.79.03-3.44 1.04-4.36 2.64-1.87 3.25-.48 8.04 1.34 10.67.88 1.29 1.93 2.74 3.31 2.69 1.33-.05 1.83-.86 3.44-.86s2.07.86 3.49.83c1.44-.02 2.35-1.31 3.23-2.6 1.02-1.49 1.44-2.94 1.46-3.02-.03-.01-2.79-1.07-2.82-4.27zM14.5 4.34c.73-.89 1.22-2.12 1.08-3.34-1.05.04-2.32.7-3.07 1.58-.67.78-1.27 2.03-1.11 3.23 1.17.09 2.37-.59 3.1-1.47z" />
+                                            </svg>
                                             <span className="flex flex-col items-start leading-tight">
-                                                <span className="text-[10px]">Download on the</span>
+                                                <span className="text-[9px] uppercase tracking-wide">
+                                                    Download on the
+                                                </span>
                                                 <span className="text-sm font-semibold">App Store</span>
                                             </span>
                                         </a>
                                         <a
                                             href="#"
-                                            className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium"
+                                            aria-label="Get it on Google Play"
+                                            className="inline-flex items-center gap-2 rounded-lg bg-black px-3 py-2 text-white"
                                         >
-                                            <span className="text-xl">▶</span>
+                                            <svg
+                                                className="size-6"
+                                                viewBox="0 0 24 24"
+                                                fill="currentColor"
+                                                aria-hidden
+                                            >
+                                                <path d="M3.6 2.27c-.32.34-.5.86-.5 1.55v16.36c0 .69.18 1.21.5 1.55l.06.06 9.16-9.16v-.22L3.66 2.2l-.06.07z" />
+                                                <path d="M15.81 14.63l-3.05-3.05v-.22l3.05-3.05.07.04 3.62 2.06c1.03.59 1.03 1.55 0 2.14l-3.62 2.06-.07.02z" />
+                                                <path d="M15.88 14.61l-3.12-3.12L3.6 20.66c.34.36.9.4 1.53.04l10.75-6.09" />
+                                                <path d="M15.88 8.37L5.13 2.28c-.63-.36-1.19-.32-1.53.04l9.16 9.17 3.12-3.12z" />
+                                            </svg>
                                             <span className="flex flex-col items-start leading-tight">
-                                                <span className="text-[10px]">Get it on</span>
+                                                <span className="text-[9px] uppercase tracking-wide">Get it on</span>
                                                 <span className="text-sm font-semibold">Google Play</span>
                                             </span>
                                         </a>
                                     </div>
                                 </div>
-                                <div className="flex justify-center md:justify-end">
-                                    <div className="relative size-64 rounded-[2.5rem] border-8 border-black bg-white shadow-2xl">
-                                        <div className="absolute inset-2 flex items-center justify-center rounded-[2rem] bg-gradient-to-br from-emerald-100 to-amber-100 text-6xl">
-                                            📱
-                                        </div>
-                                    </div>
-                                </div>
+
+                                {/* Empty column placeholder — the phones below are
+                                    absolutely positioned relative to the card so they
+                                    can extend past its bottom edge. */}
+                                <div className="hidden md:block" />
                             </div>
+
+                            {/* Phones — single mockup PNG anchored to the card.
+                                Bottom extends past the card via negative offset, and
+                                the card's overflow-hidden crops it for the "popping
+                                out" effect in the Figma. */}
+                            <img
+                                src="/assets/images/phones.png"
+                                alt=""
+                                aria-hidden
+                                className="pointer-events-none absolute right-8 top-10 hidden h-[400px] w-auto select-none md:block lg:right-12 lg:top-10 lg:h-[440px]"
+                            />
                         </div>
                     </div>
                 </section>

@@ -51,20 +51,20 @@ export function SiteHeader() {
                     <SwiftdropWordmark />
                 </Link>
 
-                <nav className="flex items-center gap-2 sm:gap-6">
+                <nav className="flex items-center gap-3 sm:gap-4">
                     {!user && (
                         <Link
                             href={`${route('register')}?as=restaurant`}
-                            className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
+                            className="hidden text-sm font-medium text-foreground transition-colors hover:text-primary sm:inline-flex"
                         >
-                            Partner with us
+                            Partner with Us
                         </Link>
                     )}
                     <Link
                         href="#"
-                        className="hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
+                        className="hidden h-9 items-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:border-primary hover:text-primary sm:inline-flex"
                     >
-                        Got Tips?
+                        Get This App
                     </Link>
 
                     {user ? (
@@ -107,8 +107,8 @@ export function SiteHeader() {
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (
-                        <Button asChild size="sm" className="rounded-md">
-                            <Link href={route('login')}>Sign in</Link>
+                        <Button asChild size="sm" className="h-9 rounded-md px-5">
+                            <Link href={route('login')}>Sign In</Link>
                         </Button>
                     )}
                 </nav>
