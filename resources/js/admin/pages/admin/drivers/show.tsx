@@ -1,6 +1,5 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle, Edit, FileText, Mail, Package, Phone, ShieldCheck, ShieldOff, Truck, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, CheckCircle, Edit, ExternalLink, Eye, FileText, Mail, Package, Phone, ShieldCheck, ShieldOff, Truck, XCircle } from 'lucide-react';
 
 import { PageContainer } from '@/components/layout/page-container';
 import { SectionHeading } from '@/components/shared/section-heading';
@@ -30,13 +29,48 @@ interface Props {
     driver: Driver;
 }
 
+/**
+ * Pretty labels for the document types we explicitly know about. Anything
+ * not in this map falls back to {@see humanizeDocType} so a new type added
+ * server-side still renders as "ID Proof" instead of "id_proof".
+ */
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
     driving_licence: 'Driving Licence',
+    driving_licence_front: 'Driving Licence (Front)',
+    driving_licence_back: 'Driving Licence (Back)',
     insurance: 'Insurance Certificate',
+    insurance_certificate: 'Insurance Certificate',
     mot: 'MOT Certificate',
     dbs_check: 'DBS Check',
     vehicle_registration: 'Vehicle Registration',
+    id_proof: 'ID Proof',
 };
+
+/**
+ * Convert a snake_case document type slug ("id_proof") into a Title Case
+ * label ("ID Proof"). Two-letter slugs like "id" and "uk" stay all-caps so
+ * "id_proof" reads as "ID Proof", not "Id Proof".
+ */
+function humanizeDocType(type: string): string {
+    return type
+        .split(/[_\s-]+/)
+        .filter(Boolean)
+        .map((part) => (part.length <= 2 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()))
+        .join(' ');
+}
+
+function labelForDocType(type: string): string {
+    return DOCUMENT_TYPE_LABELS[type] ?? humanizeDocType(type);
+}
+
+/**
+ * Best-effort detection — admin documents are usually images (front/back of
+ * licence, ID card photo) but can occasionally be PDFs. Drives whether the
+ * preview renders as an <img> or an <iframe>.
+ */
+function isImageDoc(filename: string): boolean {
+    return /\.(jpe?g|png|webp|gif|bmp|svg)$/i.test(filename);
+}
 
 const DOC_STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger'> = {
     approved: 'success',
@@ -96,6 +130,61 @@ const deliveryColumns: DataTableColumn<DriverDelivery>[] = [
     },
 ];
 
+/**
+ * Inline preview for an uploaded document. Images render straight into an
+ * <img>; anything else (PDFs, etc.) falls back to an iframe + a direct
+ * "Open in new tab" link so admins can still get to it.
+ */
+function PreviewDocumentDialog({ document }: { document: DriverDocument }) {
+    const href = document.file_path;
+    const isImage = isImageDoc(document.original_filename || href);
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button size="xs" variant="outline" leftIcon={<Eye />}>
+                    Preview
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl">
+                {/* Right-padding leaves room for the dialog's own absolute
+                    close (X) button so the title block + link don't collide. */}
+                <div className="min-w-0 pr-8">
+                    <DialogTitle>{labelForDocType(document.type)}</DialogTitle>
+                    <DialogDescription className="truncate">
+                        {document.original_filename}
+                    </DialogDescription>
+                    <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                        <ExternalLink className="size-3.5" />
+                        Open in new tab
+                    </a>
+                </div>
+
+                <div className="mt-3 max-h-[70vh] overflow-auto rounded-md bg-muted/40">
+                    {isImage ? (
+                        <img
+                            src={href}
+                            alt={document.original_filename}
+                            className="mx-auto block max-h-[70vh] w-auto object-contain"
+                        />
+                    ) : (
+                        <iframe
+                            src={href}
+                            title={labelForDocType(document.type)}
+                            className="h-[70vh] w-full"
+                        />
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 function RejectDocumentDialog({ document }: { document: DriverDocument }) {
     const { data, setData, patch, processing, reset } = useForm({ reason: '' });
 
@@ -117,7 +206,7 @@ function RejectDocumentDialog({ document }: { document: DriverDocument }) {
                 <DialogTitle>Reject document</DialogTitle>
                 <DialogDescription>
                     Provide a reason for rejecting{' '}
-                    {DOCUMENT_TYPE_LABELS[document.type] ?? document.type}. The driver will be notified.
+                    {labelForDocType(document.type)}. The driver will be notified.
                 </DialogDescription>
                 <form onSubmit={submit} className="space-y-4">
                     <div className="grid gap-1.5">
@@ -302,7 +391,7 @@ export default function DriverShow({ driver }: Props) {
                                                         <FileText className="size-5 text-muted-foreground shrink-0" />
                                                         <div className="min-w-0">
                                                             <p className="text-sm font-medium">
-                                                                {DOCUMENT_TYPE_LABELS[doc.type] ?? doc.type}
+                                                                {labelForDocType(doc.type)}
                                                             </p>
                                                             <p className="text-xs text-muted-foreground truncate">
                                                                 {doc.original_filename}
@@ -319,6 +408,7 @@ export default function DriverShow({ driver }: Props) {
                                                         <Badge variant={DOC_STATUS_VARIANT[doc.verification_status]}>
                                                             {doc.verification_status}
                                                         </Badge>
+                                                        <PreviewDocumentDialog document={doc} />
                                                         {doc.verification_status !== 'approved' && (
                                                             <Button
                                                                 size="xs"

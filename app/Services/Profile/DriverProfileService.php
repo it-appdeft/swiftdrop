@@ -16,7 +16,6 @@ use App\Models\VehicleType;
 use App\Services\Files\ImageUploadService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class DriverProfileService extends BaseProfileService implements DriverProfileServiceInterface
@@ -212,11 +211,16 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
 
             /** @var UploadedFile $file */
             $path = $file->store("driver/documents/{$user->id}", 'public');
-            $url = Storage::disk('public')->url($path);
 
+            // Store as a host-less URL ("/storage/driver/documents/…") so the
+            // value works on whichever origin loads the admin / driver app.
+            // Bug previously: Storage::url() bakes APP_URL into the value, so
+            // a row written from localhost:8000 wouldn't render when later
+            // viewed from 127.0.0.1:8000 or the production domain. The
+            // ImageUploadService customer-photo fix uses the same approach.
             return $profile->documents()->create([
                 'type' => $type,
-                'file_path' => $url,
+                'file_path' => "/storage/{$path}",
                 'original_filename' => $file->getClientOriginalName(),
                 'expires_at' => $expiresAt,
                 'verification_status' => ApprovalStatusEnum::PENDING->value,
