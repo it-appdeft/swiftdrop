@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Phone } from 'lucide-react';
 import { AuthShell } from '../../components/auth-shell';
+import { CountryCodeDropdown } from '../../components/country-code-dropdown';
 
 export default function Login() {
     const { data, setData, post, processing, errors } = useForm({
@@ -14,14 +15,21 @@ export default function Login() {
         mobile: '',
     });
 
+    const mobileDigits = data.mobile.replace(/\D/g, '');
     const mobileFormatError =
-        data.mobile.trim().length > 0 && /[^\d\s-]/.test(data.mobile)
-            ? 'Please enter a valid mobile number — country code is selected separately.'
-            : null;
+        data.mobile.trim().length === 0
+            ? null
+            : /[^\d\s-]/.test(data.mobile)
+              ? 'Please enter a valid mobile number — country code is selected separately.'
+              : mobileDigits.length < 6
+                ? 'Mobile number must be at least 6 digits.'
+                : mobileDigits.length > 11
+                  ? 'Mobile number must be at most 11 digits.'
+                  : null;
 
     const submit: React.FormEventHandler = (e) => {
         e.preventDefault();
-        if (mobileFormatError) return;
+        if (mobileFormatError || mobileDigits.length === 0) return;
         post(route('otp.send'));
     };
 
@@ -35,15 +43,10 @@ export default function Login() {
                         Mobile Number
                     </Label>
                     <div className="flex gap-2">
-                        <select
+                        <CountryCodeDropdown
                             value={data.country_code}
-                            onChange={(e) => setData('country_code', e.target.value)}
-                            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                            <option value="+44">🇬🇧 +44</option>
-                            <option value="+1">🇺🇸 +1</option>
-                            <option value="+91">🇮🇳 +91</option>
-                        </select>
+                            onChange={(v) => setData('country_code', v)}
+                        />
                         <div className="relative flex-1">
                             <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -52,6 +55,7 @@ export default function Login() {
                                 inputMode="tel"
                                 autoComplete="tel"
                                 placeholder="7123 456789"
+                                maxLength={14}
                                 value={data.mobile}
                                 onChange={(e) => setData('mobile', e.target.value)}
                                 className="pl-9"

@@ -6,6 +6,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AuthShell } from '../../components/auth-shell';
+import { CountryCodeDropdown } from '../../components/country-code-dropdown';
 import { postJson } from '../../lib/api';
 
 interface RegisterProps {
@@ -183,11 +184,19 @@ export default function Register({ role }: RegisterProps) {
     };
 
     // Mobile field should be the subscriber number only — the country code is
-    // already captured by the dropdown. Surface a hint if the user types one in.
+    // already captured by the dropdown. Enforce digit-only + 6-11 length so we
+    // catch obvious typos before sending an OTP.
+    const mobileNumberDigits = data.mobile.replace(/\D/g, '');
     const mobileFormatError =
-        data.mobile.trim().length > 0 && /[^\d\s-]/.test(data.mobile)
-            ? 'Please enter a valid mobile number — country code is selected separately.'
-            : null;
+        data.mobile.trim().length === 0
+            ? null
+            : /[^\d\s-]/.test(data.mobile)
+              ? 'Please enter a valid mobile number — country code is selected separately.'
+              : mobileNumberDigits.length < 6
+                ? 'Mobile number must be at least 6 digits.'
+                : mobileNumberDigits.length > 11
+                  ? 'Mobile number must be at most 11 digits.'
+                  : null;
 
     const sendOtp = async (channel: Channel) => {
         const body: Record<string, unknown> = {
@@ -373,16 +382,11 @@ export default function Register({ role }: RegisterProps) {
                         Mobile Number
                     </Label>
                     <div className="flex gap-2">
-                        <select
+                        <CountryCodeDropdown
                             value={data.country_code}
-                            onChange={(e) => setData('country_code', e.target.value)}
+                            onChange={(v) => setData('country_code', v)}
                             disabled={mobileVerified || mobileOtpRequested}
-                            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
-                        >
-                            <option value="+44">🇬🇧 +44</option>
-                            <option value="+1">🇺🇸 +1</option>
-                            <option value="+91">🇮🇳 +91</option>
-                        </select>
+                        />
                         <Input
                             id="mobile"
                             type="tel"
@@ -390,6 +394,7 @@ export default function Register({ role }: RegisterProps) {
                             pattern="[0-9]*"
                             autoComplete="tel"
                             placeholder="7123 456789"
+                            maxLength={14}
                             value={data.mobile}
                             onChange={(e) => setData('mobile', e.target.value)}
                             disabled={mobileVerified || mobileOtpRequested}

@@ -27,7 +27,8 @@ class SendOtpRequest extends FormRequest
 
     /**
      * Accept "phone" as the public-facing channel name and translate it to
-     * the SMS channel used internally.
+     * the SMS channel used internally; strip formatting whitespace/hyphens
+     * from the mobile so the regex rule only has to validate digits.
      */
     protected function prepareForValidation(): void
     {
@@ -36,6 +37,8 @@ class SendOtpRequest extends FormRequest
         if ($channel === 'phone') {
             $this->merge(['channel' => OtpChannelEnum::SMS->value]);
         }
+
+        $this->normalizeMobileInput();
     }
 
     public function rules(): array
@@ -64,7 +67,7 @@ class SendOtpRequest extends FormRequest
             'channel' => ['required', Rule::enum(OtpChannelEnum::class)],
             'email' => [Rule::requiredIf($needsEmail), 'nullable', 'email', 'max:255'],
             'country_code' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
-            'mobile' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+?[0-9\s\-]{6,20}$/'],
+            'mobile' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+?[0-9]{6,11}$/'],
         ];
     }
 
