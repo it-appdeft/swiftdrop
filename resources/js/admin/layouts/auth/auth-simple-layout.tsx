@@ -16,7 +16,17 @@ interface AuthLayoutProps {
  */
 export default function AuthSimpleLayout({ children, title, description }: AuthLayoutProps) {
     return (
-        <div className="bg-background relative grid min-h-svh lg:grid-cols-2">
+        <div className="bg-background relative flex min-h-svh flex-col">
+            {/* Top header — full-width brand bar spanning both columns.
+                Mirrors the customer chrome so the admin login feels like
+                part of the same product. */}
+            <header className="px-6 pt-6 sm:px-10 sm:pt-8">
+                <Link href={route('home')} className="inline-flex w-fit items-center" aria-label="SwiftDrop">
+                    <img src="/brand/Container.png" alt="SwiftDrop" className="h-9 w-auto sm:h-10" />
+                </Link>
+            </header>
+
+            <div className="relative grid flex-1 lg:grid-cols-2">
             {/* Left — branded splash panel. Hidden under lg. */}
             <aside className="relative hidden overflow-hidden lg:flex lg:flex-col lg:justify-between lg:p-10">
                 {/* <video
@@ -50,7 +60,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                 />
 
                 <div className="relative flex items-center gap-2 text-white">
-                    <span className="flex size-9 items-center justify-center rounded-md bg-white/15 ring-1 ring-white/30 backdrop-blur">
+                    {/* <span className="flex size-9 items-center justify-center rounded-md bg-white/15 ring-1 ring-white/30 backdrop-blur">
                         <AppLogoIcon className="size-5 fill-current" />
                     </span>
                     <div className="leading-tight">
@@ -58,7 +68,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                         <p className="text-[10px] font-medium tracking-[0.18em] uppercase opacity-80">
                             Fresh food · Fast delivery
                         </p>
-                    </div>
+                    </div> */}
                 </div>
 
                 <div className="relative max-w-md space-y-4 text-white">
@@ -74,15 +84,6 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
             {/* Right — form column */}
             <main className="flex w-full items-center justify-center px-6 py-10 sm:px-10">
                 <div className="w-full max-w-sm space-y-8">
-                    <div className="lg:hidden">
-                        <Link href={route('home')} className="inline-flex items-center gap-2">
-                            <span className="bg-sidebar-primary text-sidebar-primary-foreground flex size-9 items-center justify-center rounded-md shadow-sm">
-                                <AppLogoIcon className="size-5 fill-current" />
-                            </span>
-                            <span className="text-sm font-semibold">SwiftDrop</span>
-                        </Link>
-                    </div>
-
                     <div className="space-y-2">
                         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
                         {description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
@@ -91,6 +92,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                     {children}
                 </div>
             </main>
+            </div>
         </div>
     );
 }

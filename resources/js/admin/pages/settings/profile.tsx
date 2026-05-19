@@ -39,10 +39,10 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
 
             <SettingsLayout>
                 <div className="space-y-6">
-                    <HeadingSmall title="Profile information" description="Update your name and email address" />
+                    <HeadingSmall title="Profile information" description="" />
 
                     <form onSubmit={submit} className="space-y-6">
-                        <div className="grid gap-2">
+                        {/* <div className="grid gap-2">
                             <Label htmlFor="name">Name</Label>
 
                             <Input
@@ -56,7 +56,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                             />
 
                             <InputError className="mt-2" message={errors.name} />
-                        </div>
+                        </div> */}
 
                         <div className="grid gap-2">
                             <Label htmlFor="email">Email address</Label>
@@ -68,6 +68,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                                 value={data.email ?? ''}
                                 onChange={(e) => setData('email', e.target.value)}
                                 required
+                                disabled
                                 autoComplete="username"
                                 placeholder="Email address"
                             />
@@ -97,7 +98,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                             </div>
                         )}
 
-                        <div className="flex items-center gap-4">
+                        {/* <div className="flex items-center gap-4">
                             <Button disabled={processing}>Save</Button>
 
                             <Transition
@@ -109,11 +110,11 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                             >
                                 <p className="text-sm text-neutral-600">Saved</p>
                             </Transition>
-                        </div>
+                        </div> */}
                     </form>
                 </div>
 
-                <DeleteUser />
+                {/* <DeleteUser /> */}
             </SettingsLayout>
         </AppLayout>
     );

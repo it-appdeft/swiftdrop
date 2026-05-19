@@ -65,11 +65,11 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                     label={
                         <span className="flex w-full items-center justify-between gap-2">
                             <span>Password</span>
-                            {canResetPassword && (
+                            {/* {canResetPassword && (
                                 <TextLink href={route('password.request')} className="text-xs font-normal" tabIndex={5}>
                                     Forgot password?
                                 </TextLink>
-                            )}
+                            )} */}
                         </span>
                     }
                     error={errors.password}
