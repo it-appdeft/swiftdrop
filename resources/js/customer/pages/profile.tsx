@@ -308,12 +308,13 @@ interface OtpInputRowProps {
 }
 
 function OtpInputRow({ digits, onDigit, onKeyDown, inputsRef, resendIn, onResend, onVerify, disabled, label }: OtpInputRowProps) {
+    const ready = digits.join('').length >= OTP_LENGTH && !disabled;
     return (
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-xs font-semibold">Enter Verification Code</p>
-            <p className="text-[11px] text-muted-foreground">{label ?? "We've sent a 4-digit code to your email."}</p>
-            <div className="mt-3 flex items-center gap-2">
-                <div className="flex flex-1 gap-2">
+        <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3">
+            <p className="text-sm font-semibold text-foreground">Enter Verification Code</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{label ?? "We've sent a 4-digit code to your email."}</p>
+            <div className="mt-3 flex items-center gap-3">
+                <div className="flex flex-1 gap-2.5">
                     {digits.map((digit, i) => (
                         <input
                             key={i}
@@ -326,24 +327,27 @@ function OtpInputRow({ digits, onDigit, onKeyDown, inputsRef, resendIn, onResend
                             value={digit}
                             onChange={(e) => onDigit(i, e.target.value)}
                             onKeyDown={(e) => onKeyDown(i, e)}
-                            className="size-10 rounded-md border border-input bg-background text-center text-base font-semibold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="size-11 rounded-md border border-input bg-background text-center text-base font-semibold text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                     ))}
                 </div>
                 <button
                     type="button"
                     onClick={onVerify}
-                    disabled={disabled || digits.join('').length < OTP_LENGTH}
-                    className="h-10 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                    disabled={!ready}
+                    className={
+                        'h-11 rounded-md px-5 text-sm font-semibold text-primary-foreground transition ' +
+                        (ready ? 'bg-primary hover:opacity-90' : 'bg-primary/40 cursor-not-allowed')
+                    }
                 >
                     Verify
                 </button>
             </div>
-            <div className="mt-2 flex items-center justify-between text-[11px]">
+            <div className="mt-3 flex items-center justify-between text-xs">
                 {resendIn > 0 ? (
                     <>
-                        <span className="font-medium text-primary">Resend code</span>
-                        <span className="text-muted-foreground">
+                        <span className="font-medium text-primary/50">Resend code</span>
+                        <span className="font-medium text-muted-foreground">
                             {String(Math.floor(resendIn / 60)).padStart(2, '0')}:{String(resendIn % 60).padStart(2, '0')}
                         </span>
                     </>
@@ -645,52 +649,54 @@ function EditProfileDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle className="text-center">Edit Profile</DialogTitle>
+                    <DialogTitle className="text-center text-lg font-semibold">Edit Profile</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4">
-                    {/* Photo + Name */}
+                <div className="space-y-5">
+                    {/* Photo */}
+                    <div className="flex justify-center">
+                        <div className="relative">
+                            <div className="size-20 overflow-hidden rounded-full border border-border bg-muted">
+                                {photoPreview ? (
+                                    <img
+                                        src={photoPreview}
+                                        alt="Profile preview"
+                                        className="size-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex size-full items-center justify-center text-base font-semibold text-muted-foreground">
+                                        {initialsFrom(profileForm.data.name || initialName)}
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="absolute -bottom-0.5 -right-0.5 flex size-7 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-sm transition hover:bg-muted"
+                                aria-label="Change profile photo"
+                            >
+                                <Camera className="size-3.5" />
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                onChange={onPhotoChosen}
+                                className="hidden"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Name */}
                     <form onSubmit={saveProfile} className="space-y-3">
-                        <div className="flex items-center gap-4">
-                            <div className="relative">
-                                <div className="size-16 overflow-hidden rounded-full border border-border bg-muted">
-                                    {photoPreview ? (
-                                        <img
-                                            src={photoPreview}
-                                            alt="Profile preview"
-                                            className="size-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="flex size-full items-center justify-center text-sm font-semibold text-muted-foreground">
-                                            {initialsFrom(profileForm.data.name || initialName)}
-                                        </div>
-                                    )}
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full border border-border bg-background text-foreground shadow hover:bg-muted"
-                                    aria-label="Change profile photo"
-                                >
-                                    <Camera className="size-3.5" />
-                                </button>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                                    onChange={onPhotoChosen}
-                                    className="hidden"
-                                />
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-1">
-                                <label className="text-xs font-medium text-muted-foreground">Full Name</label>
-                                <input
-                                    type="text"
-                                    value={profileForm.data.name}
-                                    onChange={(e) => profileForm.setData('name', e.target.value)}
-                                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                />
-                            </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-foreground">Full Name</label>
+                            <input
+                                type="text"
+                                value={profileForm.data.name}
+                                onChange={(e) => profileForm.setData('name', e.target.value)}
+                                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            />
                         </div>
                         {profileForm.errors.name && (
                             <p className="text-xs text-destructive">{profileForm.errors.name}</p>
@@ -698,30 +704,29 @@ function EditProfileDialog({
                         {profileForm.errors.profile_photo && (
                             <p className="text-xs text-destructive">{profileForm.errors.profile_photo}</p>
                         )}
-                        <div className="flex justify-end">
-                            <button
-                                type="submit"
-                                disabled={
-                                    profileForm.processing ||
-                                    (profileForm.data.name === initialName && !profileForm.data.profile_photo)
-                                }
-                                className="h-10 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                            >
-                                {profileForm.processing ? 'Saving…' : 'Save Profile'}
-                            </button>
-                        </div>
+                        {(profileForm.data.name !== initialName || profileForm.data.profile_photo) && (
+                            <div className="flex justify-end">
+                                <button
+                                    type="submit"
+                                    disabled={profileForm.processing}
+                                    className="h-10 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                                >
+                                    {profileForm.processing ? 'Saving…' : 'Save Profile'}
+                                </button>
+                            </div>
+                        )}
                     </form>
 
                     {/* Email */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">Email Address</label>
+                        <label className="text-xs font-medium text-foreground">Email Address</label>
                         <div className="flex gap-2">
                             <input
                                 type="email"
                                 value={initialEmail}
                                 readOnly
                                 placeholder="john@example.com"
-                                className="h-10 flex-1 rounded-md border border-input bg-muted/40 px-3 text-sm"
+                                className="h-11 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
                             />
                             <button
                                 type="button"
@@ -732,9 +737,9 @@ function EditProfileDialog({
                                     }
                                     sendCurrentEmailOtp();
                                 }}
-                                className="h-10 rounded-md border border-input bg-background px-3 text-xs font-semibold text-primary hover:bg-muted"
+                                className="h-11 shrink-0 rounded-md border border-primary/40 bg-background px-3.5 text-xs font-semibold text-primary transition hover:bg-primary/5"
                             >
-                                {emailVerifyState === 'awaitingCode' ? 'Resend' : 'Change'}
+                                {emailVerifyState === 'awaitingCode' ? 'Resend' : 'Verify Email'}
                             </button>
                         </div>
                         {emailVerifyState === 'awaitingCode' && (
@@ -747,7 +752,7 @@ function EditProfileDialog({
                                 onResend={sendCurrentEmailOtp}
                                 onVerify={verifyCurrentEmail}
                                 disabled={emailVerifying}
-                                label={`We've sent a code to ${initialEmail}.`}
+                                label={`We've sent a 4-digit code to ${initialEmail}.`}
                             />
                         )}
                         {emailError && <p className="text-xs text-destructive">{emailError}</p>}
@@ -756,23 +761,20 @@ function EditProfileDialog({
                     {/* Phone — country code and subscriber digits shown
                         in separate inputs to mirror the split storage. */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">Mobile Number</label>
+                        <label className="text-xs font-medium text-foreground">Mobile Number</label>
                         <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={phoneCountry}
-                                readOnly
-                                aria-label="Country code"
-                                className="h-10 w-16 rounded-md border border-input bg-muted/40 px-2 text-center text-sm"
-                            />
-                            <input
-                                type="tel"
-                                value={initialMobile ?? ''}
-                                readOnly
-                                placeholder="—"
-                                aria-label="Mobile number"
-                                className="h-10 flex-1 rounded-md border border-input bg-muted/40 px-3 text-sm"
-                            />
+                            <div className="flex h-11 flex-1 items-center gap-2 rounded-md border border-input bg-background px-3">
+                                <span className="text-sm text-foreground">🇬🇧 {phoneCountry}</span>
+                                <span className="h-5 w-px bg-border" />
+                                <input
+                                    type="tel"
+                                    value={initialMobile ?? ''}
+                                    readOnly
+                                    placeholder="7123 456789"
+                                    aria-label="Mobile number"
+                                    className="h-full flex-1 bg-transparent text-sm text-foreground focus:outline-none"
+                                />
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -782,7 +784,7 @@ function EditProfileDialog({
                                     }
                                     sendCurrentPhoneOtp();
                                 }}
-                                className="h-10 rounded-md border border-input bg-background px-3 text-xs font-semibold text-primary hover:bg-muted"
+                                className="h-11 shrink-0 rounded-md border border-primary/40 bg-background px-3.5 text-xs font-semibold text-primary transition hover:bg-primary/5"
                             >
                                 {phoneVerifyState === 'awaitingCode' ? 'Resend' : 'Change'}
                             </button>
@@ -797,7 +799,7 @@ function EditProfileDialog({
                                 onResend={sendCurrentPhoneOtp}
                                 onVerify={verifyCurrentPhone}
                                 disabled={phoneVerifying}
-                                label={`We've sent a code to ${phoneDisplay}.`}
+                                label={`We've sent a 4-digit code to ${phoneDisplay}.`}
                             />
                         )}
                         {phoneError && <p className="text-xs text-destructive">{phoneError}</p>}
@@ -932,27 +934,30 @@ function ChangeEmailDialog({ open, onOpenChange }: ChangeEmailDialogProps) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-center">Edit Email Address</DialogTitle>
+                    <DialogTitle className="text-center text-lg font-semibold">Edit Email Address</DialogTitle>
                 </DialogHeader>
 
                 {step === 'enterNew' && (
-                    <form onSubmit={sendNewOtp} className="space-y-3">
+                    <form onSubmit={sendNewOtp} className="space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-muted-foreground">Email Address</label>
+                            <label className="text-xs font-medium text-foreground">Email Address</label>
                             <input
                                 type="email"
                                 value={newEmail}
                                 onChange={(e) => setNewEmail(e.target.value)}
                                 placeholder="Add New Email"
                                 autoFocus
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="h-11 w-full rounded-md border border-primary bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                         </div>
                         {error && <p className="text-xs text-destructive">{error}</p>}
                         <button
                             type="submit"
                             disabled={processing || !newEmail}
-                            className="h-10 w-full rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                            className={
+                                'h-11 w-full rounded-md text-sm font-semibold text-primary-foreground transition ' +
+                                (processing || !newEmail ? 'bg-primary/40 cursor-not-allowed' : 'bg-primary hover:opacity-90')
+                            }
                         >
                             Verify
                         </button>
@@ -960,7 +965,7 @@ function ChangeEmailDialog({ open, onOpenChange }: ChangeEmailDialogProps) {
                 )}
 
                 {step === 'verifyNew' && (
-                    <>
+                    <div className="space-y-3">
                         <p className="text-center text-xs text-muted-foreground">
                             Enter the code we sent to{' '}
                             <span className="font-medium text-foreground">{newEmail}</span>.
@@ -977,7 +982,7 @@ function ChangeEmailDialog({ open, onOpenChange }: ChangeEmailDialogProps) {
                             label={`Code sent to ${newEmail}`}
                         />
                         {error && <p className="text-xs text-destructive">{error}</p>}
-                    </>
+                    </div>
                 )}
             </DialogContent>
         </Dialog>
@@ -1096,30 +1101,31 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle className="text-center">Edit Mobile Number</DialogTitle>
+                    <DialogTitle className="text-center text-lg font-semibold">Edit Mobile Number</DialogTitle>
                 </DialogHeader>
 
                 {step === 'enterNew' && (
-                    <form onSubmit={sendNewOtp} className="space-y-3">
+                    <form onSubmit={sendNewOtp} className="space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-muted-foreground">Mobile Number</label>
-                            <div className="flex gap-2">
+                            <label className="text-xs font-medium text-foreground">Mobile Number</label>
+                            <div className="flex h-11 items-center gap-2 rounded-md border border-primary bg-background px-3 transition focus-within:ring-2 focus-within:ring-primary/30">
                                 <select
                                     value={newCountry}
                                     onChange={(e) => setNewCountry(e.target.value)}
-                                    className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+                                    className="h-full appearance-none bg-transparent pr-1 text-sm text-foreground focus:outline-none"
                                 >
                                     <option value="+44">🇬🇧 +44</option>
                                     <option value="+1">🇺🇸 +1</option>
                                     <option value="+91">🇮🇳 +91</option>
                                 </select>
+                                <span className="h-5 w-px bg-border" />
                                 <input
                                     type="tel"
                                     value={newMobile}
                                     onChange={(e) => setNewMobile(e.target.value)}
                                     placeholder="Add New Number"
                                     autoFocus
-                                    className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    className="h-full flex-1 bg-transparent text-sm text-foreground focus:outline-none"
                                 />
                             </div>
                         </div>
@@ -1127,7 +1133,10 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                         <button
                             type="submit"
                             disabled={processing || !newMobile}
-                            className="h-10 w-full rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                            className={
+                                'h-11 w-full rounded-md text-sm font-semibold text-primary-foreground transition ' +
+                                (processing || !newMobile ? 'bg-primary/40 cursor-not-allowed' : 'bg-primary hover:opacity-90')
+                            }
                         >
                             Verify
                         </button>
@@ -1135,7 +1144,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                 )}
 
                 {step === 'verifyNew' && (
-                    <>
+                    <div className="space-y-3">
                         <p className="text-center text-xs text-muted-foreground">
                             Enter the code we sent to{' '}
                             <span className="font-medium text-foreground">
@@ -1155,7 +1164,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                             label={`Code sent to ${newCountry} ${newMobile}`}
                         />
                         {error && <p className="text-xs text-destructive">{error}</p>}
-                    </>
+                    </div>
                 )}
             </DialogContent>
         </Dialog>

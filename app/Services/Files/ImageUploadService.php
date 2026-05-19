@@ -12,11 +12,16 @@ class ImageUploadService implements FileUploadServiceInterface
     protected string $disk = 'public';
 
     /**
-     * Save an uploaded image file
+     * Save an uploaded image file.
+     *
+     * Returns a host-less URL (e.g. "/storage/profile/file.png") so the
+     * stored value works regardless of which host serves the app
+     * (localhost, 127.0.0.1:8000, or the production domain). The browser
+     * resolves the relative path against whatever origin loaded the page.
      *
      * @param UploadedFile $file
      * @param string $folder Folder name (e.g., 'profile', 'restaurant')
-     * @return string The saved file path
+     * @return string The saved file URL (relative)
      */
     public function save(UploadedFile $file, string $folder): string
     {
@@ -27,7 +32,7 @@ class ImageUploadService implements FileUploadServiceInterface
 
         $file->storeAs($folder, $filename, $this->disk);
 
-        return Storage::disk($this->disk)->url($path);
+        return "/storage/{$path}";
     }
 
     /**
@@ -74,7 +79,17 @@ class ImageUploadService implements FileUploadServiceInterface
             return false;
         }
 
-        $storagePath = str_replace(Storage::disk($this->disk)->url(''), '', $url);
+        // Accept either the relative form ("/storage/profile/x.png" — what
+        // save() now returns) or a legacy absolute URL written before the
+        // host-less switch. Strip both prefixes; whichever applies wins.
+        $storagePath = $url;
+        $absolutePrefix = Storage::disk($this->disk)->url('');
+        if ($absolutePrefix && str_starts_with($storagePath, $absolutePrefix)) {
+            $storagePath = substr($storagePath, strlen($absolutePrefix));
+        }
+        if (str_starts_with($storagePath, '/storage/')) {
+            $storagePath = substr($storagePath, strlen('/storage/'));
+        }
 
         return $this->delete($storagePath);
     }
