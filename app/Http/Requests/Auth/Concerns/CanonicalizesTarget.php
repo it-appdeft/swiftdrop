@@ -18,6 +18,23 @@ trait CanonicalizesTarget
         return $email === '' ? '' : Str::lower(trim($email));
     }
 
+    /**
+     * Strip whitespace and hyphen separators from the inbound `mobile` field
+     * so downstream regex validators only have to worry about digits + an
+     * optional leading "+". Call from prepareForValidation() before rules()
+     * runs.
+     */
+    public function normalizeMobileInput(): void
+    {
+        $mobile = (string) $this->input('mobile');
+
+        if ($mobile === '') {
+            return;
+        }
+
+        $this->merge(['mobile' => preg_replace('/[\s\-]+/', '', $mobile)]);
+    }
+
     public function canonicalMobile(): string
     {
         $mobile = preg_replace('/[\s\-]+/', '', (string) $this->input('mobile'));

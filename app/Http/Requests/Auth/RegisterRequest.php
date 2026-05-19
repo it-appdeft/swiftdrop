@@ -17,6 +17,11 @@ class RegisterRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeMobileInput();
+    }
+
     public function rules(): array
     {
         $rules = [
@@ -32,7 +37,7 @@ class RegisterRequest extends FormRequest
             'mobile' => [
                 'required',
                 'string',
-                'regex:/^\+?[0-9\s\-]{6,20}$/',
+                'regex:/^\+?[0-9]{6,11}$/',
                 new HasVerifiedOtp($this->canonicalMobile(), 'mobile number'),
             ],
         ];
