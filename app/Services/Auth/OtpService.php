@@ -52,23 +52,47 @@ class OtpService implements OtpServiceInterface
 
     public function verify(string $target, string $code): bool
     {
-        $target = $this->normalize($target);
-        $candidate = $this->otpCodes->findLatestActiveFor($target);
-
-        if (! $candidate || ! Hash::check($code, $candidate->code_hash)) {
+        try {
+            $this->verifyOrFail($target, $code);
+        } catch (OtpException) {
             return false;
         }
-
-        $this->otpCodes->markUsed($candidate);
 
         return true;
     }
 
+    /**
+     * Throws granular OtpException cases so the API surface can route the
+     * caller (and the human reading the response) to the right next step:
+     *   - expiredCode:        request a fresh code
+     *   - maxAttemptsExceeded: also request a fresh code, but back off
+     *   - invalidCode:        let the user retype the digits
+     */
     public function verifyOrFail(string $target, string $code): void
     {
-        if (! $this->verify($target, $code)) {
+        $target = $this->normalize($target);
+        $latest = $this->otpCodes->findLatestFor($target);
+
+        if (! $latest || $latest->isUsed()) {
             throw OtpException::invalidCode();
         }
+
+        if ($latest->isExpired()) {
+            throw OtpException::expiredCode();
+        }
+
+        $maxAttempts = (int) $this->config->get('services.otp.max_attempts', 5);
+
+        if ($maxAttempts > 0 && (int) ($latest->attempts ?? 0) >= $maxAttempts) {
+            throw OtpException::maxAttemptsExceeded();
+        }
+
+        if (! Hash::check($code, $latest->code_hash)) {
+            $this->otpCodes->incrementAttempts($latest);
+            throw OtpException::invalidCode();
+        }
+
+        $this->otpCodes->markUsed($latest);
     }
 
     public function verifyAndFindUser(string $target, string $code): ?User

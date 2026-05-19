@@ -2,11 +2,18 @@
 
 namespace App\Services\Profile;
 
+use App\Contracts\Auth\OtpServiceInterface;
 use App\Contracts\Profile\DriverProfileServiceInterface;
 use App\Enums\ApprovalStatusEnum;
+use App\Enums\OtpChannelEnum;
+use App\Exceptions\ApiException;
+use App\Exceptions\InvalidInputException;
+use App\Exceptions\ResourceNotFoundException;
 use App\Models\Document;
 use App\Models\DriverProfile;
 use App\Models\User;
+use App\Models\VehicleType;
+use App\Services\Files\ImageUploadService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +21,13 @@ use Illuminate\Validation\ValidationException;
 
 class DriverProfileService extends BaseProfileService implements DriverProfileServiceInterface
 {
+    public function __construct(
+        ImageUploadService $imageUpload,
+        protected OtpServiceInterface $otp,
+    ) {
+        parent::__construct($imageUpload);
+    }
+
     /**
      * Document types accepted during driver onboarding.
      * Keep keys stable — clients reference them in upload payloads.
@@ -95,6 +109,9 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
                 ]);
             }
 
+            $vehicleType = VehicleType::findActiveBySlug($data['vehicle_type'] ?? null);
+            $requiresInsurance = (bool) ($vehicleType?->requires_insurance ?? true);
+
             $profile->update([
                 'vehicle_type' => $data['vehicle_type'],
                 'vehicle_registration' => $data['vehicle_registration'],
@@ -102,8 +119,8 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
                 'vehicle_model' => $data['vehicle_model'] ?? $profile->vehicle_model,
                 'vehicle_color' => $data['vehicle_color'] ?? $profile->vehicle_color,
                 'year_of_manufacture' => $data['year_of_manufacture'] ?? $profile->year_of_manufacture,
-                'insurance_type' => $data['insurance_type'] ?? $profile->insurance_type,
-                'insurance_expiry_date' => $data['insurance_expiry_date'] ?? $profile->insurance_expiry_date,
+                'insurance_type' => $requiresInsurance ? ($data['insurance_type'] ?? $profile->insurance_type) : null,
+                'insurance_expiry_date' => $requiresInsurance ? ($data['insurance_expiry_date'] ?? $profile->insurance_expiry_date) : null,
                 'mot_expiry_date' => $data['mot_expiry_date'] ?? $profile->mot_expiry_date,
             ]);
 
@@ -143,13 +160,47 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
         });
     }
 
+    /**
+     * Update bank/vehicle fields and re-upload any documents in a single
+     * request. Missing keys are left untouched; documents not present in
+     * the payload keep their existing files.
+     */
+    public function updateAccountDetails(User $user, array $data, array $documents = []): User
+    {
+        return DB::transaction(function () use ($user, $data, $documents) {
+            $profile = $this->profileOrFail($user);
+
+            $allowed = [
+                'account_holder_name', 'account_number', 'sort_code', 'bank_name',
+                'vehicle_type', 'vehicle_registration', 'vehicle_make', 'vehicle_model',
+                'vehicle_color', 'year_of_manufacture', 'insurance_type',
+                'insurance_expiry_date', 'mot_expiry_date',
+            ];
+
+            $profileUpdate = array_intersect_key($data, array_flip($allowed));
+
+            if (! empty($profileUpdate)) {
+                $profile->update($profileUpdate);
+            }
+
+            foreach ($documents as $type => $file) {
+                if ($file === null) {
+                    continue;
+                }
+                $this->uploadDocument($user, $type, $file);
+            }
+
+            return $user->fresh()->loadProfileRelation();
+        });
+    }
+
     public function uploadDocument(User $user, string $type, $file, ?string $expiresAt = null): Document
     {
         return DB::transaction(function () use ($user, $type, $file, $expiresAt) {
             $profile = $this->profileOrFail($user);
 
             if (! in_array($type, self::DOCUMENT_TYPES, true)) {
-                throw new \InvalidArgumentException("Invalid document type: {$type}");
+                throw InvalidInputException::make("Invalid document type: {$type}", 'type');
             }
 
             $existing = $profile->documents()->where('type', $type)->first();
@@ -194,8 +245,27 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
         });
     }
 
-    public function deleteAccount(User $user): bool
+    /**
+     * Send the deletion OTP to the driver's mobile. Drivers always register
+     * with a phone number, so we never fall back to email here.
+     */
+    public function initiateDeletion(User $user): string
     {
+        $mobile = $this->driverMobileOrFail($user);
+
+        $this->otp->send($mobile, OtpChannelEnum::SMS);
+
+        return $mobile;
+    }
+
+    public function deleteAccount(User $user, array $data): bool
+    {
+        $mobile = $this->driverMobileOrFail($user);
+
+        // Verify before the transaction so a bad code doesn't roll back
+        // work we haven't started yet.
+        $this->otp->verifyOrFail($mobile, $data['code']);
+
         return DB::transaction(function () use ($user) {
             $profile = $user->driverProfile;
 
@@ -207,8 +277,22 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
                 $profile->delete();
             }
 
+            $user->tokens()->delete();
+
             return $user->delete();
         });
+    }
+
+    protected function driverMobileOrFail(User $user): string
+    {
+        if (! $user->canonical_mobile) {
+            throw new ApiException(
+                message: 'No mobile number on file to send a verification code.',
+                status: 422,
+            );
+        }
+
+        return $user->canonical_mobile;
     }
 
     protected function profileOrFail(User $user): DriverProfile
@@ -216,7 +300,7 @@ class DriverProfileService extends BaseProfileService implements DriverProfileSe
         $profile = $user->driverProfile;
 
         if (! $profile) {
-            throw new \InvalidArgumentException('Driver profile not found.');
+            throw ResourceNotFoundException::for('Driver profile');
         }
 
         return $profile;

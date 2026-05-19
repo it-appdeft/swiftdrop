@@ -14,10 +14,11 @@ class UpdateBankDetailsRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'step'                => ['required', 'integer'],
             'account_holder_name' => ['required', 'string', 'min:2', 'max:100'],
-            'account_number' => ['required', 'string', 'regex:/^[0-9]{6,12}$/'],
-            'sort_code' => ['required', 'string', 'regex:/^[0-9]{2}-?[0-9]{2}-?[0-9]{2}$/'],
-            'bank_name' => ['required', 'string', 'min:2', 'max:100'],
+            'account_number'      => ['required', 'string', 'regex:/^[0-9]{6,12}$/'],
+            'sort_code'           => ['required', 'string', 'regex:/^[0-9]{2}-?[0-9]{2}-?[0-9]{2}$/'],
+            'bank_name'           => ['required', 'string', 'min:2', 'max:100'],
         ];
     }
 

@@ -31,9 +31,22 @@ class OtpCodeRepository implements OtpCodeRepositoryInterface
             ->first();
     }
 
+    public function findLatestFor(string $target): ?OtpCode
+    {
+        return OtpCode::query()
+            ->where('mobile_or_email', $target)
+            ->latest('id')
+            ->first();
+    }
+
     public function markUsed(OtpCode $otp): void
     {
         $otp->update(['used_at' => Carbon::now()]);
+    }
+
+    public function incrementAttempts(OtpCode $otp): void
+    {
+        $otp->increment('attempts');
     }
 
     public function countCreatedSince(string $target, \DateTimeInterface $since): int

@@ -7,6 +7,7 @@ use App\Enums\ApprovalStatusEnum;
 use App\Enums\RestaurantStatusEnum;
 use App\Enums\UserRoleEnum;
 use App\Enums\UserStatusEnum;
+use App\Exceptions\InvalidInputException;
 use App\Models\CustomerProfile;
 use App\Models\DriverProfile;
 use App\Models\Restaurant;
@@ -34,11 +35,14 @@ class RegistrationService implements RegistrationServiceInterface
     {
         return DB::transaction(function () use ($data, $type) {
 
+            [$countryCode, $localMobile] = $this->splitMobile($data);
+
             $user = $this->users->upsertByMobileOrEmail(
                 mobile: $this->canonicalMobile($data),
                 email: $data['email'] ?? null,
                 attributes: [
-                    'mobile' => $this->canonicalMobile($data),
+                    'mobile' => $localMobile,
+                    'country_code' => $countryCode,
                     'email' => $data['email'] ?? null,
                     'password' => isset($data['password']) ? Hash::make($data['password']) : null,
                     'status' => UserStatusEnum::ACTIVE->value,
@@ -51,7 +55,7 @@ class RegistrationService implements RegistrationServiceInterface
             $profileModel = $this->profiles[$type] ?? null;
 
             if (! $profileModel) {
-                throw new \InvalidArgumentException('Invalid registration type.');
+                throw InvalidInputException::make('Invalid registration type.', 'type');
             }
 
             $profileAttributes = [
@@ -79,11 +83,14 @@ class RegistrationService implements RegistrationServiceInterface
     public function registerRestaurant(array $data): User
     {
         return DB::transaction(function () use ($data) {
+            [$countryCode, $localMobile] = $this->splitMobile($data);
+
             $user = $this->users->upsertByMobileOrEmail(
                 mobile: $this->canonicalMobile($data),
                 email: $data['email'] ?? null,
                 attributes: [
-                    'mobile' => $this->canonicalMobile($data),
+                    'mobile' => $localMobile,
+                    'country_code' => $countryCode,
                     'email' => $data['email'] ?? null,
                     'password' => isset($data['password']) ? Hash::make($data['password']) : null,
                     'status' => UserStatusEnum::PENDING_APPROVAL->value,
@@ -130,6 +137,32 @@ class RegistrationService implements RegistrationServiceInterface
         }
 
         return $code.ltrim($number, '0');
+    }
+
+    /**
+     * Split the request's mobile/country_code pair into the normalised
+     * form we persist on users: country_code with a leading "+" and
+     * subscriber-only digits in mobile. Prefers the explicit country_code
+     * the form submitted; falls back to {@see User::splitCanonicalMobile()}
+     * when only the canonical string is available.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    protected function splitMobile(array $data): array
+    {
+        $canonical = $this->canonicalMobile($data);
+
+        if ($canonical === null) {
+            return [null, null];
+        }
+
+        $countryCode = $data['country_code'] ?? null;
+
+        if ($countryCode && Str::startsWith($canonical, $countryCode)) {
+            return [$countryCode, substr($canonical, strlen($countryCode))];
+        }
+
+        return User::splitCanonicalMobile($canonical);
     }
 
     protected function firstName(string $name): string

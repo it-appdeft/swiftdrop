@@ -18,6 +18,7 @@ class OtpCode extends Model
         'code_hash',
         'expires_at',
         'used_at',
+        'attempts',
         'created_at',
     ];
 

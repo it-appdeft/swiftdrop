@@ -14,14 +14,14 @@ class DeleteAccountRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'confirm' => ['required', 'boolean', 'accepted'],
+            'code' => ['required', 'string', 'regex:/^\d{4,8}$/'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'confirm.accepted' => 'You must confirm account deletion.',
+            'code.regex' => 'The verification code must be 4 to 8 digits.',
         ];
     }
 }

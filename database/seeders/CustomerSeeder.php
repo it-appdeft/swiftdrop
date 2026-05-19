@@ -40,9 +40,15 @@ class CustomerSeeder extends Seeder
         ];
 
         foreach ($customers as $data) {
+            [$countryCode, $localMobile] = User::splitCanonicalMobile($data['user']['mobile']);
+
             $user = User::firstOrCreate(
-                ['mobile' => $data['user']['mobile']],
-                array_merge($data['user'], ['password' => bcrypt('password')]),
+                ['country_code' => $countryCode, 'mobile' => $localMobile],
+                array_merge($data['user'], [
+                    'country_code' => $countryCode,
+                    'mobile' => $localMobile,
+                    'password' => bcrypt('password'),
+                ]),
             );
 
             if (!$user->hasRole('customer')) {
