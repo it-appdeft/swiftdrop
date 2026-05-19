@@ -82,6 +82,22 @@ class VerifyOtpRequest extends FormRequest
             : $this->canonicalMobile();
     }
 
+    /**
+     * Explicit dialling prefix from the request — see {@see SendOtpRequest}
+     * for context. Threaded through OtpFlowService so update_phone persists
+     * country_code verbatim instead of deriving it from the canonical mobile.
+     */
+    public function countryCode(): ?string
+    {
+        if ($this->channel() !== OtpChannelEnum::SMS) {
+            return null;
+        }
+
+        $code = (string) $this->input('country_code', '');
+
+        return $code === '' ? null : $code;
+    }
+
     public function code(): string
     {
         return (string) $this->input('code');

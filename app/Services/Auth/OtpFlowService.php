@@ -38,6 +38,7 @@ class OtpFlowService implements OtpFlowServiceInterface
         string $target,
         ?UserRoleEnum $userType = null,
         ?User $authUser = null,
+        ?string $countryCode = null,
     ): array {
         $this->assertAuthContext($type, $authUser);
         $this->assertTargetNotSoftDeleted($target);
@@ -55,6 +56,7 @@ class OtpFlowService implements OtpFlowServiceInterface
         string $code,
         ?UserRoleEnum $userType = null,
         ?User $authUser = null,
+        ?string $countryCode = null,
     ): array {
         $this->assertAuthContext($type, $authUser);
         $this->assertTargetNotSoftDeleted($target);
@@ -69,7 +71,7 @@ class OtpFlowService implements OtpFlowServiceInterface
         return match ($type) {
             OtpTypeEnum::LOGIN => $this->completeLogin($target, $userType),
             OtpTypeEnum::SIGNUP => $this->completeSignup($target),
-            OtpTypeEnum::UPDATE_PHONE => $this->completePhoneUpdate($authUser, $target),
+            OtpTypeEnum::UPDATE_PHONE => $this->completePhoneUpdate($authUser, $target, $countryCode),
             OtpTypeEnum::UPDATE_EMAIL => $this->completeEmailUpdate($authUser, $target),
             OtpTypeEnum::VERIFY_CURRENT_PHONE,
             OtpTypeEnum::VERIFY_CURRENT_EMAIL => $this->completeCurrentVerification($authUser, $type),
@@ -260,13 +262,22 @@ class OtpFlowService implements OtpFlowServiceInterface
         ];
     }
 
-    protected function completePhoneUpdate(User $authUser, string $newMobile): array
+    protected function completePhoneUpdate(User $authUser, string $newMobile, ?string $countryCode = null): array
     {
-        return DB::transaction(function () use ($authUser, $newMobile) {
-            // Persist as country_code + subscriber digits. The shared helper
-            // on User handles the prefix lookup so seeders, registration and
-            // this flow all agree on the same split.
-            [$countryCode, $local] = User::splitCanonicalMobile($newMobile);
+        return DB::transaction(function () use ($authUser, $newMobile, $countryCode) {
+            // Prefer the explicit country_code from the request — the caller
+            // already validated it (^\+[0-9]{1,4}$) and it covers any prefix,
+            // not just the handful baked into splitCanonicalMobile. Only fall
+            // back to deriving the split when no hint was sent (e.g. legacy
+            // payloads). Bug previously: a country like "+33" would split to
+            // [null, "+33…"], wiping country_code and prefixing mobile.
+            if ($countryCode !== null && $countryCode !== '' && str_starts_with($newMobile, $countryCode)) {
+                $local = substr($newMobile, strlen($countryCode));
+            } else {
+                [$derivedCountry, $derivedLocal] = User::splitCanonicalMobile($newMobile);
+                $countryCode = $derivedCountry;
+                $local = $derivedLocal;
+            }
 
             $authUser->update([
                 'country_code' => $countryCode,
