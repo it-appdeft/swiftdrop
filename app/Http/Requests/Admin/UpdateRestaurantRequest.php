@@ -14,24 +14,23 @@ class UpdateRestaurantRequest extends FormRequest
 
     public function rules(): array
     {
-        $restaurantId = $this->route('id');
-
         return [
-            'name'            => ['required', 'string', 'max:255'],
-            'description'     => ['nullable', 'string'],
-            'phone'           => ['required', 'string', 'max:20'],
-            'address_line_1'  => ['required', 'string', 'max:255'],
-            'address_line_2'  => ['nullable', 'string', 'max:255'],
-            'city'            => ['required', 'string', 'max:100'],
-            'county'          => ['nullable', 'string', 'max:100'],
-            'postcode'        => ['required', 'string', 'max:10'],
-            'lat'             => ['required', 'numeric'],
-            'lng'             => ['required', 'numeric'],
-            'cuisine_type'    => ['nullable', 'string', 'max:100'],
-            'commission_rate' => ['required', 'numeric', 'min:0', 'max:100'],
-            'vat_number'      => ['nullable', 'string', 'max:50'],
-            'status'          => ['required', Rule::in(['pending_approval', 'active', 'inactive', 'suspended'])],
-            'approval_status' => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+            'name'                => ['required', 'string', 'max:100'],
+            'legal_business_name' => ['nullable', 'string', 'max:200'],
+            'owner_name'          => ['nullable', 'string', 'max:100'],
+            'owner_email'         => ['nullable', 'email', 'max:255'],
+            'owner_mobile'        => ['nullable', 'string', 'max:20'],
+            'description'         => ['nullable', 'string'],
+            'restaurant_type'     => ['nullable', 'string', 'max:50'],
+            'cuisines'            => ['nullable', 'string', 'max:500'],
+            'branches'            => ['nullable', 'integer', 'min:1'],
+            'seating_capacity'    => ['nullable', 'integer', 'min:0'],
+            'full_address'        => ['nullable', 'string', 'max:1000'],
+            'lat'                 => ['nullable', 'numeric', 'between:-90,90'],
+            'lng'                 => ['nullable', 'numeric', 'between:-180,180'],
+            'commission_rate'     => ['required', 'numeric', 'min:0', 'max:100'],
+            'status'              => ['required', Rule::in(['pending_approval', 'active', 'inactive', 'suspended'])],
+            'approval_status'     => ['required', Rule::in(['pending', 'approved', 'rejected'])],
         ];
     }
 }

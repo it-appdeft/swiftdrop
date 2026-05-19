@@ -14,7 +14,7 @@ export function SwiftdropWordmark({ className, color = 'dark' }: SwiftdropWordma
                 src="/brand/dark-logo.png"
                 alt=""
                 aria-hidden
-                className={cn('h-10 w-auto', isLight && 'brightness-0 invert')}
+                className={cn('h-15 w-25', isLight && 'brightness-0 invert')}
             />
         </div>
     );

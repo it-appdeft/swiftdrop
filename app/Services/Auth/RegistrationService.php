@@ -99,23 +99,20 @@ class RegistrationService implements RegistrationServiceInterface
 
             $user->syncRoles([UserRoleEnum::RESTAURANT_OWNER->value]);
 
+            // Registration only collects name/email/mobile (mirrors the customer
+            // flow). All other restaurant details are filled in via the partner
+            // application steps; we pre-seed owner_email / owner_mobile so the
+            // Step 1 form can show them as defaults.
             Restaurant::updateOrCreate(
                 ['user_id' => $user->id],
-                array_filter([
+                [
                     'name' => $data['name'],
-                    'description' => $data['description'] ?? null,
-                    'address_line_1' => $data['address_line_1'] ?? null,
-                    'address_line_2' => $data['address_line_2'] ?? null,
-                    'city' => $data['city'] ?? null,
-                    'county' => $data['county'] ?? null,
-                    'postcode' => $data['postcode'] ?? null,
-                    'lat' => $data['lat'] ?? null,
-                    'lng' => $data['lng'] ?? null,
-                    'phone' => $this->canonicalMobile($data),
-                    'cuisine_type' => $data['cuisine_type'] ?? null,
+                    'owner_email' => $data['email'] ?? null,
+                    'owner_mobile' => $this->canonicalMobile($data),
                     'status' => RestaurantStatusEnum::PENDING_APPROVAL->value,
                     'approval_status' => ApprovalStatusEnum::PENDING->value,
-                ], fn ($v) => $v !== null),
+                    'application_step' => 1,
+                ],
             );
 
             return $user->fresh()->loadProfileRelation();

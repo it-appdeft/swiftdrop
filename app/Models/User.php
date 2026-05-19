@@ -59,9 +59,18 @@ class User extends Authenticatable
      */
     public function homeRouteName(): string
     {
+        if ($this->hasRole(UserRoleEnum::RESTAURANT_OWNER->value)) {
+            // Restaurant owners complete the unified 8-step partner application
+            // (registration → /partner/apply → restaurant.dashboard).
+            $restaurant = $this->restaurant ?? $this->restaurant()->first();
+
+            return $restaurant && $restaurant->hasSubmittedApplication()
+                ? 'restaurant.dashboard'
+                : 'partner.apply';
+        }
+
         return match (true) {
             $this->hasRole(UserRoleEnum::ADMIN->value) => 'admin.dashboard',
-            $this->hasRole(UserRoleEnum::RESTAURANT_OWNER->value) => 'restaurant.dashboard',
             $this->hasRole(UserRoleEnum::CUSTOMER->value) => 'customer.dashboard',
             default => 'home',
         };

@@ -1,12 +1,24 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Restaurant\PartnerApplicationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
+
+Route::controller(PartnerApplicationController::class)
+    ->middleware(['auth', 'restaurant'])
+    ->prefix('partner')
+    ->name('partner.')
+    ->group(function () {
+        Route::get('apply', 'show')->name('apply');
+        Route::post('apply/save', 'save')->name('apply.save');
+        Route::post('apply/submit', 'submit')->name('apply.submit');
+        Route::post('apply/documents/{type}', 'uploadDocument')->name('apply.documents');
+    });
 
 Route::controller(AuthController::class)->middleware('guest')->group(function () {
     Route::get('/login', 'login')->name('login');
