@@ -38,10 +38,10 @@ export function CustomerHeader() {
         <header className="sticky top-0 z-30 border-b border-border bg-background">
             <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-3 px-3 sm:gap-5 sm:px-4 lg:gap-6 lg:px-6">
                 <Link href={route('customer.dashboard')} aria-label="SwiftDrop home" className="flex shrink-0 flex-col items-center leading-none">
-                    <img src="/brand/icon.png" alt="" aria-hidden className="h-6 w-auto sm:h-7" />
+                    <img src="/brand/Container.png" alt="" aria-hidden className="h-6 w-auto sm:h-7" />
                     <span className="mt-0.5 text-[10px] font-semibold tracking-tight">
-                        <span>Swift</span>
-                        <span className="text-primary">Drop</span>
+                        {/* <span>Swift</span>
+                        <span className="text-primary">Drop</span> */}
                     </span>
                 </Link>
 

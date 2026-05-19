@@ -327,7 +327,7 @@ function OtpInputRow({ digits, onDigit, onKeyDown, inputsRef, resendIn, onResend
                             value={digit}
                             onChange={(e) => onDigit(i, e.target.value)}
                             onKeyDown={(e) => onKeyDown(i, e)}
-                            className="size-11 rounded-md border border-input bg-background text-center text-base font-semibold text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="size-11 rounded-md border-0 bg-background text-center text-base font-semibold text-foreground shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                     ))}
                 </div>
@@ -695,7 +695,8 @@ function EditProfileDialog({
                                 type="text"
                                 value={profileForm.data.name}
                                 onChange={(e) => profileForm.setData('name', e.target.value)}
-                                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                placeholder="John Doe"
+                                className="h-11 w-full rounded-md border-0 bg-muted/60 px-3 text-sm text-foreground transition placeholder:text-muted-foreground focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                         </div>
                         {profileForm.errors.name && (
@@ -726,7 +727,7 @@ function EditProfileDialog({
                                 value={initialEmail}
                                 readOnly
                                 placeholder="john@example.com"
-                                className="h-11 flex-1 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                                className="h-11 flex-1 rounded-md border-0 bg-muted/60 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                             <button
                                 type="button"
@@ -737,9 +738,9 @@ function EditProfileDialog({
                                     }
                                     sendCurrentEmailOtp();
                                 }}
-                                className="h-11 shrink-0 rounded-md border border-primary/40 bg-background px-3.5 text-xs font-semibold text-primary transition hover:bg-primary/5"
+                                className="h-11 shrink-0 rounded-md bg-primary/15 px-4 text-xs font-semibold text-primary transition hover:bg-primary/20"
                             >
-                                {emailVerifyState === 'awaitingCode' ? 'Resend' : 'Verify Email'}
+                                {emailVerifyState === 'awaitingCode' ? 'Resend' : 'Change'}
                             </button>
                         </div>
                         {emailVerifyState === 'awaitingCode' && (
@@ -763,7 +764,7 @@ function EditProfileDialog({
                     <div className="space-y-1.5">
                         <label className="text-xs font-medium text-foreground">Mobile Number</label>
                         <div className="flex gap-2">
-                            <div className="flex h-11 flex-1 items-center gap-2 rounded-md border border-input bg-background px-3">
+                            <div className="flex h-11 flex-1 items-center gap-2 rounded-md bg-muted/60 px-3">
                                 <span className="text-sm text-foreground">🇬🇧 {phoneCountry}</span>
                                 <span className="h-5 w-px bg-border" />
                                 <input
@@ -772,7 +773,7 @@ function EditProfileDialog({
                                     readOnly
                                     placeholder="7123 456789"
                                     aria-label="Mobile number"
-                                    className="h-full flex-1 bg-transparent text-sm text-foreground focus:outline-none"
+                                    className="h-full flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
                                 />
                             </div>
                             <button
@@ -784,7 +785,7 @@ function EditProfileDialog({
                                     }
                                     sendCurrentPhoneOtp();
                                 }}
-                                className="h-11 shrink-0 rounded-md border border-primary/40 bg-background px-3.5 text-xs font-semibold text-primary transition hover:bg-primary/5"
+                                className="h-11 shrink-0 rounded-md bg-primary/15 px-4 text-xs font-semibold text-primary transition hover:bg-primary/20"
                             >
                                 {phoneVerifyState === 'awaitingCode' ? 'Resend' : 'Change'}
                             </button>
@@ -947,7 +948,7 @@ function ChangeEmailDialog({ open, onOpenChange }: ChangeEmailDialogProps) {
                                 onChange={(e) => setNewEmail(e.target.value)}
                                 placeholder="Add New Email"
                                 autoFocus
-                                className="h-11 w-full rounded-md border border-primary bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="h-11 w-full rounded-md border-0 bg-muted/60 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                         </div>
                         {error && <p className="text-xs text-destructive">{error}</p>}
@@ -1108,7 +1109,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                     <form onSubmit={sendNewOtp} className="space-y-4">
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-foreground">Mobile Number</label>
-                            <div className="flex h-11 items-center gap-2 rounded-md border border-primary bg-background px-3 transition focus-within:ring-2 focus-within:ring-primary/30">
+                            <div className="flex h-11 items-center gap-2 rounded-md bg-muted/60 px-3 transition focus-within:bg-muted focus-within:ring-2 focus-within:ring-primary/30">
                                 <select
                                     value={newCountry}
                                     onChange={(e) => setNewCountry(e.target.value)}
@@ -1125,7 +1126,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                                     onChange={(e) => setNewMobile(e.target.value)}
                                     placeholder="Add New Number"
                                     autoFocus
-                                    className="h-full flex-1 bg-transparent text-sm text-foreground focus:outline-none"
+                                    className="h-full flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
                                 />
                             </div>
                         </div>
@@ -1354,19 +1355,24 @@ function AddressEditorDialog({
         }
     };
 
+    const inputCls =
+        'h-11 w-full rounded-md border-0 bg-muted/60 px-3 text-sm text-foreground placeholder:text-muted-foreground transition focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30';
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{editingId != null ? 'Edit Address' : 'Add New Address'}</DialogTitle>
+                    <DialogTitle className="text-center text-lg font-semibold">
+                        {editingId != null ? 'Edit Address' : 'Add New Address'}
+                    </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">Label</label>
+                        <label className="text-xs font-medium text-foreground">Label</label>
                         <select
                             value={form.data.label}
                             onChange={(e) => form.setData('label', e.target.value as AddressFormState['label'])}
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            className={inputCls}
                         >
                             <option value="Home">Home</option>
                             <option value="Work">Work</option>
@@ -1378,7 +1384,7 @@ function AddressEditorDialog({
                             type="text"
                             value={form.data.address_line_1}
                             onChange={(e) => form.setData('address_line_1', e.target.value)}
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            className={inputCls}
                         />
                     </Field>
                     <Field label="Address line 2 (optional)">
@@ -1386,7 +1392,7 @@ function AddressEditorDialog({
                             type="text"
                             value={form.data.address_line_2}
                             onChange={(e) => form.setData('address_line_2', e.target.value)}
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            className={inputCls}
                         />
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
@@ -1395,7 +1401,7 @@ function AddressEditorDialog({
                                 type="text"
                                 value={form.data.city}
                                 onChange={(e) => form.setData('city', e.target.value)}
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                className={inputCls}
                             />
                         </Field>
                         <Field label="County" error={form.errors.county}>
@@ -1403,7 +1409,7 @@ function AddressEditorDialog({
                                 type="text"
                                 value={form.data.county}
                                 onChange={(e) => form.setData('county', e.target.value)}
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                className={inputCls}
                             />
                         </Field>
                     </div>
@@ -1412,7 +1418,7 @@ function AddressEditorDialog({
                             type="text"
                             value={form.data.postcode}
                             onChange={(e) => form.setData('postcode', e.target.value)}
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm uppercase"
+                            className={inputCls + ' uppercase'}
                         />
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
@@ -1422,7 +1428,7 @@ function AddressEditorDialog({
                                 step="any"
                                 value={form.data.lat}
                                 onChange={(e) => form.setData('lat', e.target.value)}
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                className={inputCls}
                             />
                         </Field>
                         <Field label="Longitude" error={form.errors.lng}>
@@ -1431,7 +1437,7 @@ function AddressEditorDialog({
                                 step="any"
                                 value={form.data.lng}
                                 onChange={(e) => form.setData('lng', e.target.value)}
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                className={inputCls}
                             />
                         </Field>
                     </div>
@@ -1440,21 +1446,22 @@ function AddressEditorDialog({
                             type="checkbox"
                             checked={form.data.is_default}
                             onChange={(e) => form.setData('is_default', e.target.checked)}
+                            className="accent-primary"
                         />
                         Set as default
                     </label>
-                    <div className="flex gap-2 pt-1">
+                    <div className="flex gap-3 pt-2">
                         <button
                             type="button"
                             onClick={() => onOpenChange(false)}
-                            className="h-10 flex-1 rounded-md bg-muted text-sm font-semibold"
+                            className="h-11 flex-1 rounded-md bg-muted text-sm font-semibold text-foreground transition hover:bg-muted/70"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={form.processing}
-                            className="h-10 flex-1 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                            className="h-11 flex-1 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                         >
                             {editingId != null ? 'Save Changes' : 'Add Address'}
                         </button>
@@ -1468,10 +1475,61 @@ function AddressEditorDialog({
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
     return (
         <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">{label}</label>
+            <label className="text-xs font-medium text-foreground">{label}</label>
             {children}
             {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
+    );
+}
+
+/**
+ * Reusable red-trash confirmation modal used by destructive actions
+ * (delete address, delete account). Driven by a controlled `open` flag
+ * + onCancel/onConfirm so the parent owns the destructive call itself.
+ */
+function ConfirmDeleteDialog({
+    open,
+    onCancel,
+    onConfirm,
+    title,
+    confirmLabel = 'Delete',
+    busy = false,
+}: {
+    open: boolean;
+    onCancel: () => void;
+    onConfirm: () => void;
+    title: string;
+    confirmLabel?: string;
+    busy?: boolean;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
+            <DialogContent className="sm:max-w-sm">
+                <div className="flex flex-col items-center text-center">
+                    <div className="flex size-14 items-center justify-center rounded-full bg-rose-500">
+                        <Trash2 className="size-7 text-white" />
+                    </div>
+                    <DialogTitle className="mt-4 text-base font-semibold">{title}</DialogTitle>
+                    <div className="mt-5 flex w-full gap-3">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="h-11 flex-1 rounded-md bg-muted text-sm font-semibold text-foreground transition hover:bg-muted/70"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onConfirm}
+                            disabled={busy}
+                            className="h-11 flex-1 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                        >
+                            {busy ? 'Deleting…' : confirmLabel}
+                        </button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -1585,34 +1643,12 @@ function AddressesSection({ addresses }: { addresses: ServerAddress[] }) {
                 Add New Address
             </button>
 
-            <Dialog open={pendingDelete != null} onOpenChange={(open) => !open && setPendingDelete(null)}>
-                <DialogContent className="sm:max-w-sm">
-                    <div className="flex flex-col items-center text-center">
-                        <div className="flex size-14 items-center justify-center rounded-full bg-rose-500">
-                            <Trash2 className="size-7 text-white" />
-                        </div>
-                        <DialogTitle className="mt-4 text-base font-semibold">
-                            Are You Sure You Want To Delete This Address?
-                        </DialogTitle>
-                        <div className="mt-5 flex w-full gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setPendingDelete(null)}
-                                className="h-10 flex-1 rounded-md bg-muted text-sm font-semibold text-foreground hover:bg-muted/70"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleConfirmDelete}
-                                className="h-10 flex-1 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <ConfirmDeleteDialog
+                open={pendingDelete != null}
+                onCancel={() => setPendingDelete(null)}
+                onConfirm={handleConfirmDelete}
+                title="Are You Sure You Want To Delete This Address?"
+            />
 
             <AddressEditorDialog
                 open={editorOpen}
@@ -1948,7 +1984,7 @@ function SettingsSection({ onDeleteAccount }: { onDeleteAccount: () => void }) {
     return (
         <>
             <h2 className="text-lg font-bold tracking-tight">Settings</h2>
-            <div className="mt-4 flex items-start justify-between gap-3 rounded-xl bg-muted/40 p-4">
+            {/* <div className="mt-4 flex items-start justify-between gap-3 rounded-xl bg-muted/40 p-4">
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold">Recommendations &amp; Reminders</p>
                     <p className="mt-1 text-[11px] text-muted-foreground">
@@ -1971,7 +2007,7 @@ function SettingsSection({ onDeleteAccount }: { onDeleteAccount: () => void }) {
                         }
                     />
                 </span>
-            </div>
+            </div> */}
 
             <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/40 p-4">
                 <p className="text-sm font-semibold text-rose-700">Delete Account</p>
@@ -2010,6 +2046,10 @@ function DeleteAccountDialog({
     const [resendIn, setResendIn] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    // After the user enters their OTP and hits Verify we hold off the actual
+    // DELETE call and surface a final confirmation modal — the action is
+    // destructive and the OTP alone shouldn't be the only guardrail.
+    const [confirmOpen, setConfirmOpen] = useState(false);
     const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
     useEffect(() => {
@@ -2027,6 +2067,7 @@ function DeleteAccountDialog({
             setTarget(null);
             setOtpDigits(Array(OTP_LENGTH).fill(''));
             setError(null);
+            setConfirmOpen(false);
         }
     }, [open]);
 
@@ -2071,6 +2112,15 @@ function DeleteAccountDialog({
         }
     };
 
+    // First click on Verify after the OTP is entered: don't delete yet, ask
+    // the user to confirm the destructive action one last time.
+    const askForFinalConfirmation = () => {
+        if (!reasonId) return;
+        if (otpDigits.join('').length < OTP_LENGTH) return;
+        setError(null);
+        setConfirmOpen(true);
+    };
+
     const submitDeletion = () => {
         if (!reasonId) return;
         setError(null);
@@ -2086,12 +2136,14 @@ function DeleteAccountDialog({
                 // The server redirects to /home with a flash message; the
                 // global flash-toast listener in app.tsx will surface it,
                 // so we just close the dialog locally.
+                setConfirmOpen(false);
                 onOpenChange(false);
             },
             onError: (errors) => {
                 const msg = Object.values(errors).flat().join(' ') || 'Verification failed.';
                 setError(msg);
                 toast.error(msg);
+                setConfirmOpen(false);
                 setSubmitting(false);
             },
             onFinish: () => setSubmitting(false),
@@ -2190,7 +2242,7 @@ function DeleteAccountDialog({
                             inputsRef={inputsRef}
                             resendIn={resendIn}
                             onResend={sendDeletionOtp}
-                            onVerify={submitDeletion}
+                            onVerify={askForFinalConfirmation}
                             disabled={submitting}
                             label={`Code sent to ${target ?? 'your contact'}`}
                         />
@@ -2198,6 +2250,14 @@ function DeleteAccountDialog({
                     </div>
                 )}
             </DialogContent>
+
+            <ConfirmDeleteDialog
+                open={confirmOpen}
+                onCancel={() => !submitting && setConfirmOpen(false)}
+                onConfirm={submitDeletion}
+                title="Are You Sure You Want To Delete Your Account?"
+                busy={submitting}
+            />
         </Dialog>
     );
 }
@@ -2379,9 +2439,11 @@ export default function CustomerProfile() {
             case 'addresses':
                 return <AddressesSection addresses={addresses} />;
             case 'favorites':
-                return <FavoritesSection />;
+                return <OrderHistorySection />;
+                // return <FavoritesSection />;
             case 'payments':
-                return <PaymentsSection onAddNew={() => setAddingCard(true)} />;
+                return <OrderHistorySection />;
+                // return <PaymentsSection onAddNew={() => setAddingCard(true)} />;
             case 'settings':
                 return <SettingsSection onDeleteAccount={() => setDeleteOpen(true)} />;
             case 'privacy':
@@ -2389,7 +2451,8 @@ export default function CustomerProfile() {
             case 'terms':
                 return <TermsSection />;
             case 'help':
-                return <HelpSection />;
+                return <OrderHistorySection />;
+                // return <HelpSection />;
         }
     };
 
