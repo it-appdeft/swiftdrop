@@ -50,7 +50,7 @@ class OtpException extends ApiException
     public static function userNotRegistered(): self
     {
         return new self(
-            message: 'No account is registered for this identifier. Please sign up first.',
+            message: 'No account is registered for this credential. Please sign up first.',
             status: 404,
             field: 'target',
         );
@@ -59,7 +59,7 @@ class OtpException extends ApiException
     public static function userAlreadyExists(): self
     {
         return new self(
-            message: 'An account is already registered for this identifier.',
+            message: 'An account is already registered for this credential.',
             status: 409,
             field: 'target',
         );
@@ -103,7 +103,7 @@ class OtpException extends ApiException
 
     /**
      * The submitted target ("verify current" step) does not match the
-     * identifier on file for the authenticated user.
+     * credential on file for the authenticated user.
      */
     public static function targetNotCurrent(string $field): self
     {

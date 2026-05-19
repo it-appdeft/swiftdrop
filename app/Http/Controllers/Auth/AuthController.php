@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Auth;
 use App\Contracts\Auth\OtpServiceInterface;
 use App\Contracts\Auth\RegistrationServiceInterface;
 use App\Enums\OtpChannelEnum;
+use App\Enums\UserRoleEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterCustomerRequest;
 use App\Http\Requests\Auth\RegisterRestaurantRequest;
 use App\Http\Requests\Auth\SendOtpRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
+use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -63,13 +65,21 @@ class AuthController extends Controller
         // The web /otp/send endpoint is only used by the login flow. Refuse to
         // send a code if no account is registered to the target — the user can
         // tap "Create an account" from the same screen instead.
-        if (! $this->users->findByMobileOrEmail($target)) {
+        $user = $this->users->findByMobileOrEmail($target);
+
+        if (! $user) {
             $field = $request->canonicalEmail() !== '' ? 'email' : 'mobile';
 
             throw ValidationException::withMessages([
                 $field => "No account exists for this {$field}. Please register first.",
             ]);
         }
+
+        // Admins authenticate through /admin/login with email + password — the
+        // public OTP flow is for customer + restaurant accounts only. Refuse
+        // here so an admin whose phone is in the users table can't slip into
+        // the customer portal via SMS.
+        $this->assertWebLoginEligible($user, $request);
 
         $this->otp->send($target, $channel);
 
@@ -94,6 +104,11 @@ class AuthController extends Controller
         $request->session()->forget('otp');
 
         if ($user) {
+            // Re-check on verify too: even if a stale or replayed OTP burns
+            // through the send-time check, we should never authenticate an
+            // admin via the public web OTP page.
+            $this->assertWebLoginEligible($user, $request);
+
             Auth::login($user, remember: true);
 
             return $this->redirectAfterAuth($request);
@@ -129,5 +144,23 @@ class AuthController extends Controller
         $request->session()->forget('url.intended');
 
         return redirect()->route($request->user()->homeRouteName());
+    }
+
+    /**
+     * Reject roles that have no business going through the public customer
+     * web login. Admin accounts have a dedicated /admin/login (email +
+     * password) and must not be issuable a phone OTP here. We surface the
+     * same generic "no account" message rather than confirming the email /
+     * mobile maps to an admin row — avoids a credential-enumeration oracle.
+     */
+    protected function assertWebLoginEligible(User $user, SendOtpRequest|VerifyOtpRequest $request): void
+    {
+        if ($user->hasRole(UserRoleEnum::ADMIN->value)) {
+            $field = $request->canonicalEmail() !== '' ? 'email' : 'mobile';
+
+            throw ValidationException::withMessages([
+                $field => "You cannot log in with this phone number. Please use the admin login portal.",
+            ]);
+        }
     }
 }
