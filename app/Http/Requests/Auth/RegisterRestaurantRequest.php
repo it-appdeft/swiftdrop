@@ -19,6 +19,9 @@ class RegisterRestaurantRequest extends FormRequest
 
     public function rules(): array
     {
+        // Restaurant signup now only captures the same fields as customer
+        // signup — Name, Email, Mobile. Everything else is collected by the
+        // partner application flow after registration.
         return [
             'name' => ['required', 'string', 'min:2', 'max:255'],
             'email' => [
@@ -35,15 +38,6 @@ class RegisterRestaurantRequest extends FormRequest
                 'regex:/^\+?[0-9\s\-]{6,20}$/',
                 new HasVerifiedOtp($this->canonicalMobile(), 'mobile number'),
             ],
-            'description' => ['nullable', 'string', 'max:2000'],
-            'address_line_1' => ['nullable', 'string', 'max:255'],
-            'address_line_2' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:120'],
-            'county' => ['nullable', 'string', 'max:120'],
-            'postcode' => ['nullable', 'string', 'max:10'],
-            'lat' => ['nullable', 'numeric', 'between:-90,90'],
-            'lng' => ['nullable', 'numeric', 'between:-180,180'],
-            'cuisine_type' => ['nullable', 'string', 'max:120'],
         ];
     }
 

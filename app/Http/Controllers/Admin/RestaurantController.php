@@ -19,9 +19,8 @@ class RestaurantController extends Controller
             ->withCount('orders')
             ->when($request->search, fn($q) => $q->where(function ($q) use ($request) {
                 $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('city', 'like', "%{$request->search}%")
-                  ->orWhere('postcode', 'like', "%{$request->search}%")
-                  ->orWhere('cuisine_type', 'like', "%{$request->search}%");
+                  ->orWhere('full_address', 'like', "%{$request->search}%")
+                  ->orWhere('cuisines', 'like', "%{$request->search}%");
             }))
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->approval_status, fn($q) => $q->where('approval_status', $request->approval_status))
@@ -72,22 +71,23 @@ class RestaurantController extends Controller
             $user->assignRole('restaurant_owner');
 
             Restaurant::create([
-                'user_id'         => $user->id,
-                'name'            => $request->name,
-                'description'     => $request->description,
-                'address_line_1'  => $request->address_line_1,
-                'address_line_2'  => $request->address_line_2,
-                'city'            => $request->city,
-                'county'          => $request->county,
-                'postcode'        => $request->postcode,
-                'lat'             => $request->lat,
-                'lng'             => $request->lng,
-                'phone'           => $request->phone,
-                'cuisine_type'    => $request->cuisine_type,
-                'commission_rate' => $request->commission_rate,
-                'vat_number'      => $request->vat_number,
-                'status'          => 'pending_approval',
-                'approval_status' => 'pending',
+                'user_id'             => $user->id,
+                'name'                => $request->name,
+                'legal_business_name' => $request->legal_business_name,
+                'owner_name'          => $request->owner_name,
+                'owner_email'         => $request->email,
+                'owner_mobile'        => $request->mobile,
+                'restaurant_type'     => $request->restaurant_type,
+                'cuisines'            => $request->cuisines,
+                'branches'            => $request->branches,
+                'seating_capacity'    => $request->seating_capacity,
+                'full_address'        => $request->full_address,
+                'lat'                 => $request->lat,
+                'lng'                 => $request->lng,
+                'description'         => $request->description,
+                'commission_rate'     => $request->commission_rate,
+                'status'              => 'pending_approval',
+                'approval_status'     => 'pending',
             ]);
         });
 
@@ -109,9 +109,10 @@ class RestaurantController extends Controller
         $restaurant = Restaurant::findOrFail($id);
 
         $restaurant->update($request->only([
-            'name', 'description', 'phone',
-            'address_line_1', 'address_line_2', 'city', 'county', 'postcode', 'lat', 'lng',
-            'cuisine_type', 'commission_rate', 'vat_number',
+            'name', 'legal_business_name', 'owner_name', 'owner_email', 'owner_mobile',
+            'restaurant_type', 'cuisines', 'branches', 'seating_capacity',
+            'full_address', 'lat', 'lng',
+            'description', 'commission_rate',
             'status', 'approval_status',
         ]));
 
