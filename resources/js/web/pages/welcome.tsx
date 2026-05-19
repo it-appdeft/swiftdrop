@@ -2,7 +2,6 @@ import { Head, Link } from '@inertiajs/react';
 import { ChevronDown, Clock, Heart, MapPin, Search, Star } from 'lucide-react';
 import { SiteFooter } from '../components/site-footer';
 import { SiteHeader } from '../components/site-header';
-import { SwiftdropWordmark } from '../components/swiftdrop-wordmark';
 
 const CUISINES = [
     {
@@ -387,21 +386,18 @@ export default function Welcome() {
                 {/* App Promo -------------------------------------------------------- */}
                 <section className="bg-background py-10 sm:py-14">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-                        <div className="relative overflow-hidden rounded-3xl bg-primary px-6 py-10 text-primary-foreground sm:px-10 md:h-[360px] md:px-14 md:py-12 lg:h-[400px]">
+                        <div className="relative overflow-hidden rounded-3xl bg-primary px-6 py-10 text-primary-foreground sm:px-10 lg:h-[400px] lg:px-14 lg:py-12">
                             {/* Black frame around the phones-only half (right side
                                 of the card) — matches the figma where the border
                                 hugs the phone artwork, not the whole promo card.
-                                Rounded only on the right; the left edge stays
-                                square as the interior divider. `z-10` lifts the
-                                frame above the phones image so the stroke renders
-                                on top. */}
+                                Only visible at lg+ where the phones render and
+                                actually fill that half. */}
                             <div
                                 aria-hidden
-                                className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-1/2 rounded-r-3xl border-2 border-black md:block"
+                                className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-1/2 rounded-r-3xl border-2 border-black lg:block"
                             />
-                            <div className="grid items-center gap-8 md:grid-cols-[1.2fr_1fr]">
-                                <div>
-                                    <SwiftdropWordmark color="light" className="mb-4" />
+                            <div className="grid items-center gap-8 lg:grid-cols-[1.2fr_1fr]">
+                                <div className="max-w-xl">
                                     <h2 className="text-2xl font-bold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
                                         Elevate Your Dining Experience
                                     </h2>
@@ -465,21 +461,33 @@ export default function Welcome() {
                                     </div>
                                 </div>
 
-                                {/* Empty column placeholder — the phones below are
-                                    absolutely positioned relative to the card so they
-                                    can extend past its bottom edge. */}
-                                <div className="hidden md:block" />
+                                {/* Below lg the grid stacks, so the phones live in
+                                    the second column as a regular in-flow image so
+                                    they appear under the copy. At lg+ this column is
+                                    just a placeholder and the absolutely-positioned
+                                    phones below take over. */}
+                                <div className="flex justify-center lg:block">
+                                    <img
+                                        src="/assets/images/phones.png"
+                                        alt=""
+                                        aria-hidden
+                                        className="block h-auto max-h-[340px] w-auto select-none sm:max-h-[400px] lg:hidden"
+                                    />
+                                </div>
                             </div>
 
                             {/* Phones — single mockup PNG anchored to the card.
                                 Bottom extends past the card via negative offset, and
                                 the card's overflow-hidden crops it for the "popping
-                                out" effect in the Figma. */}
+                                out" effect in the Figma. Only shown at lg+ where the
+                                card is wide enough to host them without crowding the
+                                copy column; offset scales with breakpoint so the
+                                phones don't kiss the card edge on smaller desktops. */}
                             <img
                                 src="/assets/images/phones.png"
                                 alt=""
                                 aria-hidden
-                                className="pointer-events-none absolute right-8 top-10 hidden h-[400px] w-auto select-none md:block lg:right-12 lg:top-10 lg:h-[440px]"
+                                className="pointer-events-none absolute top-10 right-6 hidden h-[380px] w-auto select-none lg:block lg:h-[420px] xl:right-12 xl:h-[440px]"
                             />
                         </div>
                     </div>
