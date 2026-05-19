@@ -150,6 +150,7 @@ class CustomerProfileController extends Controller
             target: $request->target(),
             userType: $request->userRole(),
             authUser: Auth::user(),
+            countryCode: $request->countryCode(),
         );
 
         return back()->with('otp', $payload);
@@ -168,6 +169,7 @@ class CustomerProfileController extends Controller
             code: $request->code(),
             userType: $request->userRole(),
             authUser: Auth::user(),
+            countryCode: $request->countryCode(),
         );
 
         return back()->with('otpResult', $result);

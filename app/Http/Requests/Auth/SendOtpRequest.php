@@ -92,4 +92,22 @@ class SendOtpRequest extends FormRequest
             ? $this->canonicalEmail()
             : $this->canonicalMobile();
     }
+
+    /**
+     * Explicit dialling prefix the client sent (e.g. "+44"). Returned only
+     * for SMS-channel requests; null for email or when the field was omitted.
+     * Used by the OTP flow's update_phone branch so we persist the exact
+     * country_code the user picked instead of trying to re-derive it from
+     * the canonical mobile string.
+     */
+    public function countryCode(): ?string
+    {
+        if ($this->channel() !== OtpChannelEnum::SMS) {
+            return null;
+        }
+
+        $code = (string) $this->input('country_code', '');
+
+        return $code === '' ? null : $code;
+    }
 }

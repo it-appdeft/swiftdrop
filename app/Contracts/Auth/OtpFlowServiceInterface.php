@@ -16,6 +16,12 @@ use App\Models\User;
 interface OtpFlowServiceInterface
 {
     /**
+     * @param string|null $countryCode Explicit dialling prefix (e.g. "+44").
+     *                                 Only meaningful for SMS-channel flows;
+     *                                 stored as-is on update_phone so we don't
+     *                                 have to re-derive it from the canonical
+     *                                 string with a brittle prefix table.
+     *
      * @return array{target: string, expires_in: int, test_code: ?string}
      */
     public function send(
@@ -24,6 +30,7 @@ interface OtpFlowServiceInterface
         string $target,
         ?UserRoleEnum $userType = null,
         ?User $authUser = null,
+        ?string $countryCode = null,
     ): array;
 
     /**
@@ -38,5 +45,6 @@ interface OtpFlowServiceInterface
         string $code,
         ?UserRoleEnum $userType = null,
         ?User $authUser = null,
+        ?string $countryCode = null,
     ): array;
 }
