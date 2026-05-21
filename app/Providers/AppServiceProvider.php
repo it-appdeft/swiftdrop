@@ -67,6 +67,15 @@ class AppServiceProvider extends ServiceProvider
             \App\Contracts\Profile\DriverProfileServiceInterface::class,
             \App\Services\Profile\DriverProfileService::class,
         );
+        $this->app->bind(
+            \App\Contracts\Customer\CustomerDashboardServiceInterface::class,
+            \App\Services\Customer\CustomerDashboardService::class,
+        );
+        $this->app->bind(
+            \App\Contracts\Customer\CustomerSearchServiceInterface::class,
+            \App\Services\Customer\CustomerSearchService::class,
+        );
         $this->app->singleton(\App\Services\Files\ImageUploadService::class);
+        $this->app->singleton(\App\Services\Platform\PlatformConfigService::class);
     }
 }

@@ -48,6 +48,11 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user,
                 // Role-specific landing URL for header / post-auth redirects.
                 'home_url' => $user ? route($user->homeRouteName()) : null,
+                // Customer-only: the address driving all radius-aware queries.
+                // Header chip + dashboard banner read this. Falls back through
+                // selected → default → newest so single-address customers are
+                // always represented.
+                'selected_address' => fn () => $this->customerSelectedAddress($user),
             ],
             // Surface one-shot session flashes so the frontend can fire a
             // toast on the next visit (see app.tsx → router.on('success')).
@@ -56,5 +61,29 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
             ],
         ]);
+    }
+
+    protected function customerSelectedAddress(mixed $user): ?array
+    {
+        $profile = $user?->customerProfile ?? null;
+        if (! $profile) {
+            return null;
+        }
+
+        $address = $profile->selectedAddress()->first()
+            ?? $profile->defaultAddress()->first()
+            ?? $profile->addresses()->latest('id')->first();
+
+        if (! $address) {
+            return null;
+        }
+
+        return [
+            'id' => $address->id,
+            'label' => $address->label,
+            'address_line_1' => $address->address_line_1,
+            'city' => $address->city,
+            'postcode' => $address->postcode,
+        ];
     }
 }

@@ -22,6 +22,7 @@ class AddressResource extends JsonResource
             'lat' => $this->lat,
             'lng' => $this->lng,
             'is_default' => $this->is_default,
+            'is_selected' => $this->is_selected,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

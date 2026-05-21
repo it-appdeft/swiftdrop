@@ -63,7 +63,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
 
                 <FormField
                     label={
-                        <span className="flex w-full items-center justify-between gap-2">
+                        <span className="w-full">
                             <span>Password</span>
                             {/* {canResetPassword && (
                                 <TextLink href={route('password.request')} className="text-xs font-normal" tabIndex={5}>

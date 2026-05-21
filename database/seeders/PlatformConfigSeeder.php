@@ -18,6 +18,8 @@ class PlatformConfigSeeder extends Seeder
             ['key' => 'restaurant_accept_timeout_minutes', 'value' => '10', 'description' => 'Auto-cancel if restaurant does not accept within this time'],
             ['key' => 'base_delivery_fee_gbp', 'value' => '1.99', 'description' => 'Base delivery fee in GBP'],
             ['key' => 'free_delivery_threshold_gbp', 'value' => '25.00', 'description' => 'Order total above which delivery is free'],
+            ['key' => 'customer_dashboard_radius_miles', 'value' => '5', 'description' => 'Search radius (miles) used when a customer has a default address'],
+            ['key' => 'customer_dashboard_fallback_limit', 'value' => '12', 'description' => 'Number of latest restaurants shown when no customer address is set'],
         ];
 
         foreach ($configs as $config) {

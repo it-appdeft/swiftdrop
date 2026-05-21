@@ -19,12 +19,13 @@ const widthClass: Record<NonNullable<PageContainerProps['width']>, string> = {
     full: 'max-w-none',
 };
 
-export function PageContainer({ width = 'wide', className, children, id }: PageContainerProps) {
+export function PageContainer({ width = 'full', className, children, id }: PageContainerProps) {
     return (
         <motion.div
             id={id}
             className={cn(
-                'mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8',
+                'w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8',
+                width === 'full' ? '' : 'mx-auto',
                 widthClass[width],
                 className,
             )}

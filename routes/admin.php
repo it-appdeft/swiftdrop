@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\DriverController;
+use App\Http\Controllers\Admin\FoodItemController;
+use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\RestaurantController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
@@ -53,4 +55,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Documents
     Route::patch('documents/{document}/approve', [DocumentController::class, 'approve'])->name('documents.approve');
     Route::patch('documents/{document}/reject', [DocumentController::class, 'reject'])->name('documents.reject');
+
+    // Platform Settings
+    Route::get('platform-settings', [PlatformSettingsController::class, 'edit'])->name('platform-settings.edit');
+    Route::put('platform-settings', [PlatformSettingsController::class, 'update'])->name('platform-settings.update');
+
+    // Food Items
+    Route::get('food-items', [FoodItemController::class, 'index'])->name('food-items.index');
+    Route::get('food-items/create', [FoodItemController::class, 'create'])->name('food-items.create');
+    Route::post('food-items', [FoodItemController::class, 'store'])->name('food-items.store');
+    Route::get('food-items/{id}/edit', [FoodItemController::class, 'edit'])->name('food-items.edit');
+    Route::post('food-items/{id}', [FoodItemController::class, 'update'])->name('food-items.update');
+    Route::delete('food-items/{id}', [FoodItemController::class, 'destroy'])->name('food-items.destroy');
 });

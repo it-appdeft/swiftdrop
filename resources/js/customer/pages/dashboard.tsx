@@ -1,40 +1,52 @@
 import { Head, Link } from '@inertiajs/react';
-import { Heart, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, MapPin, Star, UtensilsCrossed } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
-import { SiteFooter } from '../../web/components/site-footer';
 
-// ─── Mock data — wire to backend resources when the catalogue endpoints land ─────
+// ─── Types (mirror App\Http\Resources\Customer\CustomerDashboardResource) ────
 
-const EXPLORE = [
-    { label: 'Pizza', emoji: '🍕' },
-    { label: 'Momos', emoji: '🥟' },
-    { label: 'Drinks', emoji: '🥤' },
-    { label: 'Sandwiches', emoji: '🥪' },
-    { label: 'Pizza', emoji: '🍕' },
-    { label: 'Momos', emoji: '🥟' },
-    { label: 'Drinks', emoji: '🥤' },
-];
+interface FoodItem {
+    id: number;
+    name: string;
+    slug: string;
+    image_url: string | null;
+}
 
-const TOP_PICKS = [
-    {
-        name: "McDonald's",
-        rating: 4.6,
-        reviews: '5,236',
-        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&h=500&fit=crop',
-    },
-    {
-        name: 'Handmade Burger',
-        rating: 4.5,
-        reviews: '3,128',
-        image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=800&h=500&fit=crop',
-    },
-    {
-        name: 'My World Pizza',
-        rating: 4.7,
-        reviews: '8,902',
-        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=500&fit=crop',
-    },
-];
+interface DashboardRestaurant {
+    id: number;
+    name: string;
+    tagline: string | null;
+    cuisines: string | null;
+    city: string | null;
+    full_address: string | null;
+    logo_url: string | null;
+    cover_url: string | null;
+    rating: number | null;
+    total_reviews: number;
+    distance_miles: number | null;
+}
+
+interface DashboardAddress {
+    id: number;
+    label: string | null;
+    address_line_1: string | null;
+    city: string | null;
+    postcode: string | null;
+    lat: number | null;
+    lng: number | null;
+}
+
+interface DashboardProps {
+    dashboard: {
+        food_items: FoodItem[];
+        restaurants: DashboardRestaurant[];
+        address: DashboardAddress | null;
+        radius_miles: number;
+        using_fallback: boolean;
+    };
+}
+
+// ─── Static (cuisines / promos remain static for now) ───────────────────────
 
 const CUISINES = [
     { label: 'Italian', image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=200&h=200&fit=crop' },
@@ -66,23 +78,16 @@ const PROMOS = [
     },
 ];
 
-const RESTAURANT_IMAGES = [
-    'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&h=450&fit=crop',
-    'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=450&fit=crop',
-    'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&h=450&fit=crop',
-];
-
-const ALL_RESTAURANTS = Array.from({ length: 9 }).map((_, i) => ({
-    id: i + 1,
-    name: i % 2 === 0 ? 'The Mocha Grill' : 'My World Pizza',
-    discount: '30% OFF select menu',
-    rating: 4.6,
-    distance: '1.2 mi',
-    eta: '25-30 min',
-    image: RESTAURANT_IMAGES[i % RESTAURANT_IMAGES.length],
-}));
-
-// ─── Sections ────────────────────────────────────────────────────────────────────
+// Sections in the Figma run edge-to-edge with sharp corners and alternate
+// between white and light-gray fills (not rounded cards floating on a gray
+// canvas). `tone` controls which side of that zebra a section sits on.
+function Section({ tone, children }: { tone: 'white' | 'gray'; children: React.ReactNode }) {
+    return (
+        <section className={tone === 'gray' ? 'bg-zinc-100' : 'bg-background'}>
+            <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">{children}</div>
+        </section>
+    );
+}
 
 function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) {
     return (
@@ -93,73 +98,137 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
     );
 }
 
-/**
- * Sections in the Figma run edge-to-edge with sharp corners and alternate
- * between white and light-gray fills (not rounded cards floating on a gray
- * canvas). `tone` controls which side of that zebra a section sits on; the
- * inner div re-centres the content to the layout's max width.
- */
-function Section({ tone, children }: { tone: 'white' | 'gray'; children: React.ReactNode }) {
-    return (
-        <section className={tone === 'gray' ? 'bg-zinc-100' : 'bg-background'}>
-            <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">{children}</div>
-        </section>
-    );
-}
+// ─── Sections ────────────────────────────────────────────────────────────────
 
-function ExploreSection() {
+function ExploreSection({ items }: { items: FoodItem[] }) {
+    if (items.length === 0) return null;
+
     return (
         <Section tone="white">
             <SectionHeader title="Explore" />
             <div className="flex gap-8 overflow-x-auto pb-1 sm:gap-10">
-                {EXPLORE.map((item, i) => (
-                    <button
-                        key={`${item.label}-${i}`}
-                        type="button"
+                {items.map((item) => (
+                    <Link
+                        key={item.id}
+                        href={`/customer/food-items/${item.slug}`}
                         className="flex shrink-0 flex-col items-center gap-2.5 transition"
                     >
-                        <span className="flex size-20 items-center justify-center rounded-full bg-amber-50 text-5xl sm:size-24 sm:text-6xl">
-                            {item.emoji}
+                        <span className="flex size-20 items-center justify-center overflow-hidden rounded-full bg-amber-50 sm:size-24">
+                            {item.image_url ? (
+                                <img
+                                    src={item.image_url}
+                                    alt={item.name}
+                                    className="h-full w-full object-cover"
+                                    loading="lazy"
+                                />
+                            ) : (
+                                <UtensilsCrossed className="size-8 text-amber-600 sm:size-10" />
+                            )}
                         </span>
-                        <span className="text-sm font-medium text-foreground">{item.label}</span>
-                    </button>
+                        <span className="text-sm font-medium text-foreground">{item.name}</span>
+                    </Link>
                 ))}
             </div>
         </Section>
     );
 }
 
-function TopPicksSection() {
+/**
+ * Top Pick's slides three restaurant cards at a time. We page in steps of
+ * one card to avoid leftover blanks when the count isn't divisible by 3.
+ */
+function TopPicksSection({ restaurants }: { restaurants: DashboardRestaurant[] }) {
+    const picks = useMemo(
+        () =>
+            [...restaurants]
+                .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+                .slice(0, Math.max(restaurants.length, 0)),
+        [restaurants],
+    );
+
+    const VISIBLE = 3;
+    const [start, setStart] = useState(0);
+    const maxStart = Math.max(0, picks.length - VISIBLE);
+
+    if (picks.length === 0) return null;
+
+    const canScroll = picks.length > VISIBLE;
+    const prev = () => setStart((s) => Math.max(0, s - 1));
+    const next = () => setStart((s) => Math.min(maxStart, s + 1));
+
     return (
         <Section tone="gray">
-            <SectionHeader title="Top Pick's" />
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
-                {TOP_PICKS.map((r) => (
-                    <Link
-                        key={r.name}
-                        href="#"
-                        className="group block transition"
-                    >
-                        <div className="aspect-[16/10] overflow-hidden rounded-xl">
-                            <img
-                                src={r.image}
-                                alt={r.name}
-                                className="h-full w-full object-cover transition group-hover:scale-105"
-                                loading="lazy"
-                            />
+            <SectionHeader
+                title="Top Pick's"
+                action={
+                    canScroll ? (
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                aria-label="Previous"
+                                onClick={prev}
+                                disabled={start === 0}
+                                className="flex size-9 items-center justify-center rounded-full border border-zinc-300 bg-background text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                <ChevronLeft className="size-4" />
+                            </button>
+                            <button
+                                type="button"
+                                aria-label="Next"
+                                onClick={next}
+                                disabled={start >= maxStart}
+                                className="flex size-9 items-center justify-center rounded-full border border-zinc-300 bg-background text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                <ChevronRight className="size-4" />
+                            </button>
                         </div>
-                        <div className="flex items-center justify-between pt-3">
-                            <div>
-                                <p className="text-base font-semibold">{r.name}</p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">30-40 min · 1.4 mi</p>
+                    ) : undefined
+                }
+            />
+
+            <div className="overflow-hidden">
+                <div
+                    className="flex gap-6 transition-transform duration-500 ease-out"
+                    style={{ transform: `translateX(calc(${-start} * ((100% - 3rem) / 3 + 1.5rem)))` }}
+                >
+                    {picks.map((r) => (
+                        <Link
+                            key={r.id}
+                            href={`/customer/restaurants/${r.id}`}
+                            className="group block shrink-0 basis-[calc((100%-3rem)/3)]"
+                        >
+                            <div className="aspect-[16/10] overflow-hidden rounded-xl bg-zinc-200">
+                                {r.cover_url || r.logo_url ? (
+                                    <img
+                                        src={(r.cover_url ?? r.logo_url)!}
+                                        alt={r.name}
+                                        className="h-full w-full object-cover transition group-hover:scale-105"
+                                        loading="lazy"
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
+                                        {r.name.charAt(0)}
+                                    </div>
+                                )}
                             </div>
-                            <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground">
-                                <Star className="size-3 fill-current" /> {r.rating}
-                                <span className="font-normal text-emerald-700/70">({r.reviews})</span>
-                            </span>
-                        </div>
-                    </Link>
-                ))}
+                            <div className="flex items-center justify-between pt-3">
+                                <div className="min-w-0">
+                                    <p className="truncate text-base font-semibold">{r.name}</p>
+                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                        20-30 min
+                                        {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
+                                    </p>
+                                </div>
+                                {r.rating !== null ? (
+                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground">
+                                        <Star className="size-3 fill-current" /> {r.rating.toFixed(1)}
+                                        <span className="font-normal text-emerald-700/70">({r.total_reviews})</span>
+                                    </span>
+                                ) : null}
+                            </div>
+                        </Link>
+                    ))}
+                </div>
             </div>
         </Section>
     );
@@ -216,63 +285,91 @@ function CuisinesAndPromoSection() {
     );
 }
 
-function AllRestaurantsSection() {
+function AllRestaurantsSection({
+    restaurants,
+    address,
+    radiusMiles,
+    usingFallback,
+}: {
+    restaurants: DashboardRestaurant[];
+    address: DashboardAddress | null;
+    radiusMiles: number;
+    usingFallback: boolean;
+}) {
     return (
         <Section tone="gray">
-            <SectionHeader
-                title="All Restaurants"
-                action={
-                    <Link href="#" className="text-sm font-semibold text-primary hover:underline">
-                        View all
-                    </Link>
-                }
-            />
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
-                {ALL_RESTAURANTS.map((r) => (
-                    <Link
-                        key={r.id}
-                        href="#"
-                        className="group block"
-                    >
-                        <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
-                            <img
-                                src={r.image}
-                                alt={r.name}
-                                className="h-full w-full object-cover transition group-hover:scale-105"
-                                loading="lazy"
-                            />
-                            <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
-                                {r.discount}
-                            </span>
-                            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
-                                <Star className="size-3 fill-current text-amber-500" /> {r.rating}
-                            </span>
-                        </div>
-                        <div className="flex items-center justify-between pt-3">
-                            <div>
-                                <p className="text-base font-semibold">{r.name}</p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                    {r.eta} · {r.distance}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                aria-label="Save"
-                                className="text-muted-foreground transition hover:text-rose-500"
-                            >
-                                <Heart className="size-5" />
-                            </button>
-                        </div>
-                    </Link>
-                ))}
+            <div className="mb-5 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h2 className="text-xl font-bold tracking-tight sm:text-2xl">All Restaurants</h2>
+                    {!usingFallback && address ? (
+                        <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MapPin className="size-3.5" />
+                            Within {radiusMiles} mi of {address.label ?? address.city ?? 'your saved address'}
+                        </p>
+                    ) : null}
+                </div>
+                <Link href="/customer/restaurants" className="text-sm font-semibold text-primary hover:underline">
+                    View all
+                </Link>
             </div>
+
+            {restaurants.length === 0 ? (
+                <div className="rounded-xl border border-dashed bg-background p-10 text-center text-sm text-muted-foreground">
+                    No restaurants {usingFallback ? 'available yet' : 'within range of your default address'}.
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
+                    {restaurants.map((r) => (
+                        <Link key={r.id} href={`/customer/restaurants/${r.id}`} className="group block">
+                            <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-zinc-200">
+                                {r.cover_url || r.logo_url ? (
+                                    <img
+                                        src={(r.cover_url ?? r.logo_url)!}
+                                        alt={r.name}
+                                        className="h-full w-full object-cover transition group-hover:scale-105"
+                                        loading="lazy"
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
+                                        {r.name.charAt(0)}
+                                    </div>
+                                )}
+                                <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
+                                    20% OFF select items
+                                </span>
+                                {r.rating !== null ? (
+                                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
+                                        <Star className="size-3 fill-current text-amber-500" /> {r.rating.toFixed(1)}
+                                    </span>
+                                ) : null}
+                            </div>
+                            <div className="flex items-center justify-between pt-3">
+                                <div className="min-w-0">
+                                    <p className="truncate text-base font-semibold">{r.name}</p>
+                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                        20-30 min
+                                        {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    aria-label="Save"
+                                    className="shrink-0 text-muted-foreground transition hover:text-rose-500"
+                                >
+                                    <Heart className="size-5" />
+                                </button>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            )}
         </Section>
     );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────────
+// ─── Page ────────────────────────────────────────────────────────────────────
 
-export default function CustomerHome() {
+export default function CustomerHome({ dashboard }: DashboardProps) {
     return (
         <div className="flex min-h-screen flex-col bg-background">
             <Head title="Home" />
@@ -280,13 +377,16 @@ export default function CustomerHome() {
             <CustomerHeader />
 
             <main className="flex-1">
-                <ExploreSection />
-                <TopPicksSection />
+                <ExploreSection items={dashboard.food_items} />
+                <TopPicksSection restaurants={dashboard.restaurants} />
                 <CuisinesAndPromoSection />
-                <AllRestaurantsSection />
+                <AllRestaurantsSection
+                    restaurants={dashboard.restaurants}
+                    address={dashboard.address}
+                    radiusMiles={dashboard.radius_miles}
+                    usingFallback={dashboard.using_fallback}
+                />
             </main>
-
-            {/* <SiteFooter /> */}
         </div>
     );
 }

@@ -5,29 +5,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CustomerAddress extends Model
+class CustomerSearchHistory extends Model
 {
+    protected $table = 'customer_search_history';
+
+    public $timestamps = false;
+
     protected $fillable = [
         'customer_profile_id',
-        'label',
-        'address_line_1',
-        'address_line_2',
-        'city',
-        'county',
-        'postcode',
-        'lat',
-        'lng',
-        'is_default',
-        'is_selected',
+        'keyword',
+        'searched_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'lat' => 'decimal:8',
-            'lng' => 'decimal:8',
-            'is_default' => 'boolean',
-            'is_selected' => 'boolean',
+            'searched_at' => 'datetime',
         ];
     }
 
