@@ -17,6 +17,8 @@ interface CustomerProfileServiceInterface
 
     public function setDefaultAddress(User $user, int $addressId): CustomerAddress;
 
+    public function setSelectedAddress(User $user, int $addressId): CustomerAddress;
+
     public function initiateDeletion(User $user): string;
 
     public function deleteAccount(User $user, array $data): bool;

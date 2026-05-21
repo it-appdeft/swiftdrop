@@ -1,11 +1,15 @@
 <?php
 
+use App\Http\Controllers\Web\Customer\CustomerDashboardController;
 use App\Http\Controllers\Web\Customer\CustomerProfileController;
+use App\Http\Controllers\Web\Customer\CustomerSearchController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->group(function () {
-    Route::get('dashboard', fn () => Inertia::render('customer/dashboard'))->name('dashboard');
+    Route::get('dashboard', [CustomerDashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('search', [CustomerSearchController::class, 'index'])->name('search');
+    Route::delete('search/history', [CustomerSearchController::class, 'clear'])->name('search.clear');
 
     Route::controller(CustomerProfileController::class)->group(function () {
         Route::get('profile', 'show')->name('profile');
@@ -28,5 +32,7 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
             ->whereNumber('addressId')->name('addresses.delete');
         Route::post('addresses/{addressId}/set-default', 'setDefaultAddress')
             ->whereNumber('addressId')->name('addresses.default');
+        Route::post('addresses/{addressId}/select', 'setSelectedAddress')
+            ->whereNumber('addressId')->name('addresses.select');
     });
 });

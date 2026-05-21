@@ -168,6 +168,18 @@ export interface Restaurant {
     orders?: RestaurantOrder[];
 }
 
+// ─── Food Item ────────────────────────────────────────────────────────────────
+
+export interface FoodItem {
+    id: number;
+    name: string;
+    slug: string;
+    image: string | null;
+    image_url: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
 export type UserStatus = 'active' | 'suspended' | 'pending_approval';

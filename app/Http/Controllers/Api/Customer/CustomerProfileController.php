@@ -87,6 +87,17 @@ class CustomerProfileController extends Controller
         );
     }
 
+    public function setSelectedAddress(int $addressId): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+        $address = $this->profile->setSelectedAddress($user, $addressId);
+
+        return $this->success(
+            data: new AddressResource($address),
+            message: 'Selected address updated.',
+        );
+    }
+
     public function initiateDeletion(): JsonResponse
     {
         $user = auth('sanctum')->user();

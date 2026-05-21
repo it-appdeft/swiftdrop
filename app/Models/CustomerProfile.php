@@ -38,4 +38,14 @@ class CustomerProfile extends Model
     {
         return $this->hasOne(CustomerAddress::class)->where('is_default', true);
     }
+
+    public function selectedAddress(): HasOne
+    {
+        return $this->hasOne(CustomerAddress::class)->where('is_selected', true);
+    }
+
+    public function searchHistory(): HasMany
+    {
+        return $this->hasMany(CustomerSearchHistory::class);
+    }
 }

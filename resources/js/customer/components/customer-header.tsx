@@ -21,6 +21,13 @@ import {
 interface SharedProps {
     auth: {
         user: { id: number; name: string; email: string | null } | null;
+        selected_address: {
+            id: number;
+            label: string | null;
+            address_line_1: string | null;
+            city: string | null;
+            postcode: string | null;
+        } | null;
     };
     [key: string]: unknown;
 }
@@ -29,6 +36,11 @@ export function CustomerHeader() {
     const { auth } = usePage<SharedProps>().props;
     const user = auth?.user ?? null;
     const displayName = user?.name ?? 'Alexander';
+    const address = auth?.selected_address ?? null;
+    const addressLabel = address?.label ?? 'Address';
+    const addressSummary = address
+        ? [address.address_line_1, address.city].filter(Boolean).join(', ') || (address.postcode ?? '')
+        : 'Add a delivery address';
 
     const handleLogout = () => {
         router.post(route('logout'));
@@ -41,26 +53,27 @@ export function CustomerHeader() {
                     <img src="/brand/Container.png" alt="" aria-hidden className="h-9 w-auto sm:h-10" />
                 </Link>
 
-                <button
-                    type="button"
+                <Link
+                    href={route('customer.profile')}
+                    aria-label="Change delivery address"
                     className="flex min-w-0 items-center gap-2 text-sm text-foreground"
                 >
-                    <span className="font-semibold underline underline-offset-4">Others</span>
+                    <span className="font-semibold underline underline-offset-4">{addressLabel}</span>
                     <span className="hidden truncate text-muted-foreground md:inline">
-                        West Coker, Yelovil, UK
+                        {addressSummary}
                     </span>
                     <ChevronDown className="size-4 shrink-0 text-primary" />
-                </button>
+                </Link>
 
                 <nav className="ml-auto flex items-center gap-6 text-sm font-medium sm:gap-8 lg:gap-10">
-                    <button
-                        type="button"
+                    <Link
+                        href={route('customer.search')}
                         aria-label="Search"
                         className="flex items-center gap-2 text-foreground hover:text-primary"
                     >
                         <Search className="size-5" />
                         <span className="hidden md:inline">Search</span>
-                    </button>
+                    </Link>
                     <button
                         type="button"
                         aria-label="Offers"

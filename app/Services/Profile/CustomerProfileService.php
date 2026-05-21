@@ -61,15 +61,39 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
                 throw ResourceNotFoundException::for('Customer profile');
             }
 
-            $isDefault = $data['is_default'] ?? (! $profile->addresses()->exists());
+            $hasAny = $profile->addresses()->exists();
+            $isDefault = $data['is_default'] ?? (! $hasAny);
 
             if ($isDefault) {
                 $profile->addresses()->update(['is_default' => false]);
             }
 
+            // First-ever address is auto-selected so radius-based search works
+            // without the customer having to pick one. Subsequent additions
+            // keep whatever selection is already in place.
+            $isSelected = ! $hasAny;
+
             return $profile->addresses()->create(array_merge($data, [
                 'is_default' => $isDefault,
+                'is_selected' => $isSelected,
             ]));
+        });
+    }
+
+    public function setSelectedAddress(User $user, int $addressId): CustomerAddress
+    {
+        return DB::transaction(function () use ($user, $addressId) {
+            $profile = $user->customerProfile;
+            $address = $profile->addresses()->find($addressId);
+
+            if (! $address) {
+                throw ResourceNotFoundException::for('Address');
+            }
+
+            $profile->addresses()->update(['is_selected' => false]);
+            $address->update(['is_selected' => true]);
+
+            return $address->fresh();
         });
     }
 
@@ -103,14 +127,18 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
                 throw ResourceNotFoundException::for('Address');
             }
 
-            if ($address->is_default) {
-                $nextAddress = $profile->addresses()
-                    ->where('id', '!=', $addressId)
-                    ->first();
+            // Move the default + selected flags onto a sibling when removing
+            // the active address — otherwise the customer ends up with no
+            // address driving the dashboard radius.
+            $nextAddress = $address->is_default || $address->is_selected
+                ? $profile->addresses()->where('id', '!=', $addressId)->first()
+                : null;
 
-                if ($nextAddress) {
-                    $nextAddress->update(['is_default' => true]);
-                }
+            if ($nextAddress) {
+                $nextAddress->update([
+                    'is_default' => $nextAddress->is_default || $address->is_default,
+                    'is_selected' => $nextAddress->is_selected || $address->is_selected,
+                ]);
             }
 
             return $address->delete();

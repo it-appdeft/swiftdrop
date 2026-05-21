@@ -67,6 +67,7 @@ class CustomerProfileController extends Controller
             'profile_photo' => $profile->profile_photo,
             'date_of_birth' => optional($profile->date_of_birth)->toDateString(),
             'addresses' => $profile->addresses
+                ->sortByDesc('is_selected')
                 ->sortByDesc('is_default')
                 ->values()
                 ->map(fn ($a) => [
@@ -80,6 +81,7 @@ class CustomerProfileController extends Controller
                     'lat' => (float) $a->lat,
                     'lng' => (float) $a->lng,
                     'is_default' => (bool) $a->is_default,
+                    'is_selected' => (bool) $a->is_selected,
                 ])
                 ->all(),
         ] : null;
@@ -133,6 +135,13 @@ class CustomerProfileController extends Controller
         $this->profile->setDefaultAddress(Auth::user(), $addressId);
 
         return back()->with('status', 'Default address updated.');
+    }
+
+    public function setSelectedAddress(int $addressId): RedirectResponse
+    {
+        $this->profile->setSelectedAddress(Auth::user(), $addressId);
+
+        return back()->with('status', 'Selected address updated.');
     }
 
     // ── Change phone / email OTP (uses unified OtpFlowService) ─────────────

@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\AuthController as ApiAuthController;
+use App\Http\Controllers\Api\Customer\CustomerDashboardController;
 use App\Http\Controllers\Api\Customer\CustomerProfileController;
+use App\Http\Controllers\Api\Customer\CustomerSearchController;
 use App\Http\Controllers\Api\DeletionReasonController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\VehicleTypeController;
@@ -21,6 +23,11 @@ Route::prefix('auth')->controller(ApiAuthController::class)->group(function () {
 });
 
 Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
+    Route::get('dashboard', [CustomerDashboardController::class, 'index']);
+
+    Route::get('search', [CustomerSearchController::class, 'index']);
+    Route::delete('search/history', [CustomerSearchController::class, 'clear']);
+
     Route::controller(CustomerProfileController::class)->prefix('profile')->group(function () {
         Route::get('/', 'show');
         Route::put('/', 'update');
@@ -33,6 +40,7 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
         Route::put('{addressId}', 'updateAddress');
         Route::delete('{addressId}', 'deleteAddress');
         Route::post('{addressId}/set-default', 'setDefaultAddress');
+        Route::post('{addressId}/select', 'setSelectedAddress');
     });
 });
 
