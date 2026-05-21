@@ -20,6 +20,7 @@ export default defineConfig({
         alias: {
             '@': path.resolve(__dirname, 'resources/js/admin'),
         },
+        dedupe: ['react', 'react-dom', '@inertiajs/react'], 
     },
     esbuild: {
         jsx: 'automatic',
