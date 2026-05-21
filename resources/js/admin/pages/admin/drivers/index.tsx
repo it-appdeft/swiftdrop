@@ -289,8 +289,10 @@ export default function DriversIndex({ drivers, filters, stats }: Props) {
                                                 variant={link.active ? 'default' : 'outline'}
                                                 disabled={!link.url}
                                                 onClick={() => link.url && router.visit(link.url, { preserveState: true })}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
+                                                // dangerouslySetInnerHTML={{ __html: link.label }}
+                                            >
+                                                 <span dangerouslySetInnerHTML={{ __html: link.label }} />  {/* ← move here */}
+                                            </Button>
                                         ))}
                                     </div>
                                 </div>
