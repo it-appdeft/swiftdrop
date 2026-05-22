@@ -64,10 +64,14 @@ class CustomerController extends Controller
     {
         DB::transaction(function () use ($request) {
             $user = User::create([
-                'mobile'   => $request->mobile,
-                'email'    => $request->email,
-                'status'   => 'active',
-                'password' => null,
+                // Split storage: subscriber digits in mobile, dialling prefix
+                // in country_code, ISO alpha-2 in country_iso (exact flag).
+                'mobile'       => $request->localMobile(),
+                'country_code' => $request->country_code,
+                'country_iso'  => $request->country_iso,
+                'email'        => $request->email,
+                'status'       => 'active',
+                'password'     => null,
             ]);
 
             $user->assignRole('customer');
@@ -98,7 +102,13 @@ class CustomerController extends Controller
         $customer = User::role('customer')->findOrFail($id);
 
         DB::transaction(function () use ($request, $customer) {
-            $customer->update($request->only(['mobile', 'email', 'status']));
+            $customer->update([
+                'mobile'       => $request->localMobile(),
+                'country_code' => $request->country_code,
+                'country_iso'  => $request->country_iso,
+                'email'        => $request->email,
+                'status'       => $request->status,
+            ]);
 
             if ($customer->customerProfile) {
                 $customer->customerProfile->update($request->only(['first_name', 'last_name', 'date_of_birth']));

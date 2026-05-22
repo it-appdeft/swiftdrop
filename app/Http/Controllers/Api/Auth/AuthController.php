@@ -39,6 +39,7 @@ class AuthController extends Controller
             userType: $request->userRole(),
             authUser: auth('sanctum')->user(),
             countryCode: $request->countryCode(),
+            countryIso: $request->countryIso(),
         );
 
         return $this->success(data: $data, message: 'OTP sent.');
@@ -58,6 +59,7 @@ class AuthController extends Controller
             userType: $request->userRole(),
             authUser: auth('sanctum')->user(),
             countryCode: $request->countryCode(),
+            countryIso: $request->countryIso(),
         );
 
         return $this->success(data: $data, message: 'OTP verified.');

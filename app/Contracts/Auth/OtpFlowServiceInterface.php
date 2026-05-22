@@ -21,6 +21,9 @@ interface OtpFlowServiceInterface
      *                                 stored as-is on update_phone so we don't
      *                                 have to re-derive it from the canonical
      *                                 string with a brittle prefix table.
+     * @param string|null $countryIso  Explicit ISO 3166-1 alpha-2 code ("GB")
+     *                                 paired with the dial code so a shared
+     *                                 prefix still resolves to one exact flag.
      *
      * @return array{target: string, expires_in: int, test_code: ?string}
      */
@@ -31,6 +34,7 @@ interface OtpFlowServiceInterface
         ?UserRoleEnum $userType = null,
         ?User $authUser = null,
         ?string $countryCode = null,
+        ?string $countryIso = null,
     ): array;
 
     /**
@@ -46,5 +50,6 @@ interface OtpFlowServiceInterface
         ?UserRoleEnum $userType = null,
         ?User $authUser = null,
         ?string $countryCode = null,
+        ?string $countryIso = null,
     ): array;
 }

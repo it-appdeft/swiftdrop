@@ -1,5 +1,8 @@
+import { CountryCodeDropdown } from '@/components/country-code-dropdown';
+import { CountryFlag } from '@/components/country-flag';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
+import { primaryIsoForDial } from '@/lib/countries';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -50,6 +53,8 @@ interface ServerUser {
     mobile: string | null;
     /** Dialling prefix, e.g. "+44". */
     country_code: string | null;
+    /** ISO 3166-1 alpha-2 code, e.g. "GB" — resolves the exact flag. */
+    country_iso: string | null;
     /** country_code + mobile, ready to pass as an OTP target. */
     canonical_mobile: string | null;
 }
@@ -370,6 +375,8 @@ interface EditProfileDialogProps {
     initialMobile: string | null;
     /** Dialling prefix, e.g. "+44". */
     initialCountryCode: string | null;
+    /** ISO 3166-1 alpha-2 code, e.g. "GB". */
+    initialCountryIso: string | null;
     initialPhoto: string | null;
 }
 
@@ -399,6 +406,7 @@ function EditProfileDialog({
     initialEmail,
     initialMobile,
     initialCountryCode,
+    initialCountryIso,
     initialPhoto,
 }: EditProfileDialogProps) {
     // ── Name + photo ───────────────────────────────────────────────────────
@@ -544,6 +552,8 @@ function EditProfileDialog({
     // Mobile is the subscriber-only digits; pair with the real country_code
     // (falls back to "+44" if the user pre-dates the split-storage backfill).
     const phoneCountry = initialCountryCode ?? '+44';
+    // Prefer the stored ISO for an exact flag; else derive it from the dial code.
+    const phoneIso = initialCountryIso ?? primaryIsoForDial(phoneCountry) ?? 'GB';
     const phoneDisplay = initialMobile ? `${phoneCountry} ${initialMobile}` : '';
 
     const sendCurrentPhoneOtp = () => {
@@ -765,7 +775,12 @@ function EditProfileDialog({
                         <label className="text-xs font-medium text-foreground">Mobile Number</label>
                         <div className="flex gap-2">
                             <div className="flex h-11 flex-1 items-center gap-2 rounded-md bg-muted/60 px-3">
-                                <span className="text-sm text-foreground">🇬🇧 {phoneCountry}</span>
+                                <span className="flex items-center gap-1.5 text-sm text-foreground">
+                                    <span className="flex h-3.5 w-5 shrink-0 items-center overflow-hidden rounded-sm ring-1 ring-zinc-200">
+                                        <CountryFlag iso={phoneIso} className="h-full w-full object-cover" />
+                                    </span>
+                                    {phoneCountry}
+                                </span>
                                 <span className="h-5 w-px bg-border" />
                                 <input
                                     type="tel"
@@ -1006,6 +1021,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
     type Step = 'enterNew' | 'verifyNew';
     const [step, setStep] = useState<Step>('enterNew');
     const [newCountry, setNewCountry] = useState('+44');
+    const [newCountryIso, setNewCountryIso] = useState('GB');
     const [newMobile, setNewMobile] = useState('');
     const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
     const [resendIn, setResendIn] = useState(0);
@@ -1023,6 +1039,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
         if (!open) return;
         setStep('enterNew');
         setNewCountry('+44');
+        setNewCountryIso('GB');
         setNewMobile('');
         setDigits(Array(OTP_LENGTH).fill(''));
         setError(null);
@@ -1035,7 +1052,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
         setProcessing(true);
         router.post(
             route('customer.profile.otp.send'),
-            { type: 'update_phone', channel: 'sms', country_code: newCountry, mobile: newMobile },
+            { type: 'update_phone', channel: 'sms', country_code: newCountry, country_iso: newCountryIso, mobile: newMobile },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -1064,6 +1081,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                 type: 'update_phone',
                 channel: 'sms',
                 country_code: newCountry,
+                country_iso: newCountryIso,
                 mobile: newMobile,
                 code: digits.join(''),
             },
@@ -1109,24 +1127,23 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                     <form onSubmit={sendNewOtp} className="space-y-4">
                         <div className="space-y-1.5">
                             <label className="text-xs font-medium text-foreground">Mobile Number</label>
-                            <div className="flex h-11 items-center gap-2 rounded-md bg-muted/60 px-3 transition focus-within:bg-muted focus-within:ring-2 focus-within:ring-primary/30">
-                                <select
-                                    value={newCountry}
-                                    onChange={(e) => setNewCountry(e.target.value)}
-                                    className="h-full appearance-none bg-transparent pr-1 text-sm text-foreground focus:outline-none"
-                                >
-                                    <option value="+44">🇬🇧 +44</option>
-                                    <option value="+1">🇺🇸 +1</option>
-                                    <option value="+91">🇮🇳 +91</option>
-                                </select>
-                                <span className="h-5 w-px bg-border" />
+                            <div className="flex gap-2">
+                                <CountryCodeDropdown
+                                    dial={newCountry}
+                                    iso={newCountryIso}
+                                    onChange={(c) => {
+                                        setNewCountry(c.dial);
+                                        setNewCountryIso(c.iso);
+                                    }}
+                                    className="h-11"
+                                />
                                 <input
                                     type="tel"
                                     value={newMobile}
                                     onChange={(e) => setNewMobile(e.target.value)}
                                     placeholder="Add New Number"
                                     autoFocus
-                                    className="h-full flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                                    className="h-11 flex-1 rounded-md bg-muted/60 px-3 text-sm text-foreground placeholder:text-muted-foreground transition focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 />
                             </div>
                         </div>
@@ -2420,6 +2437,7 @@ export default function CustomerProfile() {
     const email = customer?.user?.email ?? user?.email ?? null;
     const mobile = customer?.user?.mobile ?? user?.mobile ?? null;
     const countryCode = customer?.user?.country_code ?? null;
+    const countryIso = customer?.user?.country_iso ?? null;
     const photo = customer?.profile_photo ?? null;
     const addresses = customer?.addresses ?? [];
     const reasons = deletionReasons ?? [];
@@ -2529,6 +2547,7 @@ export default function CustomerProfile() {
                 initialEmail={email ?? ''}
                 initialMobile={mobile}
                 initialCountryCode={countryCode}
+                initialCountryIso={countryIso}
                 initialPhoto={photo}
             />
 

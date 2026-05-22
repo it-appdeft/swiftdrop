@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\CustomerAddress;
 use App\Models\CustomerProfile;
 use App\Models\User;
+use App\Support\Countries;
 use Illuminate\Database\Seeder;
 
 class CustomerSeeder extends Seeder
@@ -46,6 +47,7 @@ class CustomerSeeder extends Seeder
                 ['country_code' => $countryCode, 'mobile' => $localMobile],
                 array_merge($data['user'], [
                     'country_code' => $countryCode,
+                    'country_iso' => Countries::primaryIsoForDial($countryCode),
                     'mobile' => $localMobile,
                     'password' => bcrypt('password'),
                 ]),

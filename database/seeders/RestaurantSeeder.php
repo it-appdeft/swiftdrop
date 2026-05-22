@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Restaurant;
 use App\Models\User;
+use App\Support\Countries;
 use Illuminate\Database\Seeder;
 
 class RestaurantSeeder extends Seeder
@@ -86,6 +87,7 @@ class RestaurantSeeder extends Seeder
                 array_merge($data['user'], [
                     'password' => bcrypt('password'),
                     'country_code' => $countryCode,
+                    'country_iso' => Countries::primaryIsoForDial($countryCode),
                     'mobile' => $localMobile,
                 ]),
             );

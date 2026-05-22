@@ -76,10 +76,14 @@ class DriverController extends Controller
     {
         DB::transaction(function () use ($request) {
             $user = User::create([
-                'mobile'   => $request->mobile,
-                'email'    => $request->email,
-                'status'   => 'pending_approval',
-                'password' => null,
+                // Split storage: subscriber digits in mobile, dialling prefix
+                // in country_code, ISO alpha-2 in country_iso (exact flag).
+                'mobile'       => $request->localMobile(),
+                'country_code' => $request->country_code,
+                'country_iso'  => $request->country_iso,
+                'email'        => $request->email,
+                'status'       => 'pending_approval',
+                'password'     => null,
             ]);
 
             $user->assignRole('driver');
@@ -115,7 +119,13 @@ class DriverController extends Controller
         $driver = User::role('driver')->with('driverProfile')->findOrFail($id);
 
         DB::transaction(function () use ($request, $driver) {
-            $driver->update($request->only(['mobile', 'email', 'status']));
+            $driver->update([
+                'mobile'       => $request->localMobile(),
+                'country_code' => $request->country_code,
+                'country_iso'  => $request->country_iso,
+                'email'        => $request->email,
+                'status'       => $request->status,
+            ]);
 
             if ($driver->driverProfile) {
                 $driver->driverProfile->update($request->only([

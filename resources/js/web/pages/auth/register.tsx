@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { CountryCodeDropdown } from '@/components/country-code-dropdown';
 import { AuthShell } from '../../components/auth-shell';
-import { CountryCodeDropdown } from '../../components/country-code-dropdown';
 import { postJson } from '../../lib/api';
 
 interface RegisterProps {
@@ -106,6 +106,7 @@ export default function Register({ role }: RegisterProps) {
         name: '',
         email: '',
         country_code: '+44',
+        country_iso: 'GB',
         mobile: '',
     });
 
@@ -383,8 +384,9 @@ export default function Register({ role }: RegisterProps) {
                     </Label>
                     <div className="flex gap-2">
                         <CountryCodeDropdown
-                            value={data.country_code}
-                            onChange={(v) => setData('country_code', v)}
+                            dial={data.country_code}
+                            iso={data.country_iso}
+                            onChange={(c) => setData((d) => ({ ...d, country_code: c.dial, country_iso: c.iso }))}
                             disabled={mobileVerified || mobileOtpRequested}
                         />
                         <Input

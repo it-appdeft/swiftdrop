@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, CheckCircle, Edit, ExternalLink, Eye, FileText, Mail, Package, Phone, ShieldCheck, ShieldOff, Truck, XCircle } from 'lucide-react';
 
+import { CountryFlag } from '@/components/country-flag';
 import { PageContainer } from '@/components/layout/page-container';
 import { SectionHeading } from '@/components/shared/section-heading';
 import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
@@ -329,7 +330,10 @@ export default function DriverShow({ driver }: Props) {
                             <CardContent className="space-y-3">
                                 <div className="flex items-center gap-2 text-sm">
                                     <Phone className="size-4 text-muted-foreground shrink-0" />
-                                    <span className="font-mono">{driver.mobile}</span>
+                                    <span className="flex h-3.5 w-5 shrink-0 items-center overflow-hidden rounded-sm ring-1 ring-zinc-200">
+                                        <CountryFlag iso={driver.country_iso} className="h-full w-full object-cover" />
+                                    </span>
+                                    <span className="font-mono">{driver.canonical_mobile ?? driver.mobile}</span>
                                 </div>
                                 {driver.email && (
                                     <div className="flex items-center gap-2 text-sm">

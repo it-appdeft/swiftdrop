@@ -44,7 +44,14 @@ export interface CustomerOrder {
 
 export interface Customer {
     id: number;
+    /** Subscriber-only digits (no prefix). */
     mobile: string;
+    /** Dialling prefix, e.g. "+44". */
+    country_code: string | null;
+    /** ISO 3166-1 alpha-2, e.g. "GB" — resolves the exact flag. */
+    country_iso: string | null;
+    /** country_code + mobile, the full number for display. */
+    canonical_mobile: string | null;
     email: string | null;
     name: string;
     status: 'active' | 'suspended' | 'pending_approval';
@@ -101,7 +108,14 @@ export interface DriverProfile {
 
 export interface Driver {
     id: number;
+    /** Subscriber-only digits (no prefix). */
     mobile: string;
+    /** Dialling prefix, e.g. "+44". */
+    country_code: string | null;
+    /** ISO 3166-1 alpha-2, e.g. "GB" — resolves the exact flag. */
+    country_iso: string | null;
+    /** country_code + mobile, the full number for display. */
+    canonical_mobile: string | null;
     email: string | null;
     name: string;
     status: 'active' | 'suspended' | 'pending_approval';
@@ -136,7 +150,14 @@ export interface RestaurantOrder {
 export interface RestaurantOwner {
     id: number;
     email: string | null;
+    /** Subscriber-only digits (no prefix). */
     mobile: string | null;
+    /** Dialling prefix, e.g. "+44". */
+    country_code: string | null;
+    /** ISO 3166-1 alpha-2, e.g. "GB" — resolves the exact flag. */
+    country_iso: string | null;
+    /** country_code + mobile, the full number for display. */
+    canonical_mobile: string | null;
     status: 'active' | 'suspended' | 'pending_approval';
 }
 

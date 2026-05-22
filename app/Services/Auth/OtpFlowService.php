@@ -12,6 +12,7 @@ use App\Exceptions\Auth\OtpException;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
+use App\Support\Countries;
 use App\Traits\IssuesTokens;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,7 @@ class OtpFlowService implements OtpFlowServiceInterface
         ?UserRoleEnum $userType = null,
         ?User $authUser = null,
         ?string $countryCode = null,
+        ?string $countryIso = null,
     ): array {
         $this->assertAuthContext($type, $authUser);
         $this->assertTargetNotSoftDeleted($target);
@@ -57,6 +59,7 @@ class OtpFlowService implements OtpFlowServiceInterface
         ?UserRoleEnum $userType = null,
         ?User $authUser = null,
         ?string $countryCode = null,
+        ?string $countryIso = null,
     ): array {
         $this->assertAuthContext($type, $authUser);
         $this->assertTargetNotSoftDeleted($target);
@@ -71,7 +74,7 @@ class OtpFlowService implements OtpFlowServiceInterface
         return match ($type) {
             OtpTypeEnum::LOGIN => $this->completeLogin($target, $userType),
             OtpTypeEnum::SIGNUP => $this->completeSignup($target),
-            OtpTypeEnum::UPDATE_PHONE => $this->completePhoneUpdate($authUser, $target, $countryCode),
+            OtpTypeEnum::UPDATE_PHONE => $this->completePhoneUpdate($authUser, $target, $countryCode, $countryIso),
             OtpTypeEnum::UPDATE_EMAIL => $this->completeEmailUpdate($authUser, $target),
             OtpTypeEnum::VERIFY_CURRENT_PHONE,
             OtpTypeEnum::VERIFY_CURRENT_EMAIL => $this->completeCurrentVerification($authUser, $type),
@@ -262,9 +265,9 @@ class OtpFlowService implements OtpFlowServiceInterface
         ];
     }
 
-    protected function completePhoneUpdate(User $authUser, string $newMobile, ?string $countryCode = null): array
+    protected function completePhoneUpdate(User $authUser, string $newMobile, ?string $countryCode = null, ?string $countryIso = null): array
     {
-        return DB::transaction(function () use ($authUser, $newMobile, $countryCode) {
+        return DB::transaction(function () use ($authUser, $newMobile, $countryCode, $countryIso) {
             // Prefer the explicit country_code from the request — the caller
             // already validated it (^\+[0-9]{1,4}$) and it covers any prefix,
             // not just the handful baked into splitCanonicalMobile. Only fall
@@ -281,12 +284,29 @@ class OtpFlowService implements OtpFlowServiceInterface
 
             $authUser->update([
                 'country_code' => $countryCode,
+                'country_iso' => $this->resolveCountryIso($countryIso, $countryCode),
                 'mobile' => $local,
             ]);
             $fresh = $authUser->fresh()->loadProfileRelation();
 
             return ['user' => new UserResource($fresh)];
         });
+    }
+
+    /**
+     * Prefer the ISO the client picked (exact flag); fall back to the canonical
+     * country for the dial code so a number change never leaves country_iso
+     * stale or out of sync with the new country_code.
+     */
+    protected function resolveCountryIso(?string $countryIso, ?string $countryCode): ?string
+    {
+        $iso = $countryIso !== null ? strtoupper($countryIso) : null;
+
+        if ($iso !== null && $iso !== '' && Countries::isValidIso($iso)) {
+            return $iso;
+        }
+
+        return Countries::primaryIsoForDial($countryCode);
     }
 
     protected function completeEmailUpdate(User $authUser, string $newEmail): array

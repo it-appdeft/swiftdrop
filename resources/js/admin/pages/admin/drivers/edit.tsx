@@ -1,6 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 
+import { CountryCodeDropdown } from '@/components/country-code-dropdown';
 import { PageContainer } from '@/components/layout/page-container';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,8 @@ export default function DriverEdit({ driver }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         first_name: profile?.first_name ?? '',
         last_name: profile?.last_name ?? '',
+        country_code: driver.country_code ?? '+44',
+        country_iso: driver.country_iso ?? 'GB',
         mobile: driver.mobile,
         email: driver.email ?? '',
         vehicle_type: profile?.vehicle_type ?? ('' as 'bicycle' | 'motorcycle' | 'car' | 'van' | ''),
@@ -68,8 +71,15 @@ export default function DriverEdit({ driver }: Props) {
                                     <Input value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} />
                                 </FormField>
                             </div>
-                            <FormField label="Mobile" error={errors.mobile} required>
-                                <Input value={data.mobile} onChange={(e) => setData('mobile', e.target.value)} type="tel" />
+                            <FormField label="Mobile" error={errors.mobile ?? errors.country_code ?? errors.country_iso} required>
+                                <div className="flex gap-2">
+                                    <CountryCodeDropdown
+                                        dial={data.country_code}
+                                        iso={data.country_iso}
+                                        onChange={(c) => setData((d) => ({ ...d, country_code: c.dial, country_iso: c.iso }))}
+                                    />
+                                    <Input value={data.mobile} onChange={(e) => setData('mobile', e.target.value)} type="tel" className="flex-1" />
+                                </div>
                             </FormField>
                             <FormField label="Email" error={errors.email} optional>
                                 <Input value={data.email} onChange={(e) => setData('email', e.target.value)} type="email" />

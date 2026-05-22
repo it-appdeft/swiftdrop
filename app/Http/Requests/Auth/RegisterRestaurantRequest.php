@@ -5,6 +5,7 @@ namespace App\Http\Requests\Auth;
 use App\Http\Requests\Auth\Concerns\CanonicalizesTarget;
 use App\Models\User;
 use App\Rules\Auth\HasVerifiedOtp;
+use App\Rules\Auth\ValidCountryIso;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -20,6 +21,7 @@ class RegisterRestaurantRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->normalizeMobileInput();
+        $this->normalizeCountryIso();
     }
 
     public function rules(): array
@@ -37,6 +39,9 @@ class RegisterRestaurantRequest extends FormRequest
                 new HasVerifiedOtp($this->canonicalEmail(), 'email'),
             ],
             'country_code' => ['required', 'string', 'regex:/^\+[0-9]{1,4}$/'],
+            // Nullable for backwards-compatibility — shared by the web + API
+            // restaurant signup. RegistrationService fills a fallback ISO.
+            'country_iso' => ['nullable', 'string', 'size:2', new ValidCountryIso()],
             'mobile' => [
                 'required',
                 'string',
