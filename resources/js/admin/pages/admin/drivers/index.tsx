@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { Driver, Paginated } from '@/types/admin';
-import { formatRelative, initials } from '@/utils/format';
+import { formatRelative, initials, decodePaginationLabel } from '@/utils/format';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Admin', href: '/admin/drivers' },
@@ -295,9 +295,8 @@ export default function DriversIndex({ drivers, filters, stats }: Props) {
                                                 variant={link.active ? 'default' : 'outline'}
                                                 disabled={!link.url}
                                                 onClick={() => link.url && router.visit(link.url, { preserveState: true })}
-                                                // dangerouslySetInnerHTML={{ __html: link.label }}
                                             >
-                                                 <span dangerouslySetInnerHTML={{ __html: link.label }} />  {/* ← move here */}
+                                                {decodePaginationLabel(link.label)}
                                             </Button>
                                         ))}
                                     </div>

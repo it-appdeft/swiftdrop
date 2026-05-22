@@ -55,6 +55,26 @@ export const formatRelative = (value: Date | string) => {
     return rtf.format(-Math.round(elapsed / 31557600), 'year');
 };
 
+/**
+ * Laravel paginator labels arrive HTML-encoded ("&laquo; Previous", "Next
+ * &raquo;", "…") and may wrap text in tags. Decode the common entities and
+ * strip any markup so the label can be rendered as plain React children —
+ * setting it via dangerouslySetInnerHTML on a component that also renders
+ * children throws React error #60.
+ */
+export const decodePaginationLabel = (label: string) =>
+    label
+        .replace(/&laquo;/g, '«')
+        .replace(/&raquo;/g, '»')
+        .replace(/&hellip;/g, '…')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/<[^>]*>/g, '')
+        .trim();
+
 export const initials = (name: string, max = 2) =>
     name
         .split(/\s+/)
