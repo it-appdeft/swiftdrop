@@ -18,25 +18,33 @@
         @php
             // Mirror the namespaced page resolver in resources/js/app.tsx so the
             // Vite manifest lookup points at the same file the JS side imports.
+            // A page may live as `<name>.tsx` or, when foldered, `<name>/index.tsx`
+            // (e.g. restaurant/modifiers → pages/modifiers/index.tsx).
             $component = $page['component'];
             $namespaces = [
                 'web/' => 'resources/js/web/pages/',
                 'customer/' => 'resources/js/customer/pages/',
                 'restaurant/' => 'resources/js/restaurant/pages/',
             ];
+
+            $resolveEntry = function (string $base, string $name): string {
+                $flat = $base.$name.'.tsx';
+                return is_file(base_path($flat)) ? $flat : $base.$name.'/index.tsx';
+            };
+
             $pageEntry = null;
             foreach ($namespaces as $prefix => $base) {
                 if (str_starts_with($component, $prefix)) {
-                    $pageEntry = $base.substr($component, strlen($prefix)).'.tsx';
+                    $pageEntry = $resolveEntry($base, substr($component, strlen($prefix)));
                     break;
                 }
             }
             if (! $pageEntry) {
                 // Unprefixed names: admin first, fall back to web (legacy `welcome` etc).
-                $adminCandidate = 'resources/js/admin/pages/'.$component.'.tsx';
-                $pageEntry = is_file(base_path($adminCandidate))
-                    ? $adminCandidate
-                    : 'resources/js/web/pages/'.$component.'.tsx';
+                $adminEntry = $resolveEntry('resources/js/admin/pages/', $component);
+                $pageEntry = is_file(base_path($adminEntry))
+                    ? $adminEntry
+                    : $resolveEntry('resources/js/web/pages/', $component);
             }
         @endphp
         @vite(['resources/js/app.tsx', $pageEntry])
