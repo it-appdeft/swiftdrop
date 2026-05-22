@@ -9,7 +9,7 @@ import {
     Trash2,
     X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     type ModifierGroup,
     type ModifierOption,
@@ -22,6 +22,51 @@ import AppLayout from '../../layouts/app-layout';
 
 function nextId(prefix: string) {
     return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Merge the server's canonical groups back into local state after a save.
+ *
+ * We adopt the server-assigned numeric option ids (so the next save
+ * match-updates the row instead of inserting a duplicate) but otherwise
+ * keep the user's current field values. Blindly replacing local state with
+ * the server response would clobber text the user is still typing — and
+ * because Laravel's TrimStrings middleware strips the trailing space they
+ * just hit, the round-trip would drop word breaks ("Select the" → "Selectthe").
+ */
+function reconcileGroups(
+    local: ModifierGroup[],
+    server: ModifierGroup[],
+): ModifierGroup[] {
+    const isServerId = (id: string) => /^\d+$/.test(id);
+
+    const merged = server.map((sg) => {
+        const lg = local.find((g) => g.id === sg.id);
+        if (!lg) return sg; // group only the server knows about — take as-is
+
+        // Saved options already carry their numeric id and were matched by it
+        // server-side. The freshly-created ids are the server options whose id
+        // we don't already hold locally — hand those, in order, to the named
+        // new (client-id) options that were just sent. Blank rows aren't sent,
+        // so they keep their client id until they're named.
+        const heldIds = new Set(lg.options.filter((o) => isServerId(o.id)).map((o) => o.id));
+        const freshIds = sg.options.map((o) => o.id).filter((id) => !heldIds.has(id));
+        let f = 0;
+
+        return {
+            ...lg,
+            options: lg.options.map((lo) => {
+                if (isServerId(lo.id) || !lo.name.trim()) return lo;
+                const id = freshIds[f++];
+                return id ? { ...lo, id } : lo;
+            }),
+        };
+    });
+
+    // Preserve optimistic, not-yet-persisted local groups (client ids).
+    const serverIds = new Set(server.map((g) => g.id));
+    const localOnly = local.filter((g) => !serverIds.has(g.id));
+    return [...merged, ...localOnly];
 }
 
 // ─── Group sidebar (list of groups, left rail) ────────────────────────────
@@ -165,19 +210,29 @@ function OptionRow({
 function GroupEditor({
     group,
     onChange,
+    onSave,
     onDelete,
+    saving,
+    dirty,
 }: {
     group: ModifierGroup;
     onChange: (next: ModifierGroup) => void;
+    onSave: () => void;
     onDelete: () => void;
+    saving: boolean;
+    dirty: boolean;
 }) {
     const [renaming, setRenaming] = useState(false);
 
-    // Self-heal groups whose saved min/max exceed the current option count
-    // (e.g. a group saved with max 8 but only 4 options). Runs when the
-    // option count changes and corrects the bounds in place.
+    // Self-heal multiple-selection groups whose saved min/max exceed the
+    // current option count (e.g. a group saved with max 8 but only 4 options).
+    // Single groups are skipped — they're always min=(required?1:0)/max=1
+    // regardless of option count — and we never clamp when there are no
+    // options yet, since max must stay >= 1 (clamping to 0 fails server
+    // validation and silently rejects the whole save).
     const optionCount = group.options.length;
     useEffect(() => {
+        if (group.selectionType !== 'multiple' || optionCount === 0) return;
         const maxOver = group.maxSelections != null && group.maxSelections > optionCount;
         const minOver = group.minSelections > optionCount;
         if (maxOver || minOver) {
@@ -190,10 +245,10 @@ function GroupEditor({
                         : Math.min(group.maxSelections, optionCount),
             });
         }
-        // Only re-evaluate when the option count changes; onChange/group are
-        // intentionally omitted to avoid a clamp→render→clamp loop.
+        // Only re-evaluate when the option count or selection type changes;
+        // onChange/group are intentionally omitted to avoid a clamp loop.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [optionCount]);
+    }, [optionCount, group.selectionType]);
 
     const setOption = (id: string, patch: Partial<ModifierOption>) => {
         onChange({
@@ -267,14 +322,25 @@ function GroupEditor({
                             className="h-9 w-full max-w-xl rounded-md border-0 bg-transparent px-0 text-sm text-muted-foreground placeholder:text-muted-foreground focus:outline-none"
                         />
                     </div>
-                    <button
-                        type="button"
-                        onClick={onDelete}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-background px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
-                    >
-                        <Trash2 className="size-3.5" />
-                        Delete group
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onSave}
+                            disabled={saving || !dirty}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <Check className="size-3.5" />
+                            {saving ? 'Saving…' : dirty ? 'Save' : 'Saved'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onDelete}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-background px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                        >
+                            <Trash2 className="size-3.5" />
+                            Delete group
+                        </button>
+                    </div>
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -486,33 +552,18 @@ export default function Modifiers({
     );
     const [search, setSearch] = useState(initialFilters.search ?? '');
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-    const didMountRef = useRef(false);
-    // Debounced group-save plumbing. Holds the pending save timer and the
-    // latest persist closure so a save in flight can be flushed on unmount.
-    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pendingSaveRef = useRef<(() => void) | null>(null);
+    // Explicit-save model: edits stay local until the user clicks "Save".
+    // `dirtyIds` flags groups with unsaved changes; `savingId` is the group
+    // whose save is currently in flight (drives the Save button feedback).
+    const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+    const [savingId, setSavingId] = useState<string | null>(null);
 
-    // Push search to the server (ModifierGroup::filter scope), debounced so
-    // typing doesn't fire a request per keystroke. Skip the initial render.
+    // Re-sync when Inertia re-renders the page after a save / delete. We
+    // reconcile (adopt server option ids, keep local edits) rather than
+    // overwrite, so an in-flight save can't clobber text the user is still
+    // typing. See reconcileGroups for the trailing-space failure mode.
     useEffect(() => {
-        if (!didMountRef.current) {
-            didMountRef.current = true;
-            return;
-        }
-        const t = setTimeout(() => {
-            router.get(
-                route('restaurant.modifiers'),
-                search.trim() ? { search: search.trim() } : {},
-                { preserveState: true, preserveScroll: true, replace: true },
-            );
-        }, 300);
-        return () => clearTimeout(t);
-    }, [search]);
-
-    // Re-sync when Inertia re-renders the page after a save / delete so
-    // freshly assigned IDs from the server replace any optimistic ones.
-    useEffect(() => {
-        setGroups(serverGroups);
+        setGroups((prev) => reconcileGroups(prev, serverGroups));
         // Keep the active selection if its id survived; otherwise fall
         // back to the first group (or null when the catalogue is empty).
         setActiveId((prev) => {
@@ -530,7 +581,9 @@ export default function Modifiers({
         selection_type: g.selectionType,
         is_required: g.required,
         min_selections: g.minSelections,
-        max_selections: g.maxSelections,
+        // The server requires max_selections to be null (unlimited) or >= 1.
+        // Coerce a stray 0 to null so a save can never 422 on this field.
+        max_selections: g.maxSelections && g.maxSelections > 0 ? g.maxSelections : null,
         options: g.options.map((o) => ({
             // Numeric ids come back from the server as strings; pass
             // through so the controller can match-update instead of
@@ -542,56 +595,64 @@ export default function Modifiers({
         })),
     });
 
-    // Groups arrive already filtered from the server (ModifierGroup::filter).
-    const filteredGroups = groups;
+    // Filter client-side. The catalogue is small (groups per restaurant),
+    // and keeping local state authoritative avoids a server round-trip whose
+    // response would otherwise overwrite in-progress edits.
+    const query = search.trim().toLowerCase();
+    const filteredGroups = query
+        ? groups.filter((g) => g.name.toLowerCase().includes(query))
+        : groups;
 
     const activeGroup = groups.find((g) => g.id === activeId) ?? null;
 
     /**
-     * Local optimistic update. We also PUT to the server in the
-     * background so the row persists; the page re-renders with the
-     * canonical version (and server-generated option ids) the next
-     * time the controller sends fresh props down.
-     *
-     * Brand-new groups with no name yet (created via the "Add group"
-     * CTA but never edited) skip the network call — there's nothing
-     * meaningful to save and the server would 422 on a blank name.
+     * Local edit only — changes are held in component state and don't touch
+     * the server until the user clicks "Save". The group is flagged dirty so
+     * the Save button reflects that there are unsaved changes.
      */
     const updateGroup = (next: ModifierGroup) => {
         setGroups((prev) => prev.map((g) => (g.id === next.id ? next : g)));
+        setDirtyIds((prev) => {
+            if (prev.has(next.id)) return prev;
+            const n = new Set(prev);
+            n.add(next.id);
+            return n;
+        });
+    };
 
-        // The actual network save, gated on having something persistable.
-        const persist = () => {
-            pendingSaveRef.current = null;
+    /**
+     * Persist a single group to the database — triggered by the "Save" button.
+     *
+     * Blank options are dropped from the payload (the server requires a name
+     * per option, so sending a half-typed row would 422 and roll back the
+     * whole save); they persist once named. On success the group is marked
+     * clean and reconcileGroups adopts any server-assigned option ids.
+     */
+    const saveGroup = (group: ModifierGroup) => {
+        // Brand-new groups stay client-side until their "Add group" POST lands
+        // a numeric id — nothing to update yet.
+        if (!/^\d+$/.test(group.id)) return;
+        if (!group.name.trim()) return;
 
-            // Only persist groups that have a real numeric id assigned by
-            // the server. Brand-new groups stay client-side until the user
-            // names them and the bootstrap "Add group" POST lands their id.
-            if (!/^\d+$/.test(next.id)) return;
-            if (!next.name.trim()) return;
+        const payload = buildPayload({
+            ...group,
+            options: group.options.filter((o) => o.name.trim()),
+        });
 
-            // Defer the save while any option is still unnamed. The server
-            // rejects blank option names (options.*.name is required), and the
-            // failed round-trip + serverGroups re-sync would wipe the freshly
-            // added row ("Add option" flashing and vanishing). The save fires
-            // as soon as the option gets a name.
-            if (next.options.some((o) => !o.name.trim())) return;
-
-            router.put(route('restaurant.modifiers.update', { modifier: next.id }), buildPayload(next), {
-                preserveScroll: true,
-                preserveState: true,
-            });
-        };
-
-        // Debounce the save. Without this, every keystroke fires a PUT, and
-        // the response re-syncs serverGroups → for a freshly added option the
-        // optimistic client id ("o-xyz") is swapped for the server's numeric
-        // id, changing the React key and remounting the <input> — which steals
-        // focus after the first character. Holding the save until typing pauses
-        // keeps the key (and focus) stable while the user is editing.
-        pendingSaveRef.current = persist;
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = setTimeout(persist, 600);
+        setSavingId(group.id);
+        router.put(route('restaurant.modifiers.update', { modifier: group.id }), payload, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setDirtyIds((prev) => {
+                    if (!prev.has(group.id)) return prev;
+                    const n = new Set(prev);
+                    n.delete(group.id);
+                    return n;
+                });
+            },
+            onFinish: () => setSavingId((cur) => (cur === group.id ? null : cur)),
+        });
     };
 
     const addGroup = () => {
@@ -623,6 +684,7 @@ export default function Modifiers({
     const performDelete = () => {
         if (!confirmDeleteId) return;
         const id = confirmDeleteId;
+
         setGroups((prev) => prev.filter((g) => g.id !== id));
         if (activeId === id) {
             setActiveId(groups.find((g) => g.id !== id)?.id ?? null);
@@ -637,15 +699,6 @@ export default function Modifiers({
             });
         }
     };
-
-    // Flush any debounced save when the page unmounts so the last edit
-    // isn't dropped if the user navigates away within the debounce window.
-    useEffect(() => {
-        return () => {
-            if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-            pendingSaveRef.current?.();
-        };
-    }, []);
 
     // Lock body scroll while the confirm dialog is open.
     useEffect(() => {
@@ -700,7 +753,10 @@ export default function Modifiers({
                             <GroupEditor
                                 group={activeGroup}
                                 onChange={updateGroup}
+                                onSave={() => saveGroup(activeGroup)}
                                 onDelete={() => confirmDelete(activeGroup.id)}
+                                saving={savingId === activeGroup.id}
+                                dirty={dirtyIds.has(activeGroup.id)}
                             />
                         ) : (
                             <div className="flex min-h-[300px] flex-1 items-center justify-center rounded-2xl border border-dashed border-input bg-background text-sm text-muted-foreground">
