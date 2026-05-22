@@ -43,15 +43,24 @@ class CustomerSeeder extends Seeder
         foreach ($customers as $data) {
             [$countryCode, $localMobile] = User::splitCanonicalMobile($data['user']['mobile']);
 
-            $user = User::firstOrCreate(
-                ['country_code' => $countryCode, 'mobile' => $localMobile],
-                array_merge($data['user'], [
+            // Match on email OR mobile — both are unique, and an existing row
+            // may already hold one of them (e.g. the email was seeded earlier
+            // with a different number). Only create when neither is present so
+            // the seeder is safely re-runnable.
+            $user = User::where('email', $data['user']['email'])
+                ->orWhere(fn ($q) => $q
+                    ->where('country_code', $countryCode)
+                    ->where('mobile', $localMobile))
+                ->first();
+
+            if (! $user) {
+                $user = User::create(array_merge($data['user'], [
                     'country_code' => $countryCode,
                     'country_iso' => Countries::primaryIsoForDial($countryCode),
                     'mobile' => $localMobile,
                     'password' => bcrypt('password'),
-                ]),
-            );
+                ]));
+            }
 
             if (!$user->hasRole('customer')) {
                 $user->assignRole('customer');

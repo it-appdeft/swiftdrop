@@ -17,9 +17,8 @@ import {
     Trash2,
     Upload,
     UtensilsCrossed,
-    X,
 } from 'lucide-react';
-import { type KeyboardEvent, useState } from 'react';
+import { useState } from 'react';
 import { SwiftdropWordmark } from '../../../web/components/swiftdrop-wordmark';
 
 // ─── Types & static data ────────────────────────────────────────────────────
@@ -31,7 +30,7 @@ const STEP_LABELS: Record<StepKey, string> = {
     2: 'Location & Hours',
     3: 'Legal & Bank',
     4: 'Documents',
-    5: 'Menu starter',
+    5: 'Categories',
     6: 'Review & Submit',
 };
 
@@ -52,10 +51,9 @@ const RESTAURANT_TYPE_OPTIONS = [
     'QSR',
 ];
 
-const DIET_OPTIONS: { value: 'veg' | 'non_veg' | 'egg'; label: string }[] = [
+const DIET_OPTIONS: { value: 'veg' | 'non_veg'; label: string }[] = [
     { value: 'veg', label: 'Veg' },
     { value: 'non_veg', label: 'Non-veg' },
-    { value: 'egg', label: 'Egg' },
 ];
 
 const COUNTRY_CODE_OPTIONS: { value: string; label: string }[] = [
@@ -99,10 +97,9 @@ interface DayHours {
     to: string;
 }
 
-interface MenuItemRow {
+interface CategoryRow {
     name: string;
-    price: string;
-    diet: 'veg' | 'non_veg' | 'egg';
+    diet: 'veg' | 'non_veg';
 }
 
 interface FormState {
@@ -114,7 +111,7 @@ interface FormState {
     restaurantName: string;
     legalName: string;
     restaurantType: string;
-    cuisines: string;
+    foodItemIds: number[];
     branches: string;
     seating: string;
     // Step 2
@@ -130,8 +127,8 @@ interface FormState {
     bankName: string;
     accountNumber: string;
     ifsc: string;
-    // Step 5
-    menuItems: MenuItemRow[];
+    // Step 5 — menu categories the restaurant will list dishes under
+    categories: CategoryRow[];
     // Step 6
     termsAccepted: boolean;
 }
@@ -144,7 +141,7 @@ const DEFAULT_STATE: FormState = {
     restaurantName: '',
     legalName: '',
     restaurantType: '',
-    cuisines: '',
+    foodItemIds: [],
     branches: '',
     seating: '',
     fullAddress: '',
@@ -166,14 +163,23 @@ const DEFAULT_STATE: FormState = {
     bankName: '',
     accountNumber: '',
     ifsc: '',
-    menuItems: [{ name: '', price: '', diet: 'veg' }],
+    categories: [{ name: '', diet: 'veg' }],
     termsAccepted: false,
 };
+
+interface FoodItemOption {
+    id: number;
+    name: string;
+    slug: string;
+    image_url: string | null;
+}
 
 interface PartnerApplyProps {
     initialStep?: number;
     initialData?: Partial<FormState>;
     initialDocuments?: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
+    /** Catalog of food items managed by the admin — picker for Step 1. */
+    foodItems?: FoodItemOption[];
     /** When true, render the post-submit celebration instead of the form. */
     completed?: boolean;
 }
@@ -418,46 +424,20 @@ function AccountRestaurantStep({
     data,
     update,
     errors,
+    foodItems,
 }: {
     data: FormState;
     update: (patch: Partial<FormState>) => void;
     errors: Record<string, string>;
+    foodItems: FoodItemOption[];
 }) {
-    // `cuisines` is stored as a comma-separated string (backend column) but the
-    // UI is a tag input: partner types a cuisine, presses Enter/comma to commit
-    // it as a chip below. Split for display, re-join on every change so the
-    // round-trip payload stays a single string.
-    const selectedCuisines = data.cuisines
-        .split(',')
-        .map((c) => c.trim())
-        .filter(Boolean);
-
-    const [cuisineDraft, setCuisineDraft] = useState('');
-
-    const commitCuisine = () => {
-        const trimmed = cuisineDraft.trim().replace(/,$/, '').trim();
-        if (!trimmed) return;
-        if (selectedCuisines.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
-            setCuisineDraft('');
-            return;
-        }
-        update({ cuisines: [...selectedCuisines, trimmed].join(', ') });
-        setCuisineDraft('');
-    };
-
-    const removeCuisine = (cuisine: string) => {
-        update({
-            cuisines: selectedCuisines.filter((c) => c !== cuisine).join(', '),
-        });
-    };
-
-    const handleCuisineKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            commitCuisine();
-        } else if (e.key === 'Backspace' && cuisineDraft === '' && selectedCuisines.length) {
-            removeCuisine(selectedCuisines[selectedCuisines.length - 1]);
-        }
+    // Food categories — partner picks from the admin-managed catalog. Chip
+    // selection is stored as an array of foodItem IDs on the form state.
+    const toggleFoodItem = (id: number) => {
+        const next = data.foodItemIds.includes(id)
+            ? data.foodItemIds.filter((x) => x !== id)
+            : [...data.foodItemIds, id];
+        update({ foodItemIds: next });
     };
 
     return (
@@ -575,44 +555,54 @@ function AccountRestaurantStep({
             </div>
 
             <div className="space-y-2">
-                <FieldLabel>Cuisines</FieldLabel>
-                <input
-                    type="text"
-                    value={cuisineDraft}
-                    onChange={(e) => setCuisineDraft(e.target.value)}
-                    onKeyDown={handleCuisineKeyDown}
-                    onBlur={commitCuisine}
-                    placeholder="Type a cuisine and press Enter"
-                    aria-invalid={errors.cuisines ? true : undefined}
-                    className={
-                        'h-11 w-full rounded-md border bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 ' +
-                        (errors.cuisines
-                            ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-200'
-                            : 'border-input focus:border-primary focus:ring-primary/30')
-                    }
-                />
-                {selectedCuisines.length > 0 && (
+                <FieldLabel>Food items</FieldLabel>
+                <p className="text-xs text-muted-foreground">
+                    Pick the categories you serve. Catalog is managed by SwiftDrop admins.
+                </p>
+                {foodItems.length === 0 ? (
+                    <p className="rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
+                        No food items available yet — please check back soon.
+                    </p>
+                ) : (
                     <div className="flex flex-wrap gap-2 pt-1">
-                        {selectedCuisines.map((cuisine) => (
-                            <span
-                                key={cuisine}
-                                className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
-                            >
-                                {cuisine}
+                        {foodItems.map((item) => {
+                            const isSelected = data.foodItemIds.includes(item.id);
+                            return (
                                 <button
+                                    key={item.id}
                                     type="button"
-                                    onClick={() => removeCuisine(cuisine)}
-                                    aria-label={`Remove ${cuisine}`}
-                                    className="-mr-1 inline-flex size-4 items-center justify-center rounded-full hover:bg-primary/20"
+                                    onClick={() => toggleFoodItem(item.id)}
+                                    className={
+                                        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ' +
+                                        (isSelected
+                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            : 'border-input bg-background text-foreground hover:border-primary hover:text-primary')
+                                    }
                                 >
-                                    <X className="size-3" />
+                                    {item.image_url ? (
+                                        <span
+                                            className={
+                                                'flex size-5 shrink-0 overflow-hidden rounded-full ' +
+                                                (isSelected ? 'ring-1 ring-primary-foreground/40' : 'ring-1 ring-zinc-200')
+                                            }
+                                        >
+                                            <img
+                                                src={item.image_url}
+                                                alt=""
+                                                className="size-full object-cover"
+                                                loading="lazy"
+                                            />
+                                        </span>
+                                    ) : null}
+                                    {isSelected && <Check className="size-3" />}
+                                    {item.name}
                                 </button>
-                            </span>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
-                {errors.cuisines && (
-                    <p className="text-xs text-rose-600">{errors.cuisines}</p>
+                {errors.foodItemIds && (
+                    <p className="text-xs text-rose-600">{errors.foodItemIds}</p>
                 )}
             </div>
         </div>
@@ -886,9 +876,9 @@ function DocumentsStep({
     );
 }
 
-// ─── Step 5 — Menu starter ─────────────────────────────────────────────────
+// ─── Step 5 — Categories ───────────────────────────────────────────────────
 
-function MenuStarterStep({
+function CategoriesStep({
     data,
     update,
     errors,
@@ -897,47 +887,46 @@ function MenuStarterStep({
     update: (patch: Partial<FormState>) => void;
     errors: Record<string, string>;
 }) {
-    const setRow = (idx: number, patch: Partial<MenuItemRow>) => {
-        const next = data.menuItems.map((row, i) => (i === idx ? { ...row, ...patch } : row));
-        update({ menuItems: next });
+    const setRow = (idx: number, patch: Partial<CategoryRow>) => {
+        const next = data.categories.map((row, i) => (i === idx ? { ...row, ...patch } : row));
+        update({ categories: next });
     };
 
     const addRow = () => {
-        if (data.menuItems.length >= 50) return;
-        update({ menuItems: [...data.menuItems, { name: '', price: '', diet: 'veg' }] });
+        if (data.categories.length >= 50) return;
+        update({ categories: [...data.categories, { name: '', diet: 'veg' }] });
     };
 
     const removeRow = (idx: number) => {
-        const next = data.menuItems.filter((_, i) => i !== idx);
-        update({ menuItems: next.length ? next : [{ name: '', price: '', diet: 'veg' }] });
+        const next = data.categories.filter((_, i) => i !== idx);
+        update({ categories: next.length ? next : [{ name: '', diet: 'veg' }] });
     };
 
     return (
         <div className="space-y-6">
             <header>
-                <h2 className="text-xl font-bold tracking-tight">Menu starter</h2>
+                <h2 className="text-xl font-bold tracking-tight">Categories</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Seed a few signature dishes. You can build out the full menu later from
-                    your dashboard.
+                    Add the sections your menu is organised into — e.g. Starters, Main course,
+                    Breads. You can add dishes to each from your dashboard later.
                 </p>
             </header>
 
             <div className="space-y-3">
-                {data.menuItems.map((row, idx) => {
-                    const nameError = errors[`menuItems.${idx}.name`];
-                    const priceError = errors[`menuItems.${idx}.price`];
+                {data.categories.map((row, idx) => {
+                    const nameError = errors[`categories.${idx}.name`];
                     return (
                         <div
                             key={idx}
-                            className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-background p-3 sm:grid-cols-[1fr_140px_140px_auto] sm:items-end"
+                            className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-background p-3 sm:grid-cols-[1fr_160px_auto] sm:items-end"
                         >
                             <div className="space-y-1.5">
-                                {idx === 0 && <FieldLabel>Item name</FieldLabel>}
+                                {idx === 0 && <FieldLabel>Category name</FieldLabel>}
                                 <input
                                     type="text"
                                     value={row.name}
                                     onChange={(e) => setRow(idx, { name: e.target.value })}
-                                    placeholder="Paneer butter masala"
+                                    placeholder="Starters"
                                     className={
                                         'h-11 w-full rounded-md border bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 ' +
                                         (nameError
@@ -950,31 +939,13 @@ function MenuStarterStep({
                                 )}
                             </div>
                             <div className="space-y-1.5">
-                                {idx === 0 && <FieldLabel>Price (₹)</FieldLabel>}
-                                <input
-                                    type="number"
-                                    value={row.price}
-                                    onChange={(e) => setRow(idx, { price: e.target.value })}
-                                    placeholder="280"
-                                    className={
-                                        'h-11 w-full rounded-md border bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 ' +
-                                        (priceError
-                                            ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-200'
-                                            : 'border-input focus:border-primary focus:ring-primary/30')
-                                    }
-                                />
-                                {priceError && (
-                                    <p className="text-xs text-rose-600">{priceError}</p>
-                                )}
-                            </div>
-                            <div className="space-y-1.5">
                                 {idx === 0 && <FieldLabel>Diet</FieldLabel>}
                                 <div className="relative">
                                     <select
                                         value={row.diet}
                                         onChange={(e) =>
                                             setRow(idx, {
-                                                diet: e.target.value as MenuItemRow['diet'],
+                                                diet: e.target.value as CategoryRow['diet'],
                                             })
                                         }
                                         className="h-11 w-full appearance-none rounded-md border border-input bg-background pl-3 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -991,7 +962,7 @@ function MenuStarterStep({
                             <button
                                 type="button"
                                 onClick={() => removeRow(idx)}
-                                aria-label="Remove item"
+                                aria-label="Remove category"
                                 className="inline-flex size-11 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:border-rose-500 hover:text-rose-500"
                             >
                                 <Trash2 className="size-4" />
@@ -1007,7 +978,7 @@ function MenuStarterStep({
                 className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-input bg-background px-4 py-2 text-sm font-semibold text-foreground hover:border-primary hover:text-primary"
             >
                 <Plus className="size-4" />
-                Add another item
+                Add another category
             </button>
         </div>
     );
@@ -1057,18 +1028,24 @@ function ReviewStep({
     onAccept,
     onEditStep,
     errors,
+    foodItems,
 }: {
     data: FormState;
     documents: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
     onAccept: (v: boolean) => void;
     onEditStep: (step: StepKey) => void;
     errors: Record<string, string>;
+    foodItems: FoodItemOption[];
 }) {
     const uploadedCount = DOC_FIELDS.filter((d) => documents[d.key]?.uploaded).length;
     const openDays = DAYS.filter((d) => data.hours[d.key].open)
         .map((d) => d.label)
         .join(', ');
-    const filledMenuItems = data.menuItems.filter((m) => m.name.trim() !== '');
+    const filledCategories = data.categories.filter((c) => c.name.trim() !== '');
+    const selectedFoodItemNames = foodItems
+        .filter((f) => data.foodItemIds.includes(f.id))
+        .map((f) => f.name)
+        .join(', ');
 
     return (
         <div className="space-y-5">
@@ -1085,7 +1062,7 @@ function ReviewStep({
                 <SummaryRow label="Mobile" value={data.contactPhone} />
                 <SummaryRow label="Restaurant" value={data.restaurantName} />
                 <SummaryRow label="Type" value={data.restaurantType} />
-                <SummaryRow label="Cuisines" value={data.cuisines} />
+                <SummaryRow label="Food items" value={selectedFoodItemNames || '—'} />
             </SummaryCard>
 
             <SummaryCard title="Location & Hours" onEdit={() => onEditStep(2)}>
@@ -1112,12 +1089,12 @@ function ReviewStep({
                 />
             </SummaryCard>
 
-            <SummaryCard title="Menu starter" onEdit={() => onEditStep(5)}>
+            <SummaryCard title="Categories" onEdit={() => onEditStep(5)}>
                 <SummaryRow
-                    label="Items"
+                    label="Categories"
                     value={
-                        filledMenuItems.length
-                            ? `${filledMenuItems.length} dish${filledMenuItems.length === 1 ? '' : 'es'}`
+                        filledCategories.length
+                            ? filledCategories.map((c) => c.name).join(', ')
                             : '—'
                     }
                 />
@@ -1195,6 +1172,7 @@ export default function PartnerApply({
     initialStep = 1,
     initialData = {},
     initialDocuments = {},
+    foodItems = [],
     completed = false,
 }: PartnerApplyProps) {
     if (completed) {
@@ -1205,8 +1183,8 @@ export default function PartnerApply({
         Math.max(1, Math.min(6, Math.floor(n))) as StepKey;
 
     const merged: FormState = { ...DEFAULT_STATE, ...initialData };
-    if (!merged.menuItems || merged.menuItems.length === 0) {
-        merged.menuItems = [{ name: '', price: '', diet: 'veg' }];
+    if (!merged.categories || merged.categories.length === 0) {
+        merged.categories = [{ name: '', diet: 'veg' }];
     }
 
     const [step, setStep] = useState<StepKey>(clamp(initialStep));
@@ -1299,7 +1277,14 @@ export default function PartnerApply({
     const renderStep = () => {
         switch (step) {
             case 1:
-                return <AccountRestaurantStep data={data} update={update} errors={errors} />;
+                return (
+                    <AccountRestaurantStep
+                        data={data}
+                        update={update}
+                        errors={errors}
+                        foodItems={foodItems}
+                    />
+                );
             case 2:
                 return <LocationHoursStep data={data} update={update} errors={errors} />;
             case 3:
@@ -1313,7 +1298,7 @@ export default function PartnerApply({
                     />
                 );
             case 5:
-                return <MenuStarterStep data={data} update={update} errors={errors} />;
+                return <CategoriesStep data={data} update={update} errors={errors} />;
             case 6:
                 return (
                     <ReviewStep
@@ -1322,6 +1307,7 @@ export default function PartnerApply({
                         onAccept={(v) => update({ termsAccepted: v })}
                         onEditStep={(s) => setStep(s)}
                         errors={errors}
+                        foodItems={foodItems}
                     />
                 );
         }
