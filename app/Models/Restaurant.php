@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -113,10 +114,32 @@ class Restaurant extends Model
         return $this->hasMany(MenuItem::class);
     }
 
+    /**
+     * Reusable modifier groups (Size, Toppings, Cheese & Dip…) the
+     * partner manages from the Restaurant > Modifiers screen. Menu
+     * items attach to these via a pivot so one group can power many
+     * dishes.
+     */
+    public function modifierGroups(): HasMany
+    {
+        return $this->hasMany(ModifierGroup::class)->orderBy('sort_order');
+    }
+
     /** Starter dishes captured during the partner application (Step 5). */
     public function starterMenuItems(): HasMany
     {
         return $this->hasMany(RestaurantMenuItem::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Food categories the partner picked in Step 1. Replaces the free-text
+     * `cuisines` column for new applications — choices come from the
+     * admin-managed `food_items` catalog.
+     */
+    public function foodItems(): BelongsToMany
+    {
+        return $this->belongsToMany(FoodItem::class, 'restaurant_food_items')
+            ->withTimestamps();
     }
 
     public function orders(): HasMany

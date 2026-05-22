@@ -1,7 +1,9 @@
-import { router, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     BarChart3,
     Bell,
+    Check,
+    ChevronDown,
     ChevronsUpDown,
     ClipboardList,
     Clock,
@@ -11,17 +13,20 @@ import {
     LogOut,
     Menu,
     Package,
+    Plus,
     Receipt,
     ScrollText,
     Search,
     ShoppingBag,
+    SlidersHorizontal,
     Star,
+    Store,
     UserCog,
     UtensilsCrossed,
     Wallet,
     X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // ─── Navigation config ────────────────────────────────────────────────────
 
@@ -29,6 +34,7 @@ export type NavKey =
     | 'dashboard'
     | 'orders'
     | 'menu'
+    | 'modifiers'
     | 'inventory'
     | 'promotions'
     | 'reviews'
@@ -47,24 +53,27 @@ interface NavEntry {
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: number;
+    /** Route the entry navigates to; omit for stubs that aren't wired up yet. */
+    href?: string;
 }
 
 const NAV: NavEntry[] = [
-    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { key: 'orders', label: 'Orders', icon: ShoppingBag, badge: 4 },
-    { key: 'menu', label: 'Menu Management', icon: UtensilsCrossed },
-    { key: 'inventory', label: 'Inventory', icon: Package },
-    { key: 'promotions', label: 'Promotions', icon: Receipt },
-    { key: 'reviews', label: 'Reviews', icon: Star },
-    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { key: 'reports', label: 'Reports', icon: ScrollText },
-    { key: 'payouts', label: 'Payouts', icon: Wallet },
-    { key: 'staff', label: 'Staff', icon: UserCog },
-    { key: 'hours', label: 'Operating Hours', icon: Clock },
-    { key: 'documents', label: 'Documents', icon: FileText },
-    { key: 'notifications', label: 'Notifications', icon: Bell },
-    { key: 'support', label: 'Support', icon: HelpCircle },
-    { key: 'settings', label: 'Settings', icon: ClipboardList },
+    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: route('restaurant.dashboard') },
+    // { key: 'orders', label: 'Orders', icon: ShoppingBag, badge: 4, href: route('restaurant.orders') },
+    { key: 'menu', label: 'Menu Management', icon: UtensilsCrossed, href: route('restaurant.menu') },
+    { key: 'modifiers', label: 'Modifiers', icon: SlidersHorizontal, href: route('restaurant.modifiers') },
+    // { key: 'inventory', label: 'Inventory', icon: Package },
+    // { key: 'promotions', label: 'Promotions', icon: Receipt },
+    // { key: 'reviews', label: 'Reviews', icon: Star },
+    // { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+    // { key: 'reports', label: 'Reports', icon: ScrollText },
+    // { key: 'payouts', label: 'Payouts', icon: Wallet },
+    // { key: 'staff', label: 'Staff', icon: UserCog },
+    // { key: 'hours', label: 'Operating Hours', icon: Clock },
+    // { key: 'documents', label: 'Documents', icon: FileText },
+    // { key: 'notifications', label: 'Notifications', icon: Bell },
+    // { key: 'support', label: 'Support', icon: HelpCircle },
+    { key: 'settings', label: 'Settings', icon: ClipboardList, href: route('restaurant.settings') },
 ];
 
 interface SharedProps {
@@ -80,6 +89,139 @@ function initialsFrom(name: string): string {
             .slice(0, 2)
             .map((p) => p[0]?.toUpperCase() ?? '')
             .join('') || '?'
+    );
+}
+
+// ─── Branch switcher ──────────────────────────────────────────────────────
+
+interface Branch {
+    id: string;
+    name: string;
+    status: 'open' | 'paused';
+    orders: number;
+}
+
+// Mock branches until a restaurant-branches model lands. The active branch is
+// held in local state so the switcher feels live.
+const BRANCHES: Branch[] = [
+    { id: 'indiranagar', name: 'Spice Route — Indiranagar', status: 'open', orders: 94 },
+    { id: 'koramangala', name: 'Spice Route — Koramangala', status: 'open', orders: 62 },
+    { id: 'whitefield', name: 'Spice Route — Whitefield', status: 'paused', orders: 0 },
+];
+
+function BranchSwitcher() {
+    const [open, setOpen] = useState(false);
+    const [activeId, setActiveId] = useState(BRANCHES[0]?.id ?? '');
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    const active = BRANCHES.find((b) => b.id === activeId) ?? BRANCHES[0];
+
+    useEffect(() => {
+        if (!open) return;
+        const onDocClick = (e: MouseEvent) => {
+            if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
+        };
+        const onEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setOpen(false);
+        };
+        document.addEventListener('mousedown', onDocClick);
+        document.addEventListener('keydown', onEsc);
+        return () => {
+            document.removeEventListener('mousedown', onDocClick);
+            document.removeEventListener('keydown', onEsc);
+        };
+    }, [open]);
+
+    const statusLabel = (b: Branch) =>
+        `${b.status === 'open' ? 'Open' : 'Paused'} · ${b.orders} order${b.orders === 1 ? '' : 's'}`;
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={open}
+                className="flex w-full items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-left text-sm hover:border-primary"
+            >
+                <span className="min-w-0 flex-1">
+                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                        Active branch
+                    </span>
+                    <span className="truncate text-sm font-semibold text-white">
+                        {active?.name}
+                    </span>
+                </span>
+                <ChevronsUpDown className="ml-2 size-4 shrink-0 text-zinc-500" />
+            </button>
+
+            {open && (
+                <div
+                    role="menu"
+                    className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl"
+                >
+                    <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                        Switch branch
+                    </p>
+                    <ul className="pb-1">
+                        {BRANCHES.map((b) => {
+                            const isActive = b.id === active?.id;
+                            return (
+                                <li key={b.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveId(b.id);
+                                            setOpen(false);
+                                        }}
+                                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-zinc-800"
+                                    >
+                                        <span
+                                            className={
+                                                'flex size-7 shrink-0 items-center justify-center rounded-md ' +
+                                                (b.status === 'open'
+                                                    ? 'bg-zinc-800 text-zinc-300'
+                                                    : 'bg-zinc-800 text-zinc-500')
+                                            }
+                                        >
+                                            <Store className="size-3.5" />
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate text-sm font-medium text-white">
+                                                {b.name}
+                                            </span>
+                                            <span
+                                                className={
+                                                    'block text-[11px] ' +
+                                                    (b.status === 'open'
+                                                        ? 'text-emerald-400'
+                                                        : 'text-zinc-500')
+                                                }
+                                            >
+                                                {statusLabel(b)}
+                                            </span>
+                                        </span>
+                                        {isActive && (
+                                            <Check className="size-4 shrink-0 text-primary" />
+                                        )}
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className="border-t border-zinc-800">
+                        <button
+                            type="button"
+                            onClick={() => setOpen(false)}
+                            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                        >
+                            <Plus className="size-4" />
+                            Manage branches
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 
@@ -128,20 +270,7 @@ function SidebarBody({
             </div>
 
             <div className="px-3 pb-3">
-                <button
-                    type="button"
-                    className="flex w-full items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-left text-sm hover:border-primary"
-                >
-                    <span className="min-w-0 flex-1">
-                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                            Branch
-                        </span>
-                        <span className="truncate text-sm font-semibold text-white">
-                            Spice Route — Indiranagar
-                        </span>
-                    </span>
-                    <ChevronsUpDown className="ml-2 size-4 shrink-0 text-zinc-500" />
-                </button>
+                <BranchSwitcher />
             </div>
 
             <nav className="flex-1 overflow-y-auto px-3 pb-3">
@@ -149,33 +278,48 @@ function SidebarBody({
                     {NAV.map((item) => {
                         const Icon = item.icon;
                         const isActive = item.key === active;
+                        const className =
+                            'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition ' +
+                            (isActive
+                                ? 'bg-primary text-primary-foreground font-semibold'
+                                : 'text-zinc-300 hover:bg-zinc-900 hover:text-white');
+                        const inner = (
+                            <>
+                                <Icon className="size-4" />
+                                <span className="flex-1 text-left">{item.label}</span>
+                                {item.badge !== undefined && (
+                                    <span
+                                        className={
+                                            'flex size-5 items-center justify-center rounded-full text-[10px] font-bold ' +
+                                            (isActive
+                                                ? 'bg-primary-foreground text-primary'
+                                                : 'bg-primary text-primary-foreground')
+                                        }
+                                    >
+                                        {item.badge}
+                                    </span>
+                                )}
+                            </>
+                        );
                         return (
                             <li key={item.key}>
-                                <button
-                                    type="button"
-                                    onClick={onNavigate}
-                                    className={
-                                        'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition ' +
-                                        (isActive
-                                            ? 'bg-primary text-primary-foreground font-semibold'
-                                            : 'text-zinc-300 hover:bg-zinc-900 hover:text-white')
-                                    }
-                                >
-                                    <Icon className="size-4" />
-                                    <span className="flex-1 text-left">{item.label}</span>
-                                    {item.badge !== undefined && (
-                                        <span
-                                            className={
-                                                'flex size-5 items-center justify-center rounded-full text-[10px] font-bold ' +
-                                                (isActive
-                                                    ? 'bg-primary-foreground text-primary'
-                                                    : 'bg-primary text-primary-foreground')
-                                            }
-                                        >
-                                            {item.badge}
-                                        </span>
-                                    )}
-                                </button>
+                                {item.href ? (
+                                    <Link
+                                        href={item.href}
+                                        onClick={onNavigate}
+                                        className={className}
+                                    >
+                                        {inner}
+                                    </Link>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={onNavigate}
+                                        className={className}
+                                    >
+                                        {inner}
+                                    </button>
+                                )}
                             </li>
                         );
                     })}
@@ -196,9 +340,127 @@ function SidebarBody({
     );
 }
 
+// ─── Profile dropdown ─────────────────────────────────────────────────────
+
+interface ProfileMenuItem {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    href?: string;
+    onClick?: () => void;
+    tone?: 'default' | 'destructive';
+}
+
+function ProfileMenu({ name, email }: { name: string; email: string | null }) {
+    const [open, setOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Close on outside click + Escape so the panel doesn't trap the user.
+    useEffect(() => {
+        if (!open) return;
+        const onDocClick = (e: MouseEvent) => {
+            if (!wrapperRef.current?.contains(e.target as Node)) {
+                setOpen(false);
+            }
+        };
+        const onEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setOpen(false);
+        };
+        document.addEventListener('mousedown', onDocClick);
+        document.addEventListener('keydown', onEsc);
+        return () => {
+            document.removeEventListener('mousedown', onDocClick);
+            document.removeEventListener('keydown', onEsc);
+        };
+    }, [open]);
+
+    const handleLogout = () => {
+        setOpen(false);
+        router.post(route('logout'));
+    };
+
+    const items: ProfileMenuItem[] = [
+        // { label: 'Account settings', icon: UserCog, href: '#' },
+        // { label: 'Documents', icon: FileText, href: '#' },
+        // { label: 'Help & support', icon: HelpCircle, href: '#' },
+    ];
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={open}
+                className="flex items-center gap-2 rounded-full border border-border bg-background py-1 pl-1 pr-1 hover:border-primary sm:pr-3"
+            >
+                <span className="flex size-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                    {initialsFrom(name)}
+                </span>
+                <span className="hidden text-sm font-medium sm:inline">{name}</span>
+                <ChevronDown className="hidden size-3.5 text-muted-foreground sm:inline" />
+            </button>
+
+            {open && (
+                <div
+                    role="menu"
+                    className="absolute right-0 top-[calc(100%+8px)] z-30 w-64 overflow-hidden rounded-xl border border-border bg-background shadow-lg"
+                >
+                    <div className="border-b border-border px-4 py-3">
+                        <p className="text-sm font-semibold text-foreground">{name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            {email ?? 'Owner'}
+                        </p>
+                    </div>
+                    <ul className="py-1">
+                        {items.map((item) => {
+                            const Icon = item.icon;
+                            return (
+                                <li key={item.label}>
+                                    <a
+                                        href={item.href ?? '#'}
+                                        onClick={(e) => {
+                                            if (item.onClick) {
+                                                e.preventDefault();
+                                                item.onClick();
+                                            }
+                                            setOpen(false);
+                                        }}
+                                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-foreground hover:bg-muted"
+                                    >
+                                        <Icon className="size-4 text-muted-foreground" />
+                                        {item.label}
+                                    </a>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <div className="border-t border-border py-1">
+                        <button
+                            type="button"
+                            onClick={handleLogout}
+                            className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50"
+                        >
+                            <LogOut className="size-4" />
+                            Log out
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ─── Top bar ──────────────────────────────────────────────────────────────
 
-function TopBar({ name, onOpenMenu }: { name: string; onOpenMenu: () => void }) {
+function TopBar({
+    name,
+    email,
+    onOpenMenu,
+}: {
+    name: string;
+    email: string | null;
+    onOpenMenu: () => void;
+}) {
     const [accepting, setAccepting] = useState(true);
 
     return (
@@ -277,15 +539,7 @@ function TopBar({ name, onOpenMenu }: { name: string; onOpenMenu: () => void }) 
                     <HelpCircle className="size-4" />
                 </button>
 
-                <button
-                    type="button"
-                    className="flex items-center gap-2 rounded-full border border-border bg-background py-1 pl-1 pr-1 hover:border-primary sm:pr-3"
-                >
-                    <span className="flex size-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
-                        {initialsFrom(name)}
-                    </span>
-                    <span className="hidden text-sm font-medium sm:inline">{name}</span>
-                </button>
+                <ProfileMenu name={name} email={email} />
             </div>
         </header>
     );
@@ -308,6 +562,7 @@ export default function AppLayout({
 }) {
     const { auth } = usePage<SharedProps>().props;
     const name = auth?.user?.name ?? 'Partner';
+    const email = auth?.user?.email ?? null;
     const [drawerOpen, setDrawerOpen] = useState(false);
 
     // Lock body scroll while the mobile drawer is open.
@@ -348,7 +603,11 @@ export default function AppLayout({
             )}
 
             <div className="flex min-w-0 flex-1 flex-col">
-                <TopBar name={name} onOpenMenu={() => setDrawerOpen(true)} />
+                <TopBar
+                    name={name}
+                    email={email}
+                    onOpenMenu={() => setDrawerOpen(true)}
+                />
 
                 <main className="flex-1 overflow-y-auto px-3 py-5 sm:px-5 sm:py-6">
                     {children}

@@ -31,7 +31,15 @@ createInertiaApp({
             return resolvePageComponent(`./customer/pages/${name.slice(9)}.tsx`, customerPages);
         }
         if (name.startsWith('restaurant/')) {
-            return resolvePageComponent(`./restaurant/pages/${name.slice(11)}.tsx`, restaurantPages);
+            // Resolve `restaurant/menu` to either pages/menu.tsx or, if the
+            // page lives in its own folder, pages/menu/index.tsx.
+            const page = name.slice(11);
+            const direct = `./restaurant/pages/${page}.tsx`;
+            const indexed = `./restaurant/pages/${page}/index.tsx`;
+            return resolvePageComponent(
+                restaurantPages[direct] ? direct : indexed,
+                restaurantPages,
+            );
         }
 
         // Unprefixed names fall back to admin → web (legacy behaviour for pages like `welcome`).

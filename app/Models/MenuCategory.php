@@ -11,6 +11,7 @@ class MenuCategory extends Model
     protected $fillable = [
         'restaurant_id',
         'name',
+        'diet',
         'sort_order',
         'is_active',
     ];
