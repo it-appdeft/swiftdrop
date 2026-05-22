@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Partner;
 
-use App\Models\RestaurantMenuItem;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -45,7 +44,7 @@ class SavePartnerApplicationRequest extends FormRequest
             'data.restaurantName' => 'restaurantName',
             'data.legalName' => 'legalName',
             'data.restaurantType' => 'restaurantType',
-            'data.cuisines' => 'cuisines',
+            'data.foodItemIds' => 'foodItemIds',
             'data.branches' => 'branches',
             'data.seating' => 'seating',
             'data.fullAddress' => 'fullAddress',
@@ -59,7 +58,7 @@ class SavePartnerApplicationRequest extends FormRequest
             'data.bankName' => 'bankName',
             'data.accountNumber' => 'accountNumber',
             'data.ifsc' => 'ifsc',
-            'data.menuItems' => 'menuItems',
+            'data.categories' => 'categories',
         ];
     }
 
@@ -94,7 +93,10 @@ class SavePartnerApplicationRequest extends FormRequest
                 'data.restaurantName' => ['required', 'string', 'max:100'],
                 'data.legalName' => ['nullable', 'string', 'max:200'],
                 'data.restaurantType' => ['nullable', 'string', 'max:50'],
-                'data.cuisines' => ['nullable', 'string', 'max:500'],
+                // Food categories — the partner picks from the admin-managed
+                // `food_items` catalog. Existence is enforced at the writer.
+                'data.foodItemIds' => ['nullable', 'array', 'max:50'],
+                'data.foodItemIds.*' => ['integer', 'exists:food_items,id'],
                 'data.branches' => ['nullable', 'integer', 'min:1', 'max:1000'],
                 'data.seating' => ['nullable', 'integer', 'min:0'],
             ],
@@ -117,10 +119,9 @@ class SavePartnerApplicationRequest extends FormRequest
                 'data.ifsc' => ['nullable', 'string', 'max:20'],
             ],
             5 => [
-                'data.menuItems' => ['nullable', 'array', 'max:50'],
-                'data.menuItems.*.name' => ['required_with:data.menuItems.*.price', 'nullable', 'string', 'max:200'],
-                'data.menuItems.*.price' => ['nullable', 'numeric', 'min:0'],
-                'data.menuItems.*.diet' => ['nullable', Rule::in(RestaurantMenuItem::DIETS)],
+                'data.categories' => ['nullable', 'array', 'max:50'],
+                'data.categories.*.name' => ['nullable', 'string', 'max:120'],
+                'data.categories.*.diet' => ['nullable', Rule::in(['veg', 'non_veg'])],
             ],
             default => [], // Step 4 (documents) + Step 6 (review) post no data
         };

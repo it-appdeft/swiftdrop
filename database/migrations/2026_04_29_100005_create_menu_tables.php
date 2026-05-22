@@ -34,21 +34,12 @@ return new class extends Migration
             $table->index(['restaurant_id', 'is_available']);
         });
 
-        Schema::create('menu_item_images', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('menu_item_id')->constrained()->cascadeOnDelete();
-            $table->string('file_path');
-            $table->string('alt_text')->nullable();
-            $table->unsignedInteger('sort_order')->default(0);
-            $table->timestamps();
-
-            $table->index(['menu_item_id', 'sort_order']);
-        });
+        // menu_item_images removed — menu photos now live in the polymorphic
+        // `uploads` table (see 2026_05_22_100000_create_uploads_table).
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('menu_item_images');
         Schema::dropIfExists('menu_items');
         Schema::dropIfExists('menu_categories');
     }

@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Restaurant;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Partner\SavePartnerApplicationRequest;
 use App\Http\Requests\Partner\UploadPartnerDocumentRequest;
+use App\Models\FoodItem;
 use App\Models\Restaurant;
 use App\Models\RestaurantDocument;
 use App\Models\RestaurantHour;
 use App\Models\RestaurantLegalAndBank;
-use App\Models\RestaurantMenuItem;
+use App\Models\MenuCategory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -47,7 +48,28 @@ class PartnerApplicationController extends Controller
             'initialStep' => (int) ($restaurant->application_step ?? 1),
             'initialData' => $this->flattenForm($restaurant),
             'initialDocuments' => $this->documentMeta($restaurant),
+            'foodItems' => $this->foodItemOptions(),
         ]);
+    }
+
+    /**
+     * Catalog of food items the partner can pick from in Step 1. Managed by
+     * the super admin via the Filament admin panel.
+     *
+     * @return array<int, array{id: int, name: string, slug: string, image_url: ?string}>
+     */
+    protected function foodItemOptions(): array
+    {
+        return FoodItem::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'image'])
+            ->map(fn ($item) => [
+                'id' => (int) $item->id,
+                'name' => (string) $item->name,
+                'slug' => (string) $item->slug,
+                'image_url' => $item->image_url,
+            ])
+            ->all();
     }
 
     public function save(SavePartnerApplicationRequest $request): RedirectResponse
@@ -63,7 +85,7 @@ class PartnerApplicationController extends Controller
             1 => $this->writeAccountRestaurant($restaurant, $data),
             2 => $this->writeLocationHours($restaurant, $data),
             3 => $this->writeLegalBank($restaurant, $data),
-            5 => $this->writeMenuItems($restaurant, $data),
+            5 => $this->writeCategories($restaurant, $data),
             default => null, // Steps 4 (documents) and 6 (review) carry no structured data
         };
 
@@ -130,12 +152,25 @@ class PartnerApplicationController extends Controller
             'name' => $data['restaurantName'] ?? null,
             'legal_business_name' => $data['legalName'] ?? null,
             'restaurant_type' => $data['restaurantType'] ?? null,
-            'cuisines' => $data['cuisines'] ?? null,
             'branches' => isset($data['branches']) && $data['branches'] !== ''
                 ? (int) $data['branches'] : null,
             'seating_capacity' => isset($data['seating']) && $data['seating'] !== ''
                 ? (int) $data['seating'] : null,
         ], fn ($v) => $v !== null && $v !== ''))->save();
+
+        // Sync the pivot only when the field is present in the payload — lets
+        // partial saves (e.g. autosave) skip the food-items step without
+        // wiping previously-selected categories.
+        if (array_key_exists('foodItemIds', $data)) {
+            $ids = collect((array) $data['foodItemIds'])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            $restaurant->foodItems()->sync($ids);
+        }
     }
 
     protected function writeLocationHours(Restaurant $restaurant, array $data): void
@@ -185,15 +220,16 @@ class PartnerApplicationController extends Controller
         }
     }
 
-    protected function writeMenuItems(Restaurant $restaurant, array $data): void
+    protected function writeCategories(Restaurant $restaurant, array $data): void
     {
-        $items = (array) ($data['menuItems'] ?? []);
+        $rows = (array) ($data['categories'] ?? []);
 
-        // Replace-all is simpler than diffing — the starter list is tiny
-        // (UI caps at 50) and the rows have no foreign-key dependents.
-        RestaurantMenuItem::where('restaurant_id', $restaurant->id)->delete();
+        // Replace-all keyed by name so re-saving the step keeps existing
+        // category IDs stable where the name is unchanged, and drops the
+        // ones the partner removed.
+        $keepNames = [];
 
-        foreach (array_values($items) as $idx => $row) {
+        foreach (array_values($rows) as $idx => $row) {
             if (! is_array($row)) {
                 continue;
             }
@@ -203,16 +239,21 @@ class PartnerApplicationController extends Controller
                 continue; // Skip blank rows the user left empty
             }
 
-            RestaurantMenuItem::create([
-                'restaurant_id' => $restaurant->id,
-                'name' => $name,
-                'price' => isset($row['price']) && $row['price'] !== ''
-                    ? (float) $row['price'] : null,
-                'diet' => in_array($row['diet'] ?? null, RestaurantMenuItem::DIETS, true)
-                    ? $row['diet'] : 'veg',
-                'sort_order' => $idx,
-            ]);
+            $diet = in_array($row['diet'] ?? null, ['veg', 'non_veg'], true)
+                ? $row['diet'] : null;
+
+            MenuCategory::updateOrCreate(
+                ['restaurant_id' => $restaurant->id, 'name' => $name],
+                ['diet' => $diet, 'sort_order' => $idx, 'is_active' => true],
+            );
+
+            $keepNames[] = $name;
         }
+
+        // Remove categories the partner cleared out during this step.
+        $restaurant->categories()
+            ->when($keepNames !== [], fn ($q) => $q->whereNotIn('name', $keepNames))
+            ->delete();
     }
 
     // ─── Read helpers ───────────────────────────────────────────────────────
@@ -231,11 +272,12 @@ class PartnerApplicationController extends Controller
             ];
         }
 
-        $menuItems = $restaurant->starterMenuItems->map(fn ($item) => [
-            'name' => (string) $item->name,
-            'price' => $item->price !== null ? (string) $item->price : '',
-            'diet' => $item->diet ?: 'veg',
-        ])->values()->all();
+        $categories = $restaurant->categories
+            ->sortBy('sort_order')
+            ->map(fn ($cat) => [
+                'name' => (string) $cat->name,
+                'diet' => in_array($cat->diet, ['veg', 'non_veg'], true) ? $cat->diet : 'veg',
+            ])->values()->all();
 
         return [
             // Step 1 — Account & Restaurant. Email + mobile + country code are
@@ -248,7 +290,7 @@ class PartnerApplicationController extends Controller
             'restaurantName' => (string) ($restaurant->name ?? ''),
             'legalName' => (string) ($restaurant->legal_business_name ?? ''),
             'restaurantType' => (string) ($restaurant->restaurant_type ?? ''),
-            'cuisines' => (string) ($restaurant->cuisines ?? ''),
+            'foodItemIds' => $restaurant->foodItems->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             'branches' => $restaurant->branches !== null ? (string) $restaurant->branches : '',
             'seating' => $restaurant->seating_capacity !== null ? (string) $restaurant->seating_capacity : '',
             // Step 2 — Location & Hours
@@ -264,8 +306,8 @@ class PartnerApplicationController extends Controller
             'bankName' => (string) ($legal->bank_name ?? ''),
             'accountNumber' => (string) ($legal->account_number ?? ''),
             'ifsc' => (string) ($legal->ifsc_code ?? ''),
-            // Step 5 — Menu starter
-            'menuItems' => $menuItems,
+            // Step 5 — Categories
+            'categories' => $categories,
         ];
     }
 
@@ -292,7 +334,8 @@ class PartnerApplicationController extends Controller
                 'legalAndBank',
                 'applicationDocuments',
                 'hours',
-                'starterMenuItems',
+                'categories',
+                'foodItems',
             ])
             ->first();
 
