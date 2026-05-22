@@ -1,6 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 
+import { CountryCodeDropdown } from '@/components/country-code-dropdown';
 import { PageContainer } from '@/components/layout/page-container';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,8 @@ export default function CustomerEdit({ customer }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         first_name: customer.customer_profile?.first_name ?? '',
         last_name: customer.customer_profile?.last_name ?? '',
+        country_code: customer.country_code ?? '+44',
+        country_iso: customer.country_iso ?? 'GB',
         mobile: customer.mobile,
         email: customer.email ?? '',
         date_of_birth: customer.customer_profile?.date_of_birth ?? '',
@@ -82,12 +85,20 @@ export default function CustomerEdit({ customer }: Props) {
                     <Card>
                         <CardHeader><CardTitle>Contact & account</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            <FormField label="Mobile" error={errors.mobile} required>
-                                <Input
-                                    value={data.mobile}
-                                    onChange={(e) => setData('mobile', e.target.value)}
-                                    type="tel"
-                                />
+                            <FormField label="Mobile" error={errors.mobile ?? errors.country_code ?? errors.country_iso} required>
+                                <div className="flex gap-2">
+                                    <CountryCodeDropdown
+                                        dial={data.country_code}
+                                        iso={data.country_iso}
+                                        onChange={(c) => setData((d) => ({ ...d, country_code: c.dial, country_iso: c.iso }))}
+                                    />
+                                    <Input
+                                        value={data.mobile}
+                                        onChange={(e) => setData('mobile', e.target.value)}
+                                        type="tel"
+                                        className="flex-1"
+                                    />
+                                </div>
                             </FormField>
 
                             <FormField label="Email" error={errors.email} optional>

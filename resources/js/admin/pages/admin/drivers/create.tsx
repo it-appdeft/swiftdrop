@@ -1,6 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 
+import { CountryCodeDropdown } from '@/components/country-code-dropdown';
 import { PageContainer } from '@/components/layout/page-container';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,8 @@ export default function DriverCreate() {
     const { data, setData, post, processing, errors } = useForm({
         first_name: '',
         last_name: '',
+        country_code: '+44',
+        country_iso: 'GB',
         mobile: '',
         email: '',
         vehicle_type: '' as 'bicycle' | 'motorcycle' | 'car' | 'van' | '',
@@ -66,13 +69,26 @@ export default function DriverCreate() {
                                     />
                                 </FormField>
                             </div>
-                            <FormField label="Mobile" error={errors.mobile} required hint="UK format: +447XXXXXXXXX">
-                                <Input
-                                    value={data.mobile}
-                                    onChange={(e) => setData('mobile', e.target.value)}
-                                    placeholder="+447700000000"
-                                    type="tel"
-                                />
+                            <FormField
+                                label="Mobile"
+                                error={errors.mobile ?? errors.country_code ?? errors.country_iso}
+                                required
+                                hint="Subscriber number — pick the country separately"
+                            >
+                                <div className="flex gap-2">
+                                    <CountryCodeDropdown
+                                        dial={data.country_code}
+                                        iso={data.country_iso}
+                                        onChange={(c) => setData((d) => ({ ...d, country_code: c.dial, country_iso: c.iso }))}
+                                    />
+                                    <Input
+                                        value={data.mobile}
+                                        onChange={(e) => setData('mobile', e.target.value)}
+                                        placeholder="7700 900000"
+                                        type="tel"
+                                        className="flex-1"
+                                    />
+                                </div>
                             </FormField>
                             <FormField label="Email" error={errors.email} optional>
                                 <Input

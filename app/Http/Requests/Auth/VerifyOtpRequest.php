@@ -6,6 +6,7 @@ use App\Enums\OtpChannelEnum;
 use App\Enums\OtpTypeEnum;
 use App\Enums\UserRoleEnum;
 use App\Http\Requests\Auth\Concerns\CanonicalizesTarget;
+use App\Rules\Auth\ValidCountryIso;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -30,6 +31,7 @@ class VerifyOtpRequest extends FormRequest
         }
 
         $this->normalizeMobileInput();
+        $this->normalizeCountryIso();
     }
 
     public function rules(): array
@@ -55,6 +57,8 @@ class VerifyOtpRequest extends FormRequest
             'channel' => ['required', Rule::enum(OtpChannelEnum::class)],
             'email' => [Rule::requiredIf($needsEmail), 'nullable', 'email', 'max:255'],
             'country_code' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
+            // Optional even for SMS — see SendOtpRequest::rules() for why.
+            'country_iso' => ['nullable', 'string', 'size:2', new ValidCountryIso()],
             'mobile' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+?[0-9]{6,11}$/'],
             'code' => ['required', 'string', 'regex:/^[0-9]{4,8}$/'],
         ];
@@ -98,6 +102,22 @@ class VerifyOtpRequest extends FormRequest
         $code = (string) $this->input('country_code', '');
 
         return $code === '' ? null : $code;
+    }
+
+    /**
+     * Explicit ISO 3166-1 alpha-2 country code ("GB") — see {@see SendOtpRequest}
+     * for context. Threaded through OtpFlowService so update_phone persists the
+     * country verbatim and the right flag survives a number change.
+     */
+    public function countryIso(): ?string
+    {
+        if ($this->channel() !== OtpChannelEnum::SMS) {
+            return null;
+        }
+
+        $iso = (string) $this->input('country_iso', '');
+
+        return $iso === '' ? null : strtoupper($iso);
     }
 
     public function code(): string

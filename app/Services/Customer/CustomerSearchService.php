@@ -14,6 +14,7 @@ use App\Services\Platform\PlatformConfigService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class CustomerSearchService implements CustomerSearchServiceInterface
 {
@@ -41,7 +42,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             return new CustomerSearchResults(
                 keyword: '',
                 restaurants: collect(),
-                menuItems: collect(),
+                dishesByRestaurant: collect(),
                 recent: $profile ? $this->recentHistory($profile) : collect(),
                 address: $address,
                 radiusMiles: $radius,
@@ -52,14 +53,14 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         $this->recordSearch($profile, $keyword);
 
         $hasGeo = $address && $address->lat !== null && $address->lng !== null;
-        [$restaurants, $menuItems] = $hasGeo
+        [$restaurants, $dishesByRestaurant] = $hasGeo
             ? $this->searchWithinRadius($keyword, $address, $radius)
             : $this->searchUnbounded($keyword);
 
         return new CustomerSearchResults(
             keyword: $keyword,
             restaurants: $restaurants,
-            menuItems: $menuItems,
+            dishesByRestaurant: $dishesByRestaurant,
             recent: $this->recentHistory($profile),
             address: $address,
             radiusMiles: $radius,
@@ -95,7 +96,6 @@ class CustomerSearchService implements CustomerSearchServiceInterface
      */
     protected function recentHistory(CustomerProfile $profile): Collection
     {
-        // Dedupe by keyword (case-insensitive) keeping the most recent timestamp.
         return CustomerSearchHistory::query()
             ->where('customer_profile_id', $profile->id)
             ->orderByDesc('searched_at')
@@ -131,86 +131,142 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         $restaurants = $this->activeRestaurantsQuery()
             ->whereNotNull('restaurants.lat')
             ->whereNotNull('restaurants.lng')
-            ->where('restaurants.name', 'like', "%{$keyword}%")
+            ->where(fn ($q) => $this->applyRestaurantNameOrFoodItemMatch($q, $keyword))
             ->selectRaw("restaurants.*, {$distanceExpr} as distance_miles")
             ->whereRaw("{$distanceExpr} <= ?", [$radius])
             ->orderBy('distance_miles')
             ->limit(self::RESULT_LIMIT)
-            ->get()
-            ->map(fn (Restaurant $r) => [
+            ->get();
+
+        $dishesByRestaurant = $this->dishesGroupedByRestaurant(
+            $keyword,
+            geoFilter: function (Builder $q) use ($distanceExpr, $radius) {
+                $q->whereNotNull('restaurants.lat')
+                    ->whereNotNull('restaurants.lng')
+                    ->whereRaw("{$distanceExpr} <= ?", [$radius]);
+            },
+            distanceExpr: $distanceExpr,
+        );
+
+        return [
+            $restaurants->map(fn (Restaurant $r) => [
                 'restaurant' => $r,
                 'distance_miles' => $r->distance_miles !== null
                     ? round((float) $r->distance_miles, 2)
                     : null,
-            ])
-            ->values();
-
-        $menuItems = MenuItem::query()
-            ->join('restaurants', 'restaurants.id', '=', 'menu_items.restaurant_id')
-            ->leftJoin('food_items', 'food_items.id', '=', 'menu_items.food_item_id')
-            ->where('restaurants.status', 'active')
-            ->where('restaurants.approval_status', 'approved')
-            ->whereNotNull('restaurants.lat')
-            ->whereNotNull('restaurants.lng')
-            ->where('menu_items.is_available', true)
-            ->where(function ($q) use ($keyword) {
-                $q->where('menu_items.name', 'like', "%{$keyword}%")
-                    ->orWhere('food_items.name', 'like', "%{$keyword}%")
-                    ->orWhere('food_items.slug', 'like', "%{$keyword}%");
-            })
-            ->selectRaw('menu_items.*, '.$distanceExpr.' as distance_miles')
-            ->whereRaw("{$distanceExpr} <= ?", [$radius])
-            ->orderBy('distance_miles')
-            ->limit(self::RESULT_LIMIT)
-            ->get()
-            ->map(fn (MenuItem $m) => [
-                'menu_item' => $m,
-                'restaurant' => $m->restaurant,
-                'distance_miles' => $m->distance_miles !== null
-                    ? round((float) $m->distance_miles, 2)
-                    : null,
-            ])
-            ->values();
-
-        return [$restaurants, $menuItems];
+            ])->values(),
+            $dishesByRestaurant,
+        ];
     }
 
     /**
-     * Customer has no usable geo — degrade gracefully to a plain text match.
-     *
      * @return array{0: Collection, 1: Collection}
      */
     protected function searchUnbounded(string $keyword): array
     {
         $restaurants = $this->activeRestaurantsQuery()
-            ->where('restaurants.name', 'like', "%{$keyword}%")
+            ->where(fn ($q) => $this->applyRestaurantNameOrFoodItemMatch($q, $keyword))
             ->limit(self::RESULT_LIMIT)
             ->get()
             ->map(fn (Restaurant $r) => ['restaurant' => $r, 'distance_miles' => null])
             ->values();
 
-        $menuItems = MenuItem::query()
+        $dishesByRestaurant = $this->dishesGroupedByRestaurant(
+            $keyword,
+            geoFilter: null,
+            distanceExpr: null,
+        );
+
+        return [$restaurants, $dishesByRestaurant];
+    }
+
+    /**
+     * Restaurant matches when its own name matches the keyword, OR it has
+     * at least one available menu item linked to a food_item whose name
+     * (or the menu item's own name) matches the keyword.
+     */
+    protected function applyRestaurantNameOrFoodItemMatch(Builder $query, string $keyword): void
+    {
+        $query
+            ->where('restaurants.name', 'like', "%{$keyword}%")
+            ->orWhereExists(function ($sub) use ($keyword) {
+                $sub->select(DB::raw(1))
+                    ->from('menu_items')
+                    ->leftJoin('food_items', 'food_items.id', '=', 'menu_items.food_item_id')
+                    ->whereColumn('menu_items.restaurant_id', 'restaurants.id')
+                    ->where('menu_items.is_available', true)
+                    ->where(function ($w) use ($keyword) {
+                        $w->where('food_items.name', 'like', "%{$keyword}%")
+                            ->orWhere('menu_items.name', 'like', "%{$keyword}%");
+                    });
+            });
+    }
+
+    /**
+     * Build the Dishes tab payload: restaurants that have at least one
+     * matching menu item, each with its matching dishes nested inside.
+     *
+     * @param  ?callable(Builder): void  $geoFilter
+     * @return Collection<int, array{restaurant: Restaurant, distance_miles: ?float, dishes: Collection<int, MenuItem>}>
+     */
+    protected function dishesGroupedByRestaurant(string $keyword, ?callable $geoFilter, ?string $distanceExpr): Collection
+    {
+        $menuQuery = MenuItem::query()
+            ->with('foodItem')
             ->join('restaurants', 'restaurants.id', '=', 'menu_items.restaurant_id')
             ->leftJoin('food_items', 'food_items.id', '=', 'menu_items.food_item_id')
             ->where('restaurants.status', 'active')
             ->where('restaurants.approval_status', 'approved')
             ->where('menu_items.is_available', true)
             ->where(function ($q) use ($keyword) {
-                $q->where('menu_items.name', 'like', "%{$keyword}%")
-                    ->orWhere('food_items.name', 'like', "%{$keyword}%")
-                    ->orWhere('food_items.slug', 'like', "%{$keyword}%");
-            })
-            ->select('menu_items.*')
-            ->limit(self::RESULT_LIMIT)
-            ->get()
-            ->map(fn (MenuItem $m) => [
-                'menu_item' => $m,
-                'restaurant' => $m->restaurant,
-                'distance_miles' => null,
-            ])
-            ->values();
+                $q->where('food_items.name', 'like', "%{$keyword}%")
+                    ->orWhere('menu_items.name', 'like', "%{$keyword}%");
+            });
 
-        return [$restaurants, $menuItems];
+        if ($geoFilter) {
+            $geoFilter($menuQuery);
+        }
+
+        $select = ['menu_items.*'];
+        if ($distanceExpr) {
+            $select[] = DB::raw("{$distanceExpr} as distance_miles");
+        }
+
+        $items = $menuQuery
+            ->select($select)
+            ->orderBy('restaurants.id')
+            ->orderBy('menu_items.sort_order')
+            ->limit(self::RESULT_LIMIT * 5)
+            ->get();
+
+        if ($items->isEmpty()) {
+            return collect();
+        }
+
+        $restaurantIds = $items->pluck('restaurant_id')->unique()->all();
+        $restaurants = Restaurant::query()
+            ->whereIn('id', $restaurantIds)
+            ->get()
+            ->keyBy('id');
+
+        return $items
+            ->groupBy('restaurant_id')
+            ->map(function (Collection $dishes, int $restaurantId) use ($restaurants) {
+                $restaurant = $restaurants->get($restaurantId);
+                if (! $restaurant) {
+                    return null;
+                }
+                $distance = $dishes->first()->distance_miles ?? null;
+
+                return [
+                    'restaurant' => $restaurant,
+                    'distance_miles' => $distance !== null ? round((float) $distance, 2) : null,
+                    'dishes' => $dishes->values(),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->take(self::RESULT_LIMIT);
     }
 
     protected function activeRestaurantsQuery(): Builder

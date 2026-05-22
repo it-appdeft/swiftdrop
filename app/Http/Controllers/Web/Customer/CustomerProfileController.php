@@ -57,8 +57,10 @@ class CustomerProfileController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 // Split form for the dropdown / display; canonical form
-                // is what the OTP endpoints expect as `target`.
+                // is what the OTP endpoints expect as `target`. country_iso
+                // resolves the exact flag for a shared dialling prefix.
                 'country_code' => $user->country_code,
+                'country_iso' => $user->country_iso,
                 'mobile' => $user->mobile,
                 'canonical_mobile' => $user->canonical_mobile,
             ],
@@ -160,6 +162,7 @@ class CustomerProfileController extends Controller
             userType: $request->userRole(),
             authUser: Auth::user(),
             countryCode: $request->countryCode(),
+            countryIso: $request->countryIso(),
         );
 
         return back()->with('otp', $payload);
@@ -179,6 +182,7 @@ class CustomerProfileController extends Controller
             userType: $request->userRole(),
             authUser: Auth::user(),
             countryCode: $request->countryCode(),
+            countryIso: $request->countryIso(),
         );
 
         return back()->with('otpResult', $result);

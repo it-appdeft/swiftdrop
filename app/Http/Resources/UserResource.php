@@ -16,9 +16,12 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             // Split storage: country_code holds the dialling prefix ("+44"),
-            // mobile holds the subscriber-only digits. Clients that need the
-            // full E.164 string can read `canonical_mobile`.
+            // mobile holds the subscriber-only digits. country_iso is the ISO
+            // 3166-1 alpha-2 code ("GB") that disambiguates shared prefixes so
+            // the client can show one exact flag. Clients that need the full
+            // E.164 string can read `canonical_mobile`.
             'country_code' => $this->country_code,
+            'country_iso' => $this->country_iso,
             'mobile' => $this->mobile,
             'canonical_mobile' => $this->canonical_mobile,
             'status' => $this->status,

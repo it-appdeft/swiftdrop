@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Car, MoreHorizontal, Plus, Search, Users } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { CountryFlag } from '@/components/country-flag';
 import { PageContainer } from '@/components/layout/page-container';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
@@ -82,7 +83,12 @@ export default function DriversIndex({ drivers, filters, stats }: Props) {
                     </Avatar>
                     <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{row.name}</p>
-                        <p className="truncate text-xs text-muted-foreground font-mono">{row.mobile}</p>
+                        <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground font-mono">
+                            <span className="flex h-3 w-[18px] shrink-0 items-center overflow-hidden rounded-sm ring-1 ring-zinc-200">
+                                <CountryFlag iso={row.country_iso} className="h-full w-full object-cover" />
+                            </span>
+                            {row.canonical_mobile ?? row.mobile}
+                        </p>
                     </div>
                 </div>
             ),

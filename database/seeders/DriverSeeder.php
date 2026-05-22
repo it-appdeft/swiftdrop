@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\DriverProfile;
 use App\Models\User;
+use App\Support\Countries;
 use Illuminate\Database\Seeder;
 
 class DriverSeeder extends Seeder
@@ -65,6 +66,7 @@ class DriverSeeder extends Seeder
                 ['country_code' => $countryCode, 'mobile' => $localMobile],
                 array_merge($data['user'], [
                     'country_code' => $countryCode,
+                    'country_iso' => Countries::primaryIsoForDial($countryCode),
                     'mobile' => $localMobile,
                     'password' => null,
                 ]),

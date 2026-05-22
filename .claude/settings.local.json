@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(php artisan *)",
-      "Bash(xargs cat)"
+      "Bash(xargs cat)",
+      "Bash(sed -n '125,145p' resources/js/admin/pages/admin/customers/show.tsx)",
+      "Bash(sed -n '60,90p' resources/js/admin/pages/admin/customers/index.tsx)",
+      "Bash(sed -n '75,95p' resources/js/admin/pages/admin/drivers/index.tsx)",
+      "Bash(sed -n '322,342p' resources/js/admin/pages/admin/drivers/show.tsx)",
+      "Bash(npm run *)"
     ]
   }
 }

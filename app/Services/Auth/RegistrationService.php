@@ -14,6 +14,7 @@ use App\Models\Restaurant;
 use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
 use App\Services\Files\ImageUploadService;
+use App\Support\Countries;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -43,6 +44,7 @@ class RegistrationService implements RegistrationServiceInterface
                 attributes: [
                     'mobile' => $localMobile,
                     'country_code' => $countryCode,
+                    'country_iso' => $this->countryIso($data, $countryCode),
                     'email' => $data['email'] ?? null,
                     'password' => isset($data['password']) ? Hash::make($data['password']) : null,
                     'status' => UserStatusEnum::ACTIVE->value,
@@ -91,6 +93,7 @@ class RegistrationService implements RegistrationServiceInterface
                 attributes: [
                     'mobile' => $localMobile,
                     'country_code' => $countryCode,
+                    'country_iso' => $this->countryIso($data, $countryCode),
                     'email' => $data['email'] ?? null,
                     'password' => isset($data['password']) ? Hash::make($data['password']) : null,
                     'status' => UserStatusEnum::PENDING_APPROVAL->value,
@@ -163,6 +166,23 @@ class RegistrationService implements RegistrationServiceInterface
         }
 
         return User::splitCanonicalMobile($canonical);
+    }
+
+    /**
+     * Resolve the ISO 3166-1 alpha-2 country code to persist. Prefers the
+     * explicit one the form submitted (already validated + upper-cased); falls
+     * back to the canonical country for the dialling prefix so a row never has a
+     * country_code without a matching flag-bearing ISO.
+     */
+    protected function countryIso(array $data, ?string $countryCode): ?string
+    {
+        $iso = isset($data['country_iso']) ? strtoupper((string) $data['country_iso']) : null;
+
+        if ($iso !== null && $iso !== '' && Countries::isValidIso($iso)) {
+            return $iso;
+        }
+
+        return Countries::primaryIsoForDial($countryCode);
     }
 
     protected function firstName(string $name): string

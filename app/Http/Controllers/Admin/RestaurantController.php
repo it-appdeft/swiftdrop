@@ -62,10 +62,14 @@ class RestaurantController extends Controller
     {
         DB::transaction(function () use ($request) {
             $user = User::create([
-                'mobile'   => $request->mobile,
-                'email'    => $request->email,
-                'status'   => 'pending_approval',
-                'password' => bcrypt('password'),
+                // Split storage: subscriber digits in mobile, dialling prefix
+                // in country_code, ISO alpha-2 in country_iso (exact flag).
+                'mobile'       => $request->localMobile(),
+                'country_code' => $request->country_code,
+                'country_iso'  => $request->country_iso,
+                'email'        => $request->email,
+                'status'       => 'pending_approval',
+                'password'     => bcrypt('password'),
             ]);
 
             $user->assignRole('restaurant_owner');
@@ -76,7 +80,7 @@ class RestaurantController extends Controller
                 'legal_business_name' => $request->legal_business_name,
                 'owner_name'          => $request->owner_name,
                 'owner_email'         => $request->email,
-                'owner_mobile'        => $request->mobile,
+                'owner_mobile'        => $request->canonicalMobile(),
                 'restaurant_type'     => $request->restaurant_type,
                 'cuisines'            => $request->cuisines,
                 'branches'            => $request->branches,

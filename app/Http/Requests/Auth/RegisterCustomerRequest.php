@@ -5,6 +5,7 @@ namespace App\Http\Requests\Auth;
 use App\Http\Requests\Auth\Concerns\CanonicalizesTarget;
 use App\Models\User;
 use App\Rules\Auth\HasVerifiedOtp;
+use App\Rules\Auth\ValidCountryIso;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -20,6 +21,7 @@ class RegisterCustomerRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->normalizeMobileInput();
+        $this->normalizeCountryIso();
     }
 
     public function rules(): array
@@ -34,6 +36,10 @@ class RegisterCustomerRequest extends FormRequest
                 new HasVerifiedOtp($this->canonicalEmail(), 'email'),
             ],
             'country_code' => ['required', 'string', 'regex:/^\+[0-9]{1,4}$/'],
+            // Nullable for backwards-compatibility with API clients that
+            // pre-date this field — RegistrationService derives a best-effort
+            // ISO from country_code when it's absent. The web form always sends it.
+            'country_iso' => ['nullable', 'string', 'size:2', new ValidCountryIso()],
             'mobile' => [
                 'required',
                 'string',

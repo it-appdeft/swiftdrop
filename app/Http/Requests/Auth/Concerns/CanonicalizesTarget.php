@@ -35,6 +35,20 @@ trait CanonicalizesTarget
         $this->merge(['mobile' => preg_replace('/[\s\-]+/', '', $mobile)]);
     }
 
+    /**
+     * Uppercase the inbound ISO country code ("in" → "IN") so the stored value
+     * and the country-flag-icons lookup both key on the canonical alpha-2 form.
+     * Call from prepareForValidation() before rules() runs.
+     */
+    public function normalizeCountryIso(): void
+    {
+        $iso = $this->input('country_iso');
+
+        if (is_string($iso) && $iso !== '') {
+            $this->merge(['country_iso' => strtoupper(trim($iso))]);
+        }
+    }
+
     public function canonicalMobile(): string
     {
         $mobile = preg_replace('/[\s\-]+/', '', (string) $this->input('mobile'));
@@ -66,5 +80,29 @@ trait CanonicalizesTarget
     public function canonicalTarget(): string
     {
         return $this->canonicalEmail() !== '' ? $this->canonicalEmail() : $this->canonicalMobile();
+    }
+
+    /**
+     * Subscriber-only digits to persist in `users.mobile`, peeling the dialling
+     * prefix off the canonical form. Prefers the explicit country_code the form
+     * submitted (covers any prefix); falls back to the known-prefix splitter.
+     */
+    public function localMobile(): ?string
+    {
+        $canonical = $this->canonicalMobile();
+
+        if ($canonical === '') {
+            return null;
+        }
+
+        $code = (string) $this->input('country_code', '');
+
+        if ($code !== '' && Str::startsWith($canonical, $code)) {
+            return substr($canonical, strlen($code));
+        }
+
+        [, $local] = \App\Models\User::splitCanonicalMobile($canonical);
+
+        return $local;
     }
 }

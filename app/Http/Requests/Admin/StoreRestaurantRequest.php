@@ -2,14 +2,25 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Auth\Concerns\CanonicalizesTarget;
+use App\Repositories\Contracts\UserRepositoryInterface;
+use App\Rules\Auth\ValidCountryIso;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreRestaurantRequest extends FormRequest
 {
+    use CanonicalizesTarget;
+
     public function authorize(): bool
     {
         return $this->user()->hasRole('admin');
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeMobileInput();
+        $this->normalizeCountryIso();
     }
 
     public function rules(): array
@@ -20,7 +31,9 @@ class StoreRestaurantRequest extends FormRequest
             'owner_name'          => ['nullable', 'string', 'max:100'],
             'description'         => ['nullable', 'string'],
             'email'               => ['required', 'email', 'max:255', 'unique:users,email'],
-            'mobile'              => ['required', 'string', 'max:20', 'unique:users,mobile'],
+            'country_code'        => ['required', 'string', 'regex:/^\+[0-9]{1,4}$/'],
+            'country_iso'         => ['required', 'string', 'size:2', new ValidCountryIso()],
+            'mobile'              => ['required', 'string', 'regex:/^\+?[0-9]{6,11}$/'],
             'restaurant_type'     => ['nullable', 'string', 'max:50'],
             'cuisines'            => ['nullable', 'string', 'max:500'],
             'branches'            => ['nullable', 'integer', 'min:1'],
@@ -30,5 +43,22 @@ class StoreRestaurantRequest extends FormRequest
             'lng'                 => ['nullable', 'numeric', 'between:-180,180'],
             'commission_rate'     => ['required', 'numeric', 'min:0', 'max:100'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $canonical = $this->canonicalMobile();
+
+            if ($canonical === '') {
+                return;
+            }
+
+            $existing = app(UserRepositoryInterface::class)->findByMobile($canonical);
+
+            if ($existing) {
+                $validator->errors()->add('mobile', 'This mobile number is already registered.');
+            }
+        });
     }
 }

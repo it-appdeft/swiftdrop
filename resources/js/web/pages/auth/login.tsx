@@ -3,8 +3,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Phone } from 'lucide-react';
+import { CountryCodeDropdown } from '@/components/country-code-dropdown';
 import { AuthShell } from '../../components/auth-shell';
-import { CountryCodeDropdown } from '../../components/country-code-dropdown';
 
 export default function Login() {
     const { data, setData, post, processing, errors } = useForm({
@@ -12,6 +12,7 @@ export default function Login() {
         user_type: 'customer',
         channel: 'sms',
         country_code: '+44',
+        country_iso: 'GB',
         mobile: '',
     });
 
@@ -44,8 +45,9 @@ export default function Login() {
                     </Label>
                     <div className="flex gap-2">
                         <CountryCodeDropdown
-                            value={data.country_code}
-                            onChange={(v) => setData('country_code', v)}
+                            dial={data.country_code}
+                            iso={data.country_iso}
+                            onChange={(c) => setData((d) => ({ ...d, country_code: c.dial, country_iso: c.iso }))}
                         />
                         <div className="relative flex-1">
                             <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
