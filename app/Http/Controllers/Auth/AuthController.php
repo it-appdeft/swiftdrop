@@ -51,6 +51,7 @@ class AuthController extends Controller
             'target' => $otp['target'] ?? null,
             'email' => $otp['email'] ?? null,
             'country_code' => $otp['country_code'] ?? null,
+            'country_iso' => $otp['country_iso'] ?? null,
             'mobile' => $otp['mobile'] ?? null,
         ]);
     }
@@ -85,11 +86,13 @@ class AuthController extends Controller
 
         // Persist the original inputs (not just the joined target) so the OTP page
         // can resubmit them verbatim to /otp/verify — VerifyOtpRequest validates
-        // `email` OR `country_code + mobile`, not the canonical joined string.
+        // `email` OR `country_code + country_iso + mobile`, not the canonical
+        // joined string. country_iso is required for the SMS channel.
         $request->session()->put('otp', [
             'target' => $target,
             'email' => $request->input('email'),
             'country_code' => $request->input('country_code'),
+            'country_iso' => $request->input('country_iso'),
             'mobile' => $request->input('mobile'),
         ]);
 

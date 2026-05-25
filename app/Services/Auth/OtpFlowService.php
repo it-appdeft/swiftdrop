@@ -12,7 +12,6 @@ use App\Exceptions\Auth\OtpException;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Repositories\Contracts\UserRepositoryInterface;
-use App\Support\Countries;
 use App\Traits\IssuesTokens;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Facades\DB;
@@ -284,29 +283,16 @@ class OtpFlowService implements OtpFlowServiceInterface
 
             $authUser->update([
                 'country_code' => $countryCode,
-                'country_iso' => $this->resolveCountryIso($countryIso, $countryCode),
+                // Persist the ISO the client picked verbatim (required + validated
+                // on the verify request) — the same way country_code is taken from
+                // the request. No longer derived from the dial code.
+                'country_iso' => $countryIso !== null ? strtoupper($countryIso) : null,
                 'mobile' => $local,
             ]);
             $fresh = $authUser->fresh()->loadProfileRelation();
 
             return ['user' => new UserResource($fresh)];
         });
-    }
-
-    /**
-     * Prefer the ISO the client picked (exact flag); fall back to the canonical
-     * country for the dial code so a number change never leaves country_iso
-     * stale or out of sync with the new country_code.
-     */
-    protected function resolveCountryIso(?string $countryIso, ?string $countryCode): ?string
-    {
-        $iso = $countryIso !== null ? strtoupper($countryIso) : null;
-
-        if ($iso !== null && $iso !== '' && Countries::isValidIso($iso)) {
-            return $iso;
-        }
-
-        return Countries::primaryIsoForDial($countryCode);
     }
 
     protected function completeEmailUpdate(User $authUser, string $newEmail): array

@@ -69,10 +69,11 @@ class SendOtpRequest extends FormRequest
             'channel' => ['required', Rule::enum(OtpChannelEnum::class)],
             'email' => [Rule::requiredIf($needsEmail), 'nullable', 'email', 'max:255'],
             'country_code' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
-            // Optional even for SMS: login / signup OTPs don't carry it. Only
-            // update_phone persists it (with a dial-code fallback), so requiring
-            // it here would break existing login clients that never send it.
-            'country_iso' => ['nullable', 'string', 'size:2', new ValidCountryIso()],
+            // Required alongside country_code for every SMS flow (login / signup /
+            // update_phone). The client always picks a country, so it always knows
+            // the exact ISO — we persist it verbatim instead of deriving it from
+            // the dial code (a shared prefix like +44 maps to several countries).
+            'country_iso' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'size:2', new ValidCountryIso()],
             'mobile' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+?[0-9]{6,11}$/'],
         ];
     }

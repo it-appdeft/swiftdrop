@@ -121,19 +121,15 @@ class CustomerSearchService implements CustomerSearchServiceInterface
      */
     protected function searchWithinRadius(string $keyword, CustomerAddress $address, float $radius): array
     {
-        $distanceExpr = $this->distanceExpression(
-            (float) $address->lat,
-            (float) $address->lng,
-            'restaurants.lat',
-            'restaurants.lng',
-        );
+        $lat = (float) $address->lat;
+        $lng = (float) $address->lng;
+        $distanceExpr = Restaurant::distanceMilesExpression($lat, $lng);
 
-        $restaurants = $this->activeRestaurantsQuery()
-            ->whereNotNull('restaurants.lat')
-            ->whereNotNull('restaurants.lng')
+        $restaurants = Restaurant::query()
+            ->active()
+            ->approved()
             ->where(fn ($q) => $this->applyRestaurantNameOrFoodItemMatch($q, $keyword))
-            ->selectRaw("restaurants.*, {$distanceExpr} as distance_miles")
-            ->whereRaw("{$distanceExpr} <= ?", [$radius])
+            ->withinRadius($lat, $lng, $radius)
             ->orderBy('distance_miles')
             ->limit(self::RESULT_LIMIT)
             ->get();
@@ -164,7 +160,9 @@ class CustomerSearchService implements CustomerSearchServiceInterface
      */
     protected function searchUnbounded(string $keyword): array
     {
-        $restaurants = $this->activeRestaurantsQuery()
+        $restaurants = Restaurant::query()
+            ->active()
+            ->approved()
             ->where(fn ($q) => $this->applyRestaurantNameOrFoodItemMatch($q, $keyword))
             ->limit(self::RESULT_LIMIT)
             ->get()
@@ -269,21 +267,4 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             ->take(self::RESULT_LIMIT);
     }
 
-    protected function activeRestaurantsQuery(): Builder
-    {
-        return Restaurant::query()
-            ->where('restaurants.status', 'active')
-            ->where('restaurants.approval_status', 'approved');
-    }
-
-    protected function distanceExpression(float $lat, float $lng, string $latColumn, string $lngColumn): string
-    {
-        $earth = 3958.7613; // miles
-
-        return "({$earth} * acos("
-            ."cos(radians({$lat})) * cos(radians({$latColumn})) * "
-            ."cos(radians({$lngColumn}) - radians({$lng})) + "
-            ."sin(radians({$lat})) * sin(radians({$latColumn}))"
-            ."))";
-    }
 }

@@ -1,0 +1,27 @@
+<?php
+
+namespace App\DTO\Customer;
+
+use App\Models\Restaurant;
+use Illuminate\Support\Collection;
+
+/**
+ * Plain data carrier from {@see \App\Services\Customer\CustomerRestaurantService}
+ * to the web / api response layers. Both controllers serialise it through the
+ * shared {@see \App\Http\Resources\Customer\CustomerRestaurantResource}.
+ */
+class CustomerRestaurantData
+{
+    /**
+     * @param  Collection<int, \App\Models\MenuItem>  $menuItems   Full menu, partner sort order.
+     * @param  Collection<int, \App\Models\MenuItem>  $recommended Menu items matching the search keyword.
+     */
+    public function __construct(
+        public readonly Restaurant $restaurant,
+        public readonly Collection $menuItems,
+        public readonly Collection $recommended,
+        public readonly string $keyword,
+        public readonly ?float $distanceMiles = null,
+    ) {
+    }
+}

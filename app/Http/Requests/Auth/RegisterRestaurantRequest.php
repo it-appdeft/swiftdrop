@@ -39,9 +39,9 @@ class RegisterRestaurantRequest extends FormRequest
                 new HasVerifiedOtp($this->canonicalEmail(), 'email'),
             ],
             'country_code' => ['required', 'string', 'regex:/^\+[0-9]{1,4}$/'],
-            // Nullable for backwards-compatibility — shared by the web + API
-            // restaurant signup. RegistrationService fills a fallback ISO.
-            'country_iso' => ['nullable', 'string', 'size:2', new ValidCountryIso()],
+            // Required — shared by the web + API restaurant signup. The client
+            // picks a country, so it sends the exact ISO; persisted verbatim.
+            'country_iso' => ['required', 'string', 'size:2', new ValidCountryIso()],
             'mobile' => [
                 'required',
                 'string',

@@ -16,16 +16,19 @@ interface OtpProps {
     target?: string | null;
     email?: string | null;
     country_code?: string | null;
+    country_iso?: string | null;
     mobile?: string | null;
 }
 
-export default function Otp({ target, email, country_code, mobile }: OtpProps) {
+export default function Otp({ target, email, country_code, country_iso, mobile }: OtpProps) {
     const { data, setData, post, processing, errors } = useForm({
         type: 'login',
         user_type: 'customer',
         channel: email ? 'email' : 'sms',
         email: email ?? '',
         country_code: country_code ?? '',
+        // Required for the SMS channel — resubmitted verbatim to /otp/verify.
+        country_iso: country_iso ?? '',
         mobile: mobile ?? '',
         code: '',
     });
@@ -37,9 +40,10 @@ export default function Otp({ target, email, country_code, mobile }: OtpProps) {
             channel: email ? 'email' : 'sms',
             email: email ?? '',
             country_code: country_code ?? '',
+            country_iso: country_iso ?? '',
             mobile: mobile ?? '',
         }));
-    }, [email, country_code, mobile, setData]);
+    }, [email, country_code, country_iso, mobile, setData]);
 
     const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
     const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));

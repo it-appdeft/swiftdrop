@@ -7,7 +7,9 @@
       "Bash(sed -n '60,90p' resources/js/admin/pages/admin/customers/index.tsx)",
       "Bash(sed -n '75,95p' resources/js/admin/pages/admin/drivers/index.tsx)",
       "Bash(sed -n '322,342p' resources/js/admin/pages/admin/drivers/show.tsx)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(php -l app/Models/Restaurant.php)",
+      "Bash(php -l app/Services/Customer/CustomerSearchService.php)"
     ]
   }
 }

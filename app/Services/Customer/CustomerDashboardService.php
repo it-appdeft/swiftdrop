@@ -9,7 +9,6 @@ use App\Models\FoodItem;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Services\Platform\PlatformConfigService;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class CustomerDashboardService implements CustomerDashboardServiceInterface
@@ -30,7 +29,6 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
             12,
         ));
 
-        $foodItems = FoodItem::query()->orderBy('id')->get();
         $address = $this->defaultAddressFor($user);
 
         if ($address && $address->lat !== null && $address->lng !== null) {
@@ -40,6 +38,15 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
             $restaurants = $this->fallbackRestaurants($fallbackLimit);
             $usingFallback = true;
         }
+
+        // Only surface food types the displayed restaurants actually offer, so
+        // the Explore row mirrors what's orderable in range (empty when nothing
+        // is nearby). Distinctness is handled by the whereHas scope.
+        $restaurantIds = $restaurants->pluck('restaurant.id')->all();
+        $foodItems = FoodItem::query()
+            ->availableForRestaurants($restaurantIds)
+            ->orderBy('id')
+            ->get();
 
         return new CustomerDashboardData(
             foodItems: $foodItems,
@@ -70,30 +77,18 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
     }
 
     /**
-     * Haversine on the SQL side keeps the radius filter index-friendly and
-     * sortable without pulling every row into PHP. Sort by rating desc, then
-     * by distance asc — matches the configured priority.
+     * In-range restaurants ordered by rating desc, then distance asc — matches
+     * the configured priority. Filtering goes through the model scopes
+     * ({@see Restaurant::scopeActive()}, scopeApproved(), scopeWithinRadius()).
      *
      * @return Collection<int, array{restaurant: Restaurant, distance_miles: ?float}>
      */
     protected function restaurantsNear(CustomerAddress $address, float $radiusMiles): Collection
     {
-        $lat = (float) $address->lat;
-        $lng = (float) $address->lng;
-        // Earth radius in miles.
-        $earth = 3958.7613;
-
-        $distance = "({$earth} * acos("
-            ."cos(radians({$lat})) * cos(radians(`lat`)) * "
-            ."cos(radians(`lng`) - radians({$lng})) + "
-            ."sin(radians({$lat})) * sin(radians(`lat`))"
-            ."))";
-
-        return $this->activeRestaurantsQuery()
-            ->whereNotNull('lat')
-            ->whereNotNull('lng')
-            ->selectRaw("restaurants.*, {$distance} as distance_miles")
-            ->whereRaw("{$distance} <= ?", [$radiusMiles])
+        return Restaurant::query()
+            ->active()
+            ->approved()
+            ->withinRadius((float) $address->lat, (float) $address->lng, $radiusMiles)
             ->orderByDesc('rating')
             ->orderBy('distance_miles')
             ->get()
@@ -111,18 +106,13 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
      */
     protected function fallbackRestaurants(int $limit): Collection
     {
-        return $this->activeRestaurantsQuery()
+        return Restaurant::query()
+            ->active()
+            ->approved()
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get()
             ->map(fn (Restaurant $r) => ['restaurant' => $r, 'distance_miles' => null])
             ->values();
-    }
-
-    protected function activeRestaurantsQuery(): Builder
-    {
-        return Restaurant::query()
-            ->where('status', 'active')
-            ->where('approval_status', 'approved');
     }
 }

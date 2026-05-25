@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\Customer\CustomerDashboardController;
 use App\Http\Controllers\Web\Customer\CustomerProfileController;
+use App\Http\Controllers\Web\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Web\Customer\CustomerSearchController;
 use Illuminate\Support\Facades\Route;
 
@@ -10,6 +11,9 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
 
     Route::get('search', [CustomerSearchController::class, 'index'])->name('search');
     Route::delete('search/history', [CustomerSearchController::class, 'clear'])->name('search.clear');
+
+    Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])
+        ->whereNumber('id')->name('restaurants.show');
 
     Route::controller(CustomerProfileController::class)->group(function () {
         Route::get('profile', 'show')->name('profile');

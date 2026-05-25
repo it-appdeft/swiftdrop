@@ -217,6 +217,7 @@ export default function Register({ role }: RegisterProps) {
             setMobileSending(true);
             setMobileError(null);
             body.country_code = data.country_code;
+            body.country_iso = data.country_iso;
             body.mobile = data.mobile;
         }
 
@@ -258,6 +259,7 @@ export default function Register({ role }: RegisterProps) {
             setMobileVerifying(true);
             setMobileError(null);
             body.country_code = data.country_code;
+            body.country_iso = data.country_iso;
             body.mobile = data.mobile;
         }
 

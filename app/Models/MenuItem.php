@@ -71,6 +71,31 @@ class MenuItem extends Model
             );
     }
 
+    // ─── Query scopes ────────────────────────────────────────────────────────
+
+    /** Only items the partner currently has switched on. */
+    public function scopeAvailable(Builder $query): Builder
+    {
+        return $query->where('is_available', true);
+    }
+
+    public function scopeForRestaurant(Builder $query, int $restaurantId): Builder
+    {
+        return $query->where('restaurant_id', $restaurantId);
+    }
+
+    /**
+     * Items whose own name OR linked food-type name matches the keyword —
+     * the "recommended / related to your search" filter on the restaurant page.
+     */
+    public function scopeMatchingKeyword(Builder $query, string $keyword): Builder
+    {
+        return $query->where(function (Builder $w) use ($keyword) {
+            $w->where('name', 'like', "%{$keyword}%")
+                ->orWhereHas('foodItem', fn (Builder $f) => $f->where('name', 'like', "%{$keyword}%"));
+        });
+    }
+
     public function restaurant(): BelongsTo
     {
         return $this->belongsTo(Restaurant::class);
