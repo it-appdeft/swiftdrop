@@ -12,7 +12,7 @@ import {
     type DocSlot,
     type FoodItemOption,
     type FormState,
-} from '../partner/apply';
+} from '../../components/partner-application-form';
 
 const COUNTRY_CODE_OPTIONS: { value: string; label: string }[] = [
     { value: '+44', label: '🇬🇧 +44' },
