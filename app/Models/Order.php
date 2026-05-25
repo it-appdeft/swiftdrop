@@ -10,6 +10,13 @@ use Illuminate\Support\Str;
 
 class Order extends Model
 {
+    /**
+     * In-progress statuses — an order in any of these is still live, so its
+     * delivery address must not be deleted. Terminal statuses (delivered,
+     * cancelled) are excluded.
+     */
+    public const ACTIVE_STATUSES = ['placed', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery'];
+
     protected $fillable = [
         'uuid',
         'user_id',
@@ -20,7 +27,7 @@ class Order extends Model
         'discount_amount',
         'vat_amount',
         'total',
-        'delivery_address',
+        'address_id',
         'special_instructions',
         'cancellation_reason',
         'cancelled_by',
@@ -41,7 +48,6 @@ class Order extends Model
             'discount_amount' => 'decimal:2',
             'vat_amount' => 'decimal:2',
             'total' => 'decimal:2',
-            'delivery_address' => 'array',
             'placed_at' => 'datetime',
             'accepted_at' => 'datetime',
             'preparing_at' => 'datetime',
@@ -69,6 +75,16 @@ class Order extends Model
     public function restaurant(): BelongsTo
     {
         return $this->belongsTo(Restaurant::class);
+    }
+
+    /**
+     * The delivery address. Nullable: if the customer deletes the address
+     * after ordering, this FK nulls out (see migration), so always guard for
+     * a missing address when rendering an order.
+     */
+    public function address(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAddress::class, 'address_id');
     }
 
     public function items(): HasMany

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\DriverController;
@@ -59,6 +60,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Platform Settings
     Route::get('platform-settings', [PlatformSettingsController::class, 'edit'])->name('platform-settings.edit');
     Route::put('platform-settings', [PlatformSettingsController::class, 'update'])->name('platform-settings.update');
+
+    // Coupons (backed by the Offer model)
+    Route::get('coupons', [CouponController::class, 'index'])->name('coupons.index');
+    Route::get('coupons/create', [CouponController::class, 'create'])->name('coupons.create');
+    Route::post('coupons', [CouponController::class, 'store'])->name('coupons.store');
+    Route::get('coupons/{id}/edit', [CouponController::class, 'edit'])->name('coupons.edit');
+    Route::put('coupons/{id}', [CouponController::class, 'update'])->name('coupons.update');
+    Route::delete('coupons/{id}', [CouponController::class, 'destroy'])->name('coupons.destroy');
+    Route::patch('coupons/{id}/status', [CouponController::class, 'updateStatus'])->name('coupons.status');
 
     // Food Items
     Route::get('food-items', [FoodItemController::class, 'index'])->name('food-items.index');

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Web\Customer\CheckoutController;
+use App\Http\Controllers\Web\Customer\CustomerCartController;
 use App\Http\Controllers\Web\Customer\CustomerDashboardController;
 use App\Http\Controllers\Web\Customer\CustomerProfileController;
 use App\Http\Controllers\Web\Customer\CustomerRestaurantController;
@@ -14,6 +16,21 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
 
     Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])
         ->whereNumber('id')->name('restaurants.show');
+
+    // Cart: view + mutations. Mutations redirect back so the restaurant page
+    // re-renders with the refreshed `cart` prop (steppers + bottom bar).
+    Route::controller(CustomerCartController::class)->group(function () {
+        Route::get('cart', 'index')->name('cart');
+        Route::post('cart', 'store')->name('cart.store');
+        Route::put('cart/items/{itemId}', 'update')->whereNumber('itemId')->name('cart.update');
+        Route::delete('cart/items/{itemId}', 'destroy')->whereNumber('itemId')->name('cart.destroy');
+        Route::delete('cart', 'clear')->name('cart.clear');
+    });
+
+    // Checkout: summary recomputes on GET (address_id / coupon query params),
+    // place order on POST.
+    Route::get('checkout', [CheckoutController::class, 'index'])->name('checkout');
+    Route::post('checkout', [CheckoutController::class, 'store'])->name('checkout.place');
 
     Route::controller(CustomerProfileController::class)->group(function () {
         Route::get('profile', 'show')->name('profile');

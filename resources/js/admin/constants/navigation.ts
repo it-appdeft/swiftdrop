@@ -1,16 +1,5 @@
 import type { NavGroup, NavItem } from '@/types';
-import {
-    BarChart3,
-    BookOpen,
-    Car,
-    Folder,
-    LayoutGrid,
-    Settings,
-    SlidersHorizontal,
-    Store,
-    UtensilsCrossed,
-    Users,
-} from 'lucide-react';
+import { Car, LayoutGrid, Settings, SlidersHorizontal, Store, Ticket, Users, UtensilsCrossed } from 'lucide-react';
 
 export const primaryNavigation: NavGroup[] = [
     {
@@ -27,19 +16,16 @@ export const primaryNavigation: NavGroup[] = [
             { title: 'Drivers', url: '/admin/drivers', icon: Car },
             { title: 'Restaurants', url: '/admin/restaurants', icon: Store },
             { title: 'Food Items', url: '/admin/food-items', icon: UtensilsCrossed },
+            { title: 'Coupons', url: '/admin/coupons', icon: Ticket },
         ],
     },
     {
         title: 'Configuration',
-        items: [
-            { title: 'Platform Settings', url: '/admin/platform-settings', icon: SlidersHorizontal },
-        ],
+        items: [{ title: 'Platform Settings', url: '/admin/platform-settings', icon: SlidersHorizontal }],
     },
     {
         title: 'Account',
-        items: [
-            { title: 'Settings', url: '/settings/profile', icon: Settings },
-        ],
+        items: [{ title: 'Settings', url: '/settings/profile', icon: Settings }],
     },
 ];
 

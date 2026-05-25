@@ -6,8 +6,8 @@ import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 
 import { Toaster } from '@/components/ui/toast';
-import { toast } from '@/hooks/use-toast';
 import { initializeTheme } from '@/hooks/use-appearance';
+import { toast } from '@/hooks/use-toast';
 
 declare global {
     const route: typeof routeFn;
@@ -36,10 +36,7 @@ createInertiaApp({
             const page = name.slice(11);
             const direct = `./restaurant/pages/${page}.tsx`;
             const indexed = `./restaurant/pages/${page}/index.tsx`;
-            return resolvePageComponent(
-                restaurantPages[direct] ? direct : indexed,
-                restaurantPages,
-            );
+            return resolvePageComponent(restaurantPages[direct] ? direct : indexed, restaurantPages);
         }
 
         // Unprefixed names fall back to admin → web (legacy behaviour for pages like `welcome`).
@@ -66,8 +63,9 @@ createInertiaApp({
 // Controllers set them via `->with('status', '…')` or `->with('error', '…')`;
 // this fires once per successful Inertia visit.
 router.on('success', (event) => {
-    const flash = (event.detail.page.props as { flash?: { status?: string; error?: string } }).flash;
+    const flash = (event.detail.page.props as { flash?: { status?: string; success?: string; error?: string } }).flash;
     if (flash?.status) toast.success(flash.status);
+    if (flash?.success) toast.success(flash.success);
     if (flash?.error) toast.error(flash.error);
 });
 

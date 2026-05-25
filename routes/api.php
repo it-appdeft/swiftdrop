@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\AuthController as ApiAuthController;
+use App\Http\Controllers\Api\Customer\CheckoutController;
+use App\Http\Controllers\Api\Customer\CustomerCartController;
 use App\Http\Controllers\Api\Customer\CustomerDashboardController;
 use App\Http\Controllers\Api\Customer\CustomerProfileController;
 use App\Http\Controllers\Api\Customer\CustomerRestaurantController;
@@ -30,6 +32,19 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     Route::delete('search/history', [CustomerSearchController::class, 'clear']);
 
     Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])->whereNumber('id');
+
+    Route::controller(CustomerCartController::class)->prefix('cart')->group(function () {
+        Route::get('/', 'index');
+        Route::post('/', 'store');
+        Route::put('items/{itemId}', 'update')->whereNumber('itemId');
+        Route::delete('items/{itemId}', 'destroy')->whereNumber('itemId');
+        Route::delete('/', 'clear');
+    });
+
+    Route::controller(CheckoutController::class)->prefix('checkout')->group(function () {
+        Route::get('/', 'summary');
+        Route::post('/', 'store');
+    });
 
     Route::controller(CustomerProfileController::class)->prefix('profile')->group(function () {
         Route::get('/', 'show');

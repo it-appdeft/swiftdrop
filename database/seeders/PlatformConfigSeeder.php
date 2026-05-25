@@ -17,7 +17,9 @@ class PlatformConfigSeeder extends Seeder
             ['key' => 'driver_location_update_interval_seconds', 'value' => '5', 'description' => 'How often drivers push location updates'],
             ['key' => 'restaurant_accept_timeout_minutes', 'value' => '10', 'description' => 'Auto-cancel if restaurant does not accept within this time'],
             ['key' => 'base_delivery_fee_gbp', 'value' => '1.99', 'description' => 'Base delivery fee in GBP'],
+            ['key' => 'delivery_fee_per_mile_gbp', 'value' => '0.80', 'description' => 'Delivery fee added per mile between customer and restaurant'],
             ['key' => 'free_delivery_threshold_gbp', 'value' => '25.00', 'description' => 'Order total above which delivery is free'],
+            ['key' => 'order_tax_rate_percent', 'value' => '5.00', 'description' => 'Taxes & charges applied to the item subtotal (%)'],
             ['key' => 'customer_dashboard_radius_miles', 'value' => '5', 'description' => 'Search radius (miles) used when a customer has a default address'],
             ['key' => 'customer_dashboard_fallback_limit', 'value' => '12', 'description' => 'Number of latest restaurants shown when no customer address is set'],
         ];

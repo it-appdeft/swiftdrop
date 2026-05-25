@@ -13,6 +13,7 @@ use App\Http\Requests\Customer\Profile\DeleteAccountRequest;
 use App\Http\Requests\Customer\Profile\UpdateAddressRequest;
 use App\Http\Requests\Customer\Profile\UpdateProfileRequest;
 use App\Models\DeletionReason;
+use App\Models\Order;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -99,7 +100,44 @@ class CustomerProfileController extends Controller
         return Inertia::render('customer/profile', [
             'customer' => $customer,
             'deletionReasons' => $deletionReasons,
+            'orders' => $this->pastOrders($user->id),
         ]);
+    }
+
+    /**
+     * The customer's past orders for the Order History tab, newest first.
+     * Plain arrays so Inertia doesn't wrap them; shape matches the page's
+     * order card (restaurant, image, line items, status, placed time).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function pastOrders(int $userId): array
+    {
+        return Order::query()
+            ->where('user_id', $userId)
+            ->with(['restaurant:id,name,city,full_address,logo_path,cover_photo_path', 'items:id,order_id,name,quantity'])
+            ->orderByDesc('placed_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (Order $order) {
+                $restaurant = $order->restaurant;
+                $image = $restaurant?->cover_photo_path ?? $restaurant?->logo_path;
+
+                return [
+                    'id' => $order->id,
+                    'restaurant' => $restaurant?->name ?? 'Restaurant',
+                    'location' => $restaurant?->city ?? $restaurant?->full_address ?? '',
+                    'image' => $image ? '/storage/'.ltrim($image, '/') : null,
+                    'status' => $order->status,
+                    'items' => $order->items->map(fn ($i) => [
+                        'qty' => (int) $i->quantity,
+                        'name' => $i->name,
+                    ])->all(),
+                    'payment_failed' => false, // wired with the payment gateway later
+                    'placed_at' => optional($order->placed_at ?? $order->created_at)->format('F j, g:i A'),
+                ];
+            })
+            ->all();
     }
 
     public function update(UpdateProfileRequest $request): RedirectResponse

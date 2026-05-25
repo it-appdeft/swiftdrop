@@ -16,6 +16,15 @@ class PlatformConfigService
 
     public const KEY_DASHBOARD_FALLBACK_LIMIT = 'customer_dashboard_fallback_limit';
 
+    // Checkout pricing — all admin-tunable from Platform Settings.
+    public const KEY_BASE_DELIVERY_FEE = 'base_delivery_fee_gbp';
+
+    public const KEY_DELIVERY_FEE_PER_MILE = 'delivery_fee_per_mile_gbp';
+
+    public const KEY_FREE_DELIVERY_THRESHOLD = 'free_delivery_threshold_gbp';
+
+    public const KEY_ORDER_TAX_RATE = 'order_tax_rate_percent';
+
     /** @var array<string, string>|null */
     protected ?array $cache = null;
 

@@ -34,16 +34,35 @@ interface ToastProps extends ToastItem {
     onDismiss: (id: string) => void;
 }
 
-const Toast = React.memo(function Toast({ id, title, description, variant = 'default', action, onDismiss }: ToastProps) {
+/** Time the slide-out animation runs before the toast is removed. */
+const EXIT_MS = 250;
+
+const Toast = React.memo(function Toast({ id, title, description, variant = 'default', duration = 5000, action, onDismiss }: ToastProps) {
     const Icon = ICONS[variant] ?? Info;
     const filled = variant !== 'default';
+    const [leaving, setLeaving] = React.useState(false);
+
+    const close = React.useCallback(() => {
+        setLeaving(true);
+        window.setTimeout(() => onDismiss(id), EXIT_MS);
+    }, [id, onDismiss]);
+
+    // Auto-dismiss after `duration` (0 = sticky), driving the exit animation.
+    React.useEffect(() => {
+        if (duration === 0) return;
+        const t = window.setTimeout(close, duration);
+        return () => window.clearTimeout(t);
+    }, [duration, close]);
 
     return (
         <div
             role="status"
             aria-live="polite"
             className={cn(
-                'pointer-events-auto flex w-full items-start gap-3 rounded-xl border p-4 shadow-lg [animation:var(--animate-fade-up)]',
+                'pointer-events-auto flex w-full items-start gap-3 rounded-xl border p-4 shadow-lg duration-300',
+                leaving
+                    ? 'animate-out fade-out slide-out-to-right-full'
+                    : 'animate-in fade-in slide-in-from-right-full',
                 FILL[variant],
             )}
         >
@@ -68,7 +87,7 @@ const Toast = React.memo(function Toast({ id, title, description, variant = 'def
                         type="button"
                         onClick={() => {
                             action.onClick();
-                            onDismiss(id);
+                            close();
                         }}
                         className={cn(
                             'mt-1 inline-flex text-sm font-medium underline-offset-4 hover:underline',
@@ -82,7 +101,7 @@ const Toast = React.memo(function Toast({ id, title, description, variant = 'def
             <button
                 type="button"
                 aria-label="Dismiss notification"
-                onClick={() => onDismiss(id)}
+                onClick={close}
                 className="-mr-1 -mt-1 rounded-md p-1 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <X className="size-4" />
@@ -109,4 +128,3 @@ export function Toaster() {
         </div>
     );
 }
-

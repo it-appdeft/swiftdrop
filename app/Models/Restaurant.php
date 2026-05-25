@@ -32,6 +32,7 @@ class Restaurant extends Model
         'lng',
         // Operational state (lifecycle after onboarding).
         'description',
+        'accepts_cooking_requests',
         'logo_path',
         'cover_photo_path',
         'status',
@@ -51,6 +52,7 @@ class Restaurant extends Model
         return [
             'lat' => 'decimal:8',
             'lng' => 'decimal:8',
+            'accepts_cooking_requests' => 'boolean',
             'rating' => 'decimal:2',
             'commission_rate' => 'decimal:2',
             'is_accepting_orders' => 'boolean',
@@ -123,6 +125,31 @@ class Restaurant extends Model
             ."cos(radians({$lngColumn}) - radians({$lng})) + "
             ."sin(radians({$lat})) * sin(radians({$latColumn}))"
             ."))";
+    }
+
+    /**
+     * PHP-side Haversine distance in miles from this restaurant to a single
+     * coordinate (e.g. the customer's chosen delivery address). Mirrors
+     * {@see distanceMilesExpression()} for the one-pair checkout case. Returns
+     * null when this restaurant has no coordinates.
+     */
+    public function distanceMilesFrom(float $lat, float $lng): ?float
+    {
+        if ($this->lat === null || $this->lng === null) {
+            return null;
+        }
+
+        $earth = 3958.7613; // miles
+        $rLat = (float) $this->lat;
+        $rLng = (float) $this->lng;
+
+        $angle = acos(
+            min(1.0, cos(deg2rad($lat)) * cos(deg2rad($rLat))
+                * cos(deg2rad($rLng) - deg2rad($lng))
+                + sin(deg2rad($lat)) * sin(deg2rad($rLat))),
+        );
+
+        return round($earth * $angle, 2);
     }
 
     public function user(): BelongsTo

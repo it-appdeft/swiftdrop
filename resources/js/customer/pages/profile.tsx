@@ -27,8 +27,8 @@ import {
     Users as UsersIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AddressDialog } from '../components/address-dialog';
 import { CustomerHeader } from '../components/customer-header';
-import { SiteFooter } from '../../web/components/site-footer';
 
 // ─── Server-supplied types ────────────────────────────────────────────────────
 
@@ -83,6 +83,7 @@ interface SharedProps {
     };
     customer?: ServerCustomer | null;
     deletionReasons?: ServerDeletionReason[];
+    orders?: PastOrder[];
     flash?: {
         status?: string;
         otp?: { target: string; expires_in: number; test_code: string | null } | null;
@@ -92,15 +93,7 @@ interface SharedProps {
     [key: string]: unknown;
 }
 
-type SidebarKey =
-    | 'orders'
-    | 'addresses'
-    | 'favorites'
-    | 'payments'
-    | 'settings'
-    | 'privacy'
-    | 'terms'
-    | 'help';
+type SidebarKey = 'orders' | 'addresses' | 'favorites' | 'payments' | 'settings' | 'privacy' | 'terms' | 'help';
 
 const SIDEBAR_ITEMS: { key: SidebarKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { key: 'orders', label: 'Order History', icon: ShoppingBag },
@@ -115,52 +108,17 @@ const SIDEBAR_ITEMS: { key: SidebarKey; label: string; icon: React.ComponentType
 
 // ─── Mock data ─────────────────────────────────────────────────────────────────
 
+/** Past order shape supplied by CustomerProfileController@show. */
 interface PastOrder {
     id: number;
     restaurant: string;
     location: string;
-    image: string;
+    image: string | null;
     items: { qty: number; name: string }[];
-    paymentFailed?: boolean;
-    placedAt: string;
+    status: string;
+    payment_failed?: boolean;
+    placed_at: string | null;
 }
-
-const PAST_ORDERS: PastOrder[] = [
-    {
-        id: 1,
-        restaurant: 'The Marble Grill',
-        location: 'Green Park, CA 90210',
-        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
-        items: [
-            { qty: 1, name: 'Margherita Pizza Giant Slice' },
-            { qty: 1, name: 'Sweet Corn Pizza Regular' },
-        ],
-        placedAt: 'Ordered April 25, 5:08 PM',
-    },
-    {
-        id: 2,
-        restaurant: 'The Marble Grill',
-        location: 'Green Park, CA 90210',
-        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
-        items: [
-            { qty: 1, name: 'Margherita Pizza Giant Slice' },
-            { qty: 1, name: 'Sweet Corn Pizza Regular' },
-        ],
-        paymentFailed: true,
-        placedAt: 'Ordered April 25, 5:08 PM',
-    },
-    {
-        id: 3,
-        restaurant: 'The Marble Grill',
-        location: 'Green Park, CA 90210',
-        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop',
-        items: [
-            { qty: 1, name: 'Margherita Pizza Giant Slice' },
-            { qty: 1, name: 'Sweet Corn Pizza Regular' },
-        ],
-        placedAt: 'Ordered April 25, 5:08 PM',
-    },
-];
 
 interface FavoriteRestaurant {
     id: number;
@@ -315,9 +273,9 @@ interface OtpInputRowProps {
 function OtpInputRow({ digits, onDigit, onKeyDown, inputsRef, resendIn, onResend, onVerify, disabled, label }: OtpInputRowProps) {
     const ready = digits.join('').length >= OTP_LENGTH && !disabled;
     return (
-        <div className="rounded-lg border border-border bg-muted/30 px-3.5 py-3">
-            <p className="text-sm font-semibold text-foreground">Enter Verification Code</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{label ?? "We've sent a 4-digit code to your email."}</p>
+        <div className="border-border bg-muted/30 rounded-lg border px-3.5 py-3">
+            <p className="text-foreground text-sm font-semibold">Enter Verification Code</p>
+            <p className="text-muted-foreground mt-0.5 text-xs">{label ?? "We've sent a 4-digit code to your email."}</p>
             <div className="mt-3 flex items-center gap-3">
                 <div className="flex flex-1 gap-2.5">
                     {digits.map((digit, i) => (
@@ -332,7 +290,7 @@ function OtpInputRow({ digits, onDigit, onKeyDown, inputsRef, resendIn, onResend
                             value={digit}
                             onChange={(e) => onDigit(i, e.target.value)}
                             onKeyDown={(e) => onKeyDown(i, e)}
-                            className="size-11 rounded-md border-0 bg-background text-center text-base font-semibold text-foreground shadow-sm transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            className="bg-background text-foreground focus:ring-primary/40 size-11 rounded-md border-0 text-center text-base font-semibold shadow-sm transition focus:ring-2 focus:outline-none"
                         />
                     ))}
                 </div>
@@ -341,7 +299,7 @@ function OtpInputRow({ digits, onDigit, onKeyDown, inputsRef, resendIn, onResend
                     onClick={onVerify}
                     disabled={!ready}
                     className={
-                        'h-11 rounded-md px-5 text-sm font-semibold text-primary-foreground transition ' +
+                        'text-primary-foreground h-11 rounded-md px-5 text-sm font-semibold transition ' +
                         (ready ? 'bg-primary hover:opacity-90' : 'bg-primary/40 cursor-not-allowed')
                     }
                 >
@@ -351,13 +309,13 @@ function OtpInputRow({ digits, onDigit, onKeyDown, inputsRef, resendIn, onResend
             <div className="mt-3 flex items-center justify-between text-xs">
                 {resendIn > 0 ? (
                     <>
-                        <span className="font-medium text-primary/50">Resend code</span>
-                        <span className="font-medium text-muted-foreground">
+                        <span className="text-primary/50 font-medium">Resend code</span>
+                        <span className="text-muted-foreground font-medium">
                             {String(Math.floor(resendIn / 60)).padStart(2, '0')}:{String(resendIn % 60).padStart(2, '0')}
                         </span>
                     </>
                 ) : (
-                    <button type="button" onClick={onResend} className="font-medium text-primary hover:underline">
+                    <button type="button" onClick={onResend} className="text-primary font-medium hover:underline">
                         Resend code
                     </button>
                 )}
@@ -668,15 +626,11 @@ function EditProfileDialog({
                     {/* Photo */}
                     <div className="flex justify-center">
                         <div className="relative">
-                            <div className="size-20 overflow-hidden rounded-full border border-border bg-muted">
+                            <div className="border-border bg-muted size-20 overflow-hidden rounded-full border">
                                 {photoPreview ? (
-                                    <img
-                                        src={photoPreview}
-                                        alt="Profile preview"
-                                        className="size-full object-cover"
-                                    />
+                                    <img src={photoPreview} alt="Profile preview" className="size-full object-cover" />
                                 ) : (
-                                    <div className="flex size-full items-center justify-center text-base font-semibold text-muted-foreground">
+                                    <div className="text-muted-foreground flex size-full items-center justify-center text-base font-semibold">
                                         {initialsFrom(profileForm.data.name || initialName)}
                                     </div>
                                 )}
@@ -684,7 +638,7 @@ function EditProfileDialog({
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="absolute -bottom-0.5 -right-0.5 flex size-7 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-sm transition hover:bg-muted"
+                                className="border-border bg-background text-foreground hover:bg-muted absolute -right-0.5 -bottom-0.5 flex size-7 items-center justify-center rounded-full border shadow-sm transition"
                                 aria-label="Change profile photo"
                             >
                                 <Camera className="size-3.5" />
@@ -702,27 +656,23 @@ function EditProfileDialog({
                     {/* Name */}
                     <form onSubmit={saveProfile} className="space-y-3">
                         <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-foreground">Full Name</label>
+                            <label className="text-foreground text-xs font-medium">Full Name</label>
                             <input
                                 type="text"
                                 value={profileForm.data.name}
                                 onChange={(e) => profileForm.setData('name', e.target.value)}
                                 placeholder="John Doe"
-                                className="h-11 w-full rounded-md border-0 bg-muted/60 px-3 text-sm text-foreground transition placeholder:text-muted-foreground focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="bg-muted/60 text-foreground placeholder:text-muted-foreground focus:bg-muted focus:ring-primary/30 h-11 w-full rounded-md border-0 px-3 text-sm transition focus:ring-2 focus:outline-none"
                             />
                         </div>
-                        {profileForm.errors.name && (
-                            <p className="text-xs text-destructive">{profileForm.errors.name}</p>
-                        )}
-                        {profileForm.errors.profile_photo && (
-                            <p className="text-xs text-destructive">{profileForm.errors.profile_photo}</p>
-                        )}
+                        {profileForm.errors.name && <p className="text-destructive text-xs">{profileForm.errors.name}</p>}
+                        {profileForm.errors.profile_photo && <p className="text-destructive text-xs">{profileForm.errors.profile_photo}</p>}
                         {(profileForm.data.name !== initialName || profileForm.data.profile_photo) && (
                             <div className="flex justify-end">
                                 <button
                                     type="submit"
                                     disabled={profileForm.processing}
-                                    className="h-10 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                                    className="bg-primary text-primary-foreground h-10 rounded-md px-4 text-xs font-semibold transition hover:opacity-90 disabled:opacity-50"
                                 >
                                     {profileForm.processing ? 'Saving…' : 'Save Profile'}
                                 </button>
@@ -732,14 +682,14 @@ function EditProfileDialog({
 
                     {/* Email */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Email Address</label>
+                        <label className="text-foreground text-xs font-medium">Email Address</label>
                         <div className="flex gap-2">
                             <input
                                 type="email"
                                 value={initialEmail}
                                 readOnly
                                 placeholder="john@example.com"
-                                className="h-11 flex-1 rounded-md border-0 bg-muted/60 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="bg-muted/60 text-foreground placeholder:text-muted-foreground focus:ring-primary/30 h-11 flex-1 rounded-md border-0 px-3 text-sm focus:ring-2 focus:outline-none"
                             />
                             <button
                                 type="button"
@@ -750,7 +700,7 @@ function EditProfileDialog({
                                     }
                                     sendCurrentEmailOtp();
                                 }}
-                                className="h-11 shrink-0 rounded-md bg-primary/15 px-4 text-xs font-semibold text-primary transition hover:bg-primary/20"
+                                className="bg-primary/15 text-primary hover:bg-primary/20 h-11 shrink-0 rounded-md px-4 text-xs font-semibold transition"
                             >
                                 {emailVerifyState === 'awaitingCode' ? 'Resend' : 'Change'}
                             </button>
@@ -768,29 +718,29 @@ function EditProfileDialog({
                                 label={`We've sent a 4-digit code to ${initialEmail}.`}
                             />
                         )}
-                        {emailError && <p className="text-xs text-destructive">{emailError}</p>}
+                        {emailError && <p className="text-destructive text-xs">{emailError}</p>}
                     </div>
 
                     {/* Phone — country code and subscriber digits shown
                         in separate inputs to mirror the split storage. */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Mobile Number</label>
+                        <label className="text-foreground text-xs font-medium">Mobile Number</label>
                         <div className="flex gap-2">
-                            <div className="flex h-11 flex-1 items-center gap-2 rounded-md bg-muted/60 px-3">
-                                <span className="flex items-center gap-1.5 text-sm text-foreground">
+                            <div className="bg-muted/60 flex h-11 flex-1 items-center gap-2 rounded-md px-3">
+                                <span className="text-foreground flex items-center gap-1.5 text-sm">
                                     <span className="flex h-3.5 w-5 shrink-0 items-center overflow-hidden rounded-sm ring-1 ring-zinc-200">
                                         <CountryFlag iso={phoneIso} className="h-full w-full object-cover" />
                                     </span>
                                     {phoneCountry}
                                 </span>
-                                <span className="h-5 w-px bg-border" />
+                                <span className="bg-border h-5 w-px" />
                                 <input
                                     type="tel"
                                     value={initialMobile ?? ''}
                                     readOnly
                                     placeholder="7123 456789"
                                     aria-label="Mobile number"
-                                    className="h-full flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                                    className="text-foreground placeholder:text-muted-foreground h-full flex-1 bg-transparent text-sm focus:outline-none"
                                 />
                             </div>
                             <button
@@ -802,7 +752,7 @@ function EditProfileDialog({
                                     }
                                     sendCurrentPhoneOtp();
                                 }}
-                                className="h-11 shrink-0 rounded-md bg-primary/15 px-4 text-xs font-semibold text-primary transition hover:bg-primary/20"
+                                className="bg-primary/15 text-primary hover:bg-primary/20 h-11 shrink-0 rounded-md px-4 text-xs font-semibold transition"
                             >
                                 {phoneVerifyState === 'awaitingCode' ? 'Resend' : 'Change'}
                             </button>
@@ -820,7 +770,7 @@ function EditProfileDialog({
                                 label={`We've sent a 4-digit code to ${phoneDisplay}.`}
                             />
                         )}
-                        {phoneError && <p className="text-xs text-destructive">{phoneError}</p>}
+                        {phoneError && <p className="text-destructive text-xs">{phoneError}</p>}
                     </div>
                 </div>
             </DialogContent>
@@ -958,22 +908,22 @@ function ChangeEmailDialog({ open, onOpenChange }: ChangeEmailDialogProps) {
                 {step === 'enterNew' && (
                     <form onSubmit={sendNewOtp} className="space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-foreground">Email Address</label>
+                            <label className="text-foreground text-xs font-medium">Email Address</label>
                             <input
                                 type="email"
                                 value={newEmail}
                                 onChange={(e) => setNewEmail(e.target.value)}
                                 placeholder="Add New Email"
                                 autoFocus
-                                className="h-11 w-full rounded-md border-0 bg-muted/60 px-3 text-sm text-foreground placeholder:text-muted-foreground focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="bg-muted/60 text-foreground placeholder:text-muted-foreground focus:bg-muted focus:ring-primary/30 h-11 w-full rounded-md border-0 px-3 text-sm focus:ring-2 focus:outline-none"
                             />
                         </div>
-                        {error && <p className="text-xs text-destructive">{error}</p>}
+                        {error && <p className="text-destructive text-xs">{error}</p>}
                         <button
                             type="submit"
                             disabled={processing || !newEmail}
                             className={
-                                'h-11 w-full rounded-md text-sm font-semibold text-primary-foreground transition ' +
+                                'text-primary-foreground h-11 w-full rounded-md text-sm font-semibold transition ' +
                                 (processing || !newEmail ? 'bg-primary/40 cursor-not-allowed' : 'bg-primary hover:opacity-90')
                             }
                         >
@@ -984,9 +934,8 @@ function ChangeEmailDialog({ open, onOpenChange }: ChangeEmailDialogProps) {
 
                 {step === 'verifyNew' && (
                     <div className="space-y-3">
-                        <p className="text-center text-xs text-muted-foreground">
-                            Enter the code we sent to{' '}
-                            <span className="font-medium text-foreground">{newEmail}</span>.
+                        <p className="text-muted-foreground text-center text-xs">
+                            Enter the code we sent to <span className="text-foreground font-medium">{newEmail}</span>.
                         </p>
                         <OtpInputRow
                             digits={digits}
@@ -999,7 +948,7 @@ function ChangeEmailDialog({ open, onOpenChange }: ChangeEmailDialogProps) {
                             disabled={processing}
                             label={`Code sent to ${newEmail}`}
                         />
-                        {error && <p className="text-xs text-destructive">{error}</p>}
+                        {error && <p className="text-destructive text-xs">{error}</p>}
                     </div>
                 )}
             </DialogContent>
@@ -1128,7 +1077,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                 {step === 'enterNew' && (
                     <form onSubmit={sendNewOtp} className="space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-foreground">Mobile Number</label>
+                            <label className="text-foreground text-xs font-medium">Mobile Number</label>
                             <div className="flex gap-2">
                                 <CountryCodeDropdown
                                     dial={newCountry}
@@ -1145,16 +1094,16 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                                     onChange={(e) => setNewMobile(e.target.value)}
                                     placeholder="Add New Number"
                                     autoFocus
-                                    className="h-11 flex-1 rounded-md bg-muted/60 px-3 text-sm text-foreground placeholder:text-muted-foreground transition focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    className="bg-muted/60 text-foreground placeholder:text-muted-foreground focus:bg-muted focus:ring-primary/30 h-11 flex-1 rounded-md px-3 text-sm transition focus:ring-2 focus:outline-none"
                                 />
                             </div>
                         </div>
-                        {error && <p className="text-xs text-destructive">{error}</p>}
+                        {error && <p className="text-destructive text-xs">{error}</p>}
                         <button
                             type="submit"
                             disabled={processing || !newMobile}
                             className={
-                                'h-11 w-full rounded-md text-sm font-semibold text-primary-foreground transition ' +
+                                'text-primary-foreground h-11 w-full rounded-md text-sm font-semibold transition ' +
                                 (processing || !newMobile ? 'bg-primary/40 cursor-not-allowed' : 'bg-primary hover:opacity-90')
                             }
                         >
@@ -1165,9 +1114,9 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
 
                 {step === 'verifyNew' && (
                     <div className="space-y-3">
-                        <p className="text-center text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-center text-xs">
                             Enter the code we sent to{' '}
-                            <span className="font-medium text-foreground">
+                            <span className="text-foreground font-medium">
                                 {newCountry} {newMobile}
                             </span>
                             .
@@ -1183,7 +1132,7 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
                             disabled={processing}
                             label={`Code sent to ${newCountry} ${newMobile}`}
                         />
-                        {error && <p className="text-xs text-destructive">{error}</p>}
+                        {error && <p className="text-destructive text-xs">{error}</p>}
                     </div>
                 )}
             </DialogContent>
@@ -1193,33 +1142,47 @@ function ChangePhoneDialog({ open, onOpenChange }: ChangePhoneDialogProps) {
 
 // ─── Section: Order History ────────────────────────────────────────────────────
 
+const ORDER_STATUS: Record<string, { label: string; className: string }> = {
+    placed: { label: 'Placed', className: 'text-amber-600' },
+    accepted: { label: 'Accepted', className: 'text-amber-600' },
+    preparing: { label: 'Preparing', className: 'text-amber-600' },
+    ready_for_pickup: { label: 'Ready', className: 'text-sky-600' },
+    out_for_delivery: { label: 'Out for delivery', className: 'text-sky-600' },
+    delivered: { label: 'Delivered', className: 'text-emerald-700' },
+    cancelled: { label: 'Cancelled', className: 'text-rose-600' },
+};
+
 function OrderCard({ order }: { order: PastOrder }) {
+    const badge = ORDER_STATUS[order.status] ?? { label: order.status, className: 'text-muted-foreground' };
+
     return (
-        <article className="rounded-2xl bg-muted/40 p-5">
+        <article className="bg-muted/40 rounded-2xl p-5">
             <header className="flex items-start gap-4">
-                <img
-                    src={order.image}
-                    alt=""
-                    className="size-14 shrink-0 rounded-xl object-cover"
-                    loading="lazy"
-                />
+                {order.image ? (
+                    <img src={order.image} alt="" className="size-14 shrink-0 rounded-xl object-cover" loading="lazy" />
+                ) : (
+                    <div className="bg-muted text-muted-foreground flex size-14 shrink-0 items-center justify-center rounded-xl">
+                        <ShoppingBag className="size-6" />
+                    </div>
+                )}
                 <div className="min-w-0 flex-1">
                     <h3 className="text-base font-semibold">{order.restaurant}</h3>
-                    <p className="mt-0.5 text-sm text-muted-foreground">{order.location}</p>
+                    <p className="text-muted-foreground mt-0.5 text-sm">{order.location}</p>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-emerald-700">
-                    <CheckCircle2 className="size-4 fill-emerald-700 text-white" />
-                    Delivered
+                <span className={`inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold ${badge.className}`}>
+                    {order.status === 'delivered' ? (
+                        <CheckCircle2 className="size-4 fill-emerald-700 text-white" />
+                    ) : (
+                        <span className="size-2 rounded-full bg-current" />
+                    )}
+                    {badge.label}
                 </span>
             </header>
 
-            <div className="mt-4 border-t border-border/70 pt-4">
+            <div className="border-border/70 mt-4 border-t pt-4">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {order.items.map((item, i) => (
-                        <span
-                            key={`${order.id}-${i}`}
-                            className="inline-flex items-center gap-2 text-sm font-medium text-foreground"
-                        >
+                        <span key={`${order.id}-${i}`} className="text-foreground inline-flex items-center gap-2 text-sm font-medium">
                             <span className="rounded-md border border-emerald-200 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
                                 {item.qty}x
                             </span>
@@ -1231,32 +1194,30 @@ function OrderCard({ order }: { order: PastOrder }) {
 
             <button
                 type="button"
-                className="mt-5 w-75 rounded-md bg-primary py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                className="bg-primary text-primary-foreground mt-5 w-75 rounded-md py-3 text-sm font-semibold transition hover:opacity-90"
             >
                 Reorder
             </button>
 
-            {order.paymentFailed && (
+            {order.payment_failed && (
                 <div className="mt-4 space-y-1">
                     <p className="flex items-center gap-1.5 text-sm font-semibold text-rose-600">
                         <AlertCircle className="size-4" />
                         Payment failed
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                        If any amount is deducted, it will be refunded in 3-5 Working days
-                    </p>
+                    <p className="text-muted-foreground text-xs">If any amount is deducted, it will be refunded in 3-5 Working days</p>
                 </div>
             )}
 
-            <p className="mt-4 text-xs text-muted-foreground">Ordered {order.placedAt}</p>
+            {order.placed_at ? <p className="text-muted-foreground mt-4 text-xs">Ordered {order.placed_at}</p> : null}
         </article>
     );
 }
 
-function OrderHistorySection() {
+function OrderHistorySection({ orders }: { orders: PastOrder[] }) {
     const [search, setSearch] = useState('');
 
-    const filtered = PAST_ORDERS.filter((o) => {
+    const filtered = orders.filter((o) => {
         const q = search.trim().toLowerCase();
         if (!q) return true;
         return o.restaurant.toLowerCase().includes(q) || o.items.some((i) => i.name.toLowerCase().includes(q));
@@ -1266,19 +1227,19 @@ function OrderHistorySection() {
         <>
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Past Orders</h2>
             <div className="relative mt-6">
-                <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+                <Search className="text-muted-foreground absolute top-1/2 left-4 size-5 -translate-y-1/2" />
                 <input
                     type="search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by restaurant or dish"
-                    className="h-12 w-full rounded-lg border-0 bg-muted/50 pl-12 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="bg-muted/50 text-foreground placeholder:text-muted-foreground focus:bg-muted focus:ring-primary/30 h-12 w-full rounded-lg border-0 pr-4 pl-12 text-sm focus:ring-2 focus:outline-none"
                 />
             </div>
             <div className="mt-6 space-y-4">
                 {filtered.length === 0 ? (
-                    <p className="rounded-lg bg-muted/50 py-8 text-center text-sm text-muted-foreground">
-                        No orders match your search.
+                    <p className="bg-muted/50 text-muted-foreground rounded-lg py-8 text-center text-sm">
+                        {orders.length === 0 ? 'You haven’t placed any orders yet.' : 'No orders match your search.'}
                     </p>
                 ) : (
                     filtered.map((o) => <OrderCard key={o.id} order={o} />)
@@ -1383,13 +1344,11 @@ function AddressEditorDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle className="text-center text-lg font-semibold">
-                        {editingId != null ? 'Edit Address' : 'Add New Address'}
-                    </DialogTitle>
+                    <DialogTitle className="text-center text-lg font-semibold">{editingId != null ? 'Edit Address' : 'Add New Address'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-foreground">Label</label>
+                        <label className="text-foreground text-xs font-medium">Label</label>
                         <select
                             value={form.data.label}
                             onChange={(e) => form.setData('label', e.target.value as AddressFormState['label'])}
@@ -1418,12 +1377,7 @@ function AddressEditorDialog({
                     </Field>
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="City" error={form.errors.city}>
-                            <input
-                                type="text"
-                                value={form.data.city}
-                                onChange={(e) => form.setData('city', e.target.value)}
-                                className={inputCls}
-                            />
+                            <input type="text" value={form.data.city} onChange={(e) => form.setData('city', e.target.value)} className={inputCls} />
                         </Field>
                         <Field label="County" error={form.errors.county}>
                             <input
@@ -1475,14 +1429,14 @@ function AddressEditorDialog({
                         <button
                             type="button"
                             onClick={() => onOpenChange(false)}
-                            className="h-11 flex-1 rounded-md bg-muted text-sm font-semibold text-foreground transition hover:bg-muted/70"
+                            className="bg-muted text-foreground hover:bg-muted/70 h-11 flex-1 rounded-md text-sm font-semibold transition"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={form.processing}
-                            className="h-11 flex-1 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                            className="bg-primary text-primary-foreground h-11 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50"
                         >
                             {editingId != null ? 'Save Changes' : 'Add Address'}
                         </button>
@@ -1496,9 +1450,9 @@ function AddressEditorDialog({
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
     return (
         <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground">{label}</label>
+            <label className="text-foreground text-xs font-medium">{label}</label>
             {children}
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && <p className="text-destructive text-xs">{error}</p>}
         </div>
     );
 }
@@ -1535,7 +1489,7 @@ function ConfirmDeleteDialog({
                         <button
                             type="button"
                             onClick={onCancel}
-                            className="h-11 flex-1 rounded-md bg-muted text-sm font-semibold text-foreground transition hover:bg-muted/70"
+                            className="bg-muted text-foreground hover:bg-muted/70 h-11 flex-1 rounded-md text-sm font-semibold transition"
                         >
                             Cancel
                         </button>
@@ -1543,7 +1497,7 @@ function ConfirmDeleteDialog({
                             type="button"
                             onClick={onConfirm}
                             disabled={busy}
-                            className="h-11 flex-1 rounded-md bg-primary text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                            className="bg-primary text-primary-foreground h-11 flex-1 rounded-md text-sm font-semibold transition hover:opacity-90 disabled:opacity-50"
                         >
                             {busy ? 'Deleting…' : confirmLabel}
                         </button>
@@ -1558,35 +1512,34 @@ function AddressesSection({ addresses }: { addresses: ServerAddress[] }) {
     const [pendingDelete, setPendingDelete] = useState<number | null>(null);
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [addOpen, setAddOpen] = useState(false); // map-based add flow (edit still uses the dialog below)
 
-    const editingAddress = useMemo(
-        () => (editingId != null ? addresses.find((a) => a.id === editingId) : undefined),
-        [addresses, editingId],
-    );
+    const editingAddress = useMemo(() => (editingId != null ? addresses.find((a) => a.id === editingId) : undefined), [addresses, editingId]);
 
     const handleConfirmDelete = () => {
         if (pendingDelete != null) {
             router.delete(route('customer.addresses.delete', pendingDelete), {
                 preserveScroll: true,
                 onSuccess: () => toast.success('Address deleted.'),
-                onError: () => toast.error('Could not delete address.'),
+                onError: (errors) => toast.error(errors.address ?? 'Could not delete address.'),
                 onFinish: () => setPendingDelete(null),
             });
         }
     };
 
     const handleSetDefault = (id: number) => {
-        router.post(route('customer.addresses.default', id), {}, {
-            preserveScroll: true,
-            onSuccess: () => toast.success('Default address updated.'),
-            onError: () => toast.error('Could not update default address.'),
-        });
+        router.post(
+            route('customer.addresses.default', id),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success('Default address updated.'),
+                onError: () => toast.error('Could not update default address.'),
+            },
+        );
     };
 
-    const openAdd = () => {
-        setEditingId(null);
-        setEditorOpen(true);
-    };
+    const openAdd = () => setAddOpen(true);
 
     const openEdit = (id: number) => {
         setEditingId(id);
@@ -1599,23 +1552,20 @@ function AddressesSection({ addresses }: { addresses: ServerAddress[] }) {
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {addresses.length === 0 && (
-                    <p className="col-span-full rounded-lg bg-muted/50 py-8 text-center text-sm text-muted-foreground">
+                    <p className="bg-muted/50 text-muted-foreground col-span-full rounded-lg py-8 text-center text-sm">
                         You have no saved addresses yet.
                     </p>
                 )}
                 {addresses.map((addr) => {
                     const Icon = iconForLabel(addr.label);
                     return (
-                        <div
-                            key={addr.id}
-                            className="flex items-start gap-3 rounded-2xl border border-border bg-background p-4"
-                        >
+                        <div key={addr.id} className="border-border bg-background flex items-start gap-3 rounded-2xl border p-4">
                             <div className="min-w-0 flex-1">
                                 <p className="flex items-center gap-1.5 text-sm font-semibold">
-                                    <Icon className="size-4 text-muted-foreground" />
+                                    <Icon className="text-muted-foreground size-4" />
                                     {addr.label}
                                 </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="text-muted-foreground mt-1 text-xs">
                                     {addr.address_line_1}
                                     {addr.address_line_2 ? `, ${addr.address_line_2}` : ''}
                                     <br />
@@ -1629,9 +1579,7 @@ function AddressesSection({ addresses }: { addresses: ServerAddress[] }) {
                                     aria-label={addr.is_default ? 'Default' : 'Set as default'}
                                     className={
                                         'flex size-5 items-center justify-center rounded-full border transition ' +
-                                        (addr.is_default
-                                            ? 'border-primary bg-primary text-primary-foreground'
-                                            : 'border-input hover:border-primary')
+                                        (addr.is_default ? 'border-primary bg-primary text-primary-foreground' : 'border-input hover:border-primary')
                                     }
                                 >
                                     {addr.is_default && <CheckCircle2 className="size-3" />}
@@ -1641,11 +1589,7 @@ function AddressesSection({ addresses }: { addresses: ServerAddress[] }) {
                                         EDIT
                                     </button>
                                     <span className="text-muted-foreground">|</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPendingDelete(addr.id)}
-                                        className="text-rose-600 hover:underline"
-                                    >
+                                    <button type="button" onClick={() => setPendingDelete(addr.id)} className="text-rose-600 hover:underline">
                                         DELETE
                                     </button>
                                 </div>
@@ -1658,7 +1602,7 @@ function AddressesSection({ addresses }: { addresses: ServerAddress[] }) {
             <button
                 type="button"
                 onClick={openAdd}
-                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-input bg-background py-3 text-sm font-medium text-muted-foreground hover:border-primary hover:text-primary"
+                className="border-input bg-background text-muted-foreground hover:border-primary hover:text-primary mt-3 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed py-3 text-sm font-medium"
             >
                 <Plus className="size-4" />
                 Add New Address
@@ -1671,12 +1615,8 @@ function AddressesSection({ addresses }: { addresses: ServerAddress[] }) {
                 title="Are You Sure You Want To Delete This Address?"
             />
 
-            <AddressEditorDialog
-                open={editorOpen}
-                onOpenChange={setEditorOpen}
-                initial={editingAddress}
-                editingId={editingId}
-            />
+            <AddressEditorDialog open={editorOpen} onOpenChange={setEditorOpen} initial={editingAddress} editingId={editingId} />
+            <AddressDialog open={addOpen} onOpenChange={setAddOpen} />
         </>
     );
 }
@@ -1690,7 +1630,7 @@ function FavoritesSection() {
         <>
             <h2 className="text-lg font-bold tracking-tight">Favorites</h2>
 
-            <div className="mt-3 border-b border-border">
+            <div className="border-border mt-3 border-b">
                 <div className="flex gap-6 text-sm font-medium">
                     {(['restaurants', 'items'] as const).map((t) => (
                         <button
@@ -1699,9 +1639,7 @@ function FavoritesSection() {
                             onClick={() => setTab(t)}
                             className={
                                 'border-b-2 px-1 pb-2 capitalize transition ' +
-                                (tab === t
-                                    ? 'border-primary text-primary'
-                                    : 'border-transparent text-muted-foreground hover:text-foreground')
+                                (tab === t ? 'border-primary text-primary' : 'text-muted-foreground hover:text-foreground border-transparent')
                             }
                         >
                             {t}
@@ -1713,28 +1651,20 @@ function FavoritesSection() {
             {tab === 'restaurants' ? (
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {FAVORITE_RESTAURANTS.map((r) => (
-                        <div
-                            key={r.id}
-                            className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm"
-                        >
+                        <div key={r.id} className="border-border bg-background overflow-hidden rounded-2xl border shadow-sm">
                             <div className="relative aspect-[4/3] overflow-hidden">
-                                <img
-                                    src={r.image}
-                                    alt={r.name}
-                                    className="h-full w-full object-cover"
-                                    loading="lazy"
-                                />
-                                <span className="absolute left-3 bottom-3 rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                                <img src={r.image} alt={r.name} className="h-full w-full object-cover" loading="lazy" />
+                                <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow">
                                     {r.discount}
                                 </span>
-                                <span className="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-semibold text-amber-600 shadow">
+                                <span className="absolute top-3 right-3 inline-flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-semibold text-amber-600 shadow">
                                     <Star className="size-3 fill-current" /> {r.rating}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between p-3">
                                 <div>
                                     <p className="text-sm font-semibold">{r.name}</p>
-                                    <p className="text-[11px] text-muted-foreground">
+                                    <p className="text-muted-foreground text-[11px]">
                                         {r.eta} · {r.distance}
                                     </p>
                                 </div>
@@ -1746,11 +1676,11 @@ function FavoritesSection() {
             ) : (
                 <div className="mt-4 space-y-4">
                     {FAVORITE_ITEM_GROUPS.map((g) => (
-                        <div key={g.restaurant} className="rounded-2xl border border-border bg-background">
+                        <div key={g.restaurant} className="border-border bg-background rounded-2xl border">
                             <header className="flex items-center justify-between p-3">
                                 <div>
                                     <p className="text-sm font-semibold">{g.restaurant}</p>
-                                    <p className="text-[11px] text-muted-foreground">
+                                    <p className="text-muted-foreground text-[11px]">
                                         {g.eta} · {g.distance}
                                     </p>
                                 </div>
@@ -1760,17 +1690,12 @@ function FavoritesSection() {
                             </header>
                             <div className="grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-2">
                                 {g.items.map((item) => (
-                                    <div key={item.id} className="flex gap-3 rounded-lg border border-border p-2">
+                                    <div key={item.id} className="border-border flex gap-3 rounded-lg border p-2">
                                         <div className="relative size-20 shrink-0">
-                                            <img
-                                                src={item.image}
-                                                alt={item.name}
-                                                className="size-full rounded-md object-cover"
-                                                loading="lazy"
-                                            />
+                                            <img src={item.image} alt={item.name} className="size-full rounded-md object-cover" loading="lazy" />
                                             <button
                                                 type="button"
-                                                className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-primary bg-background px-2 py-0.5 text-[10px] font-semibold text-primary shadow-sm"
+                                                className="border-primary bg-background text-primary absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
                                             >
                                                 ADD
                                             </button>
@@ -1781,21 +1706,18 @@ function FavoritesSection() {
                                                     <span
                                                         className={
                                                             'size-3 shrink-0 rounded-sm border-2 ' +
-                                                            (item.veg
-                                                                ? 'border-emerald-500'
-                                                                : 'border-rose-500')
+                                                            (item.veg ? 'border-emerald-500' : 'border-rose-500')
                                                         }
                                                     >
                                                         <span
                                                             className={
-                                                                'block size-full rounded-full ' +
-                                                                (item.veg ? 'bg-emerald-500' : 'bg-rose-500')
+                                                                'block size-full rounded-full ' + (item.veg ? 'bg-emerald-500' : 'bg-rose-500')
                                                             }
                                                         />
                                                     </span>
                                                     <Heart className="size-4 fill-rose-500 text-rose-500" />
                                                 </div>
-                                                <p className="text-xs font-semibold leading-tight">{item.name}</p>
+                                                <p className="text-xs leading-tight font-semibold">{item.name}</p>
                                             </div>
                                             <div className="flex items-center justify-between text-[11px]">
                                                 <span className="font-semibold">{item.price}</span>
@@ -1821,8 +1743,7 @@ function PaymentsSection({ onAddNew }: { onAddNew: () => void }) {
     const [cards, setCards] = useState(INITIAL_CARDS);
 
     const handleDelete = (id: number) => setCards((prev) => prev.filter((c) => c.id !== id));
-    const handleSetDefault = (id: number) =>
-        setCards((prev) => prev.map((c) => ({ ...c, isDefault: c.id === id })));
+    const handleSetDefault = (id: number) => setCards((prev) => prev.map((c) => ({ ...c, isDefault: c.id === id })));
 
     return (
         <>
@@ -1831,12 +1752,9 @@ function PaymentsSection({ onAddNew }: { onAddNew: () => void }) {
 
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {cards.map((card) => (
-                    <div
-                        key={card.id}
-                        className="rounded-2xl border border-border bg-background p-4 shadow-sm"
-                    >
+                    <div key={card.id} className="border-border bg-background rounded-2xl border p-4 shadow-sm">
                         <div className="flex items-start justify-between">
-                            <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-[10px] font-bold tracking-wide text-foreground">
+                            <span className="bg-muted text-foreground inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold tracking-wide">
                                 {card.brand}
                             </span>
                             <button
@@ -1845,18 +1763,14 @@ function PaymentsSection({ onAddNew }: { onAddNew: () => void }) {
                                 aria-label={card.isDefault ? 'Default' : 'Set as default'}
                                 className={
                                     'flex size-5 items-center justify-center rounded-full border ' +
-                                    (card.isDefault
-                                        ? 'border-primary bg-primary text-primary-foreground'
-                                        : 'border-input hover:border-primary')
+                                    (card.isDefault ? 'border-primary bg-primary text-primary-foreground' : 'border-input hover:border-primary')
                                 }
                             >
                                 {card.isDefault && <CheckCircle2 className="size-3" />}
                             </button>
                         </div>
                         <div className="mt-4 flex items-end justify-between">
-                            <p className="font-mono text-sm tracking-widest text-muted-foreground">
-                                •••• •••• •••• {card.last4}
-                            </p>
+                            <p className="text-muted-foreground font-mono text-sm tracking-widest">•••• •••• •••• {card.last4}</p>
                             <button
                                 type="button"
                                 onClick={() => handleDelete(card.id)}
@@ -1865,18 +1779,14 @@ function PaymentsSection({ onAddNew }: { onAddNew: () => void }) {
                                 DELETE
                             </button>
                         </div>
-                        <div className="mt-3 flex items-end justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <div className="text-muted-foreground mt-3 flex items-end justify-between text-[10px] tracking-wide uppercase">
                             <div>
                                 <p>Card Holder</p>
-                                <p className="mt-0.5 text-xs font-semibold tracking-normal text-foreground">
-                                    {card.holder}
-                                </p>
+                                <p className="text-foreground mt-0.5 text-xs font-semibold tracking-normal">{card.holder}</p>
                             </div>
                             <div className="text-right">
                                 <p>Expires</p>
-                                <p className="mt-0.5 text-xs font-semibold tracking-normal text-foreground">
-                                    {card.expires}
-                                </p>
+                                <p className="text-foreground mt-0.5 text-xs font-semibold tracking-normal">{card.expires}</p>
                             </div>
                         </div>
                     </div>
@@ -1885,7 +1795,7 @@ function PaymentsSection({ onAddNew }: { onAddNew: () => void }) {
                 <button
                     type="button"
                     onClick={onAddNew}
-                    className="flex min-h-[150px] flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-input bg-background text-sm font-medium text-muted-foreground hover:border-primary hover:text-primary"
+                    className="border-input bg-background text-muted-foreground hover:border-primary hover:text-primary flex min-h-[150px] flex-col items-center justify-center gap-1 rounded-2xl border border-dashed text-sm font-medium"
                 >
                     <Plus className="size-5" />
                     Add New Card
@@ -1899,66 +1809,52 @@ function AddPaymentMethod({ onBack }: { onBack: () => void }) {
     const [save, setSave] = useState(true);
     return (
         <>
-            <button
-                type="button"
-                onClick={onBack}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-            >
+            <button type="button" onClick={onBack} className="text-primary inline-flex items-center gap-1 text-sm font-semibold hover:underline">
                 <ArrowLeft className="size-4" />
                 Back to Payments
             </button>
 
-            <div className="mt-4 mx-auto max-w-md rounded-2xl bg-muted/40 p-6">
+            <div className="bg-muted/40 mx-auto mt-4 max-w-md rounded-2xl p-6">
                 <h2 className="text-xl font-bold tracking-tight">Add New Payment Method</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                    Enter your card details to secure your next meal faster.
-                </p>
+                <p className="text-muted-foreground mt-1 text-xs">Enter your card details to secure your next meal faster.</p>
 
                 <div className="mt-5 space-y-4">
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Cardholder Name
-                        </label>
+                        <label className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Cardholder Name</label>
                         <input
                             type="text"
                             placeholder="e.g. ALEX MORGAN"
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="border-input bg-background focus:border-primary focus:ring-primary/30 h-10 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-none"
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Card Number
-                        </label>
+                        <label className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Card Number</label>
                         <div className="relative">
                             <input
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="0000 0000 0000 0000"
-                                className="h-10 w-full rounded-md border border-input bg-background pl-3 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="border-input bg-background focus:border-primary focus:ring-primary/30 h-10 w-full rounded-md border pr-9 pl-3 text-sm focus:ring-2 focus:outline-none"
                             />
-                            <CreditCard className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <CreditCard className="text-muted-foreground absolute top-1/2 right-3 size-4 -translate-y-1/2" />
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                Expiry Date
-                            </label>
+                            <label className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Expiry Date</label>
                             <input
                                 type="text"
                                 placeholder="MM/YY"
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="border-input bg-background focus:border-primary focus:ring-primary/30 h-10 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-none"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                CVV / CVC
-                            </label>
+                            <label className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">CVV / CVC</label>
                             <input
                                 type="text"
                                 inputMode="numeric"
                                 placeholder="•••"
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                className="border-input bg-background focus:border-primary focus:ring-primary/30 h-10 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-none"
                             />
                         </div>
                     </div>
@@ -1975,8 +1871,7 @@ function AddPaymentMethod({ onBack }: { onBack: () => void }) {
                         >
                             <span
                                 className={
-                                    'inline-block size-4 rounded-full bg-background shadow transition ' +
-                                    (save ? 'translate-x-4' : 'translate-x-0.5')
+                                    'bg-background inline-block size-4 rounded-full shadow transition ' + (save ? 'translate-x-4' : 'translate-x-0.5')
                                 }
                             />
                         </span>
@@ -1985,11 +1880,11 @@ function AddPaymentMethod({ onBack }: { onBack: () => void }) {
 
                     <button
                         type="button"
-                        className="h-11 w-full rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90"
+                        className="bg-primary text-primary-foreground h-11 w-full rounded-md text-sm font-semibold hover:opacity-90"
                     >
                         Add Card & Pay
                     </button>
-                    <p className="text-center text-[11px] text-muted-foreground">
+                    <p className="text-muted-foreground text-center text-[11px]">
                         🔒 Secure encrypted transaction. Verified by Visa &amp; Mastercard.
                     </p>
                 </div>
@@ -2191,17 +2086,12 @@ function DeleteAccountDialog({
                                 onClick={() => setReasonId(r.id)}
                                 className={
                                     'flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left text-sm transition ' +
-                                    (reasonId === r.id
-                                        ? 'border-primary bg-primary/5 text-primary'
-                                        : 'border-input hover:border-primary/50')
+                                    (reasonId === r.id ? 'border-primary bg-primary/5 text-primary' : 'border-input hover:border-primary/50')
                                 }
                             >
                                 <span>{r.label}</span>
                                 <span
-                                    className={
-                                        'size-4 rounded-full border ' +
-                                        (reasonId === r.id ? 'border-primary bg-primary' : 'border-input')
-                                    }
+                                    className={'size-4 rounded-full border ' + (reasonId === r.id ? 'border-primary bg-primary' : 'border-input')}
                                 />
                             </button>
                         ))}
@@ -2209,7 +2099,7 @@ function DeleteAccountDialog({
                             type="button"
                             disabled={!reasonId}
                             onClick={() => setStep('confirmCopy')}
-                            className="mt-3 h-10 w-full rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                            className="bg-primary text-primary-foreground mt-3 h-10 w-full rounded-md text-sm font-semibold hover:opacity-90 disabled:opacity-50"
                         >
                             Continue
                         </button>
@@ -2223,26 +2113,22 @@ function DeleteAccountDialog({
                             rows={4}
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder={
-                                selectedReason?.is_other
-                                    ? 'Tell us a bit more (optional).'
-                                    : 'Do you have any feedback for us? (optional)'
-                            }
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            placeholder={selectedReason?.is_other ? 'Tell us a bit more (optional).' : 'Do you have any feedback for us? (optional)'}
+                            className="border-input bg-background focus:border-primary focus:ring-primary/30 w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                         />
-                        {error && <p className="text-xs text-destructive">{error}</p>}
+                        {error && <p className="text-destructive text-xs">{error}</p>}
                         <div className="flex gap-2">
                             <button
                                 type="button"
                                 onClick={() => setStep('pickReason')}
-                                className="h-10 flex-1 rounded-md bg-muted text-sm font-semibold"
+                                className="bg-muted h-10 flex-1 rounded-md text-sm font-semibold"
                             >
                                 Back
                             </button>
                             <button
                                 type="button"
                                 onClick={sendDeletionOtp}
-                                className="h-10 flex-1 rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90"
+                                className="bg-primary text-primary-foreground h-10 flex-1 rounded-md text-sm font-semibold hover:opacity-90"
                             >
                                 Send Verification Code
                             </button>
@@ -2252,9 +2138,9 @@ function DeleteAccountDialog({
 
                 {step === 'enterOtp' && (
                     <div className="space-y-3">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                             For your security, please enter the code we sent to{' '}
-                            <span className="font-medium text-foreground">{target ?? 'your contact'}</span>.
+                            <span className="text-foreground font-medium">{target ?? 'your contact'}</span>.
                         </p>
                         <OtpInputRow
                             digits={otpDigits}
@@ -2267,7 +2153,7 @@ function DeleteAccountDialog({
                             disabled={submitting}
                             label={`Code sent to ${target ?? 'your contact'}`}
                         />
-                        {error && <p className="text-xs text-destructive">{error}</p>}
+                        {error && <p className="text-destructive text-xs">{error}</p>}
                     </div>
                 )}
             </DialogContent>
@@ -2289,14 +2175,14 @@ function PrivacyPolicySection() {
     return (
         <>
             <h2 className="text-lg font-bold tracking-tight">Privacy Policy</h2>
-            <div className="mt-4 space-y-3 rounded-xl bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground">
+            <div className="bg-muted/40 text-muted-foreground mt-4 space-y-3 rounded-xl p-4 text-xs leading-relaxed">
                 <p>
-                    This Privacy Policy describes how SwiftDrop collects, uses, and shares your personal
-                    information when you use our website or mobile application.
+                    This Privacy Policy describes how SwiftDrop collects, uses, and shares your personal information when you use our website or
+                    mobile application.
                 </p>
                 <p>
-                    At SwiftDrop, we are committed to protecting your privacy and ensuring that your personal
-                    data is handled in a safe and responsible manner.
+                    At SwiftDrop, we are committed to protecting your privacy and ensuring that your personal data is handled in a safe and
+                    responsible manner.
                 </p>
             </div>
         </>
@@ -2307,14 +2193,11 @@ function TermsSection() {
     return (
         <>
             <h2 className="text-lg font-bold tracking-tight">Terms &amp; Conditions</h2>
-            <div className="mt-4 space-y-3 rounded-xl bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground">
+            <div className="bg-muted/40 text-muted-foreground mt-4 space-y-3 rounded-xl p-4 text-xs leading-relaxed">
+                <p>By using SwiftDrop, you agree to be bound by these Terms &amp; Conditions. Please read them carefully before placing an order.</p>
                 <p>
-                    By using SwiftDrop, you agree to be bound by these Terms &amp; Conditions. Please read
-                    them carefully before placing an order.
-                </p>
-                <p>
-                    We may update these terms from time to time. Continued use of the service after changes
-                    are posted constitutes acceptance of the new terms.
+                    We may update these terms from time to time. Continued use of the service after changes are posted constitutes acceptance of the
+                    new terms.
                 </p>
             </div>
         </>
@@ -2332,27 +2215,26 @@ function HelpSection() {
         <>
             <h2 className="text-lg font-bold tracking-tight">Help</h2>
 
-            <div className="mt-4 rounded-2xl bg-muted/40 p-5">
+            <div className="bg-muted/40 mt-4 rounded-2xl p-5">
                 <h3 className="text-lg font-bold">Report An Issue</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                    If you are experiencing any issue, please let us know. We will try to solve as soon as
-                    possible.
+                <p className="text-muted-foreground mt-1 text-xs">
+                    If you are experiencing any issue, please let us know. We will try to solve as soon as possible.
                 </p>
 
                 <div className="mt-5 space-y-4">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">
+                        <label className="text-muted-foreground text-xs font-medium">
                             Order ID <span className="text-rose-500">*</span>
                         </label>
                         <input
                             type="text"
                             value={orderId}
                             onChange={(e) => setOrderId(e.target.value)}
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="border-input bg-background focus:border-primary focus:ring-primary/30 h-10 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-none"
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">
+                        <label className="text-muted-foreground text-xs font-medium">
                             Issue <span className="text-rose-500">*</span>
                         </label>
                         <input
@@ -2360,11 +2242,11 @@ function HelpSection() {
                             value={issue}
                             onChange={(e) => setIssue(e.target.value)}
                             placeholder="Enter title for the issue"
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="border-input bg-background focus:border-primary focus:ring-primary/30 h-10 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-none"
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">
+                        <label className="text-muted-foreground text-xs font-medium">
                             Details <span className="text-rose-500">*</span>
                         </label>
                         <textarea
@@ -2372,12 +2254,12 @@ function HelpSection() {
                             value={details}
                             onChange={(e) => setDetails(e.target.value)}
                             placeholder="Describe the issue in details..."
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="border-input bg-background focus:border-primary focus:ring-primary/30 w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                         />
                     </div>
                     <button
                         type="button"
-                        className="h-11 w-full rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90"
+                        className="bg-primary text-primary-foreground h-11 w-full rounded-md text-sm font-semibold hover:opacity-90"
                     >
                         Submit Issue
                     </button>
@@ -2389,36 +2271,22 @@ function HelpSection() {
 
 // ─── Profile header ────────────────────────────────────────────────────────────
 
-function ProfileHeader({
-    name,
-    email,
-    photo,
-    onEdit,
-}: {
-    name: string;
-    email: string | null;
-    photo: string | null;
-    onEdit: () => void;
-}) {
+function ProfileHeader({ name, email, photo, onEdit }: { name: string; email: string | null; photo: string | null; onEdit: () => void }) {
     return (
-        <div className="flex flex-col items-start justify-between gap-4 rounded-2xl bg-background p-6 shadow-sm sm:flex-row sm:items-center sm:p-8">
+        <div className="bg-background flex flex-col items-start justify-between gap-4 rounded-2xl p-6 shadow-sm sm:flex-row sm:items-center sm:p-8">
             <div className="flex items-center gap-5">
-                <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-lg font-semibold text-muted-foreground sm:size-24">
-                    {photo ? (
-                        <img src={photo} alt="" className="size-full object-cover" />
-                    ) : (
-                        initialsFrom(name)
-                    )}
+                <div className="bg-muted text-muted-foreground flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full text-lg font-semibold sm:size-24">
+                    {photo ? <img src={photo} alt="" className="size-full object-cover" /> : initialsFrom(name)}
                 </div>
                 <div>
                     <p className="text-2xl font-bold tracking-tight sm:text-3xl">{name}</p>
-                    {email && <p className="mt-1 text-sm text-muted-foreground">{email}</p>}
+                    {email && <p className="text-muted-foreground mt-1 text-sm">{email}</p>}
                 </div>
             </div>
             <button
                 type="button"
                 onClick={onEdit}
-                className="inline-flex h-12 items-center gap-2 rounded-md bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                className="bg-primary text-primary-foreground inline-flex h-12 items-center gap-2 rounded-md px-6 text-sm font-semibold transition hover:opacity-90"
             >
                 <PencilLine className="size-4" />
                 Edit Profile
@@ -2430,12 +2298,11 @@ function ProfileHeader({
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CustomerProfile() {
-    const { auth, customer, deletionReasons } = usePage<SharedProps>().props;
+    const { auth, customer, deletionReasons, orders: serverOrders } = usePage<SharedProps>().props;
+    const orders = serverOrders ?? [];
     const user = auth?.user ?? null;
     // Prefer real server data; fall back to auth shared props.
-    const fullName = customer
-        ? `${customer.first_name} ${customer.last_name}`.trim()
-        : user?.name ?? '';
+    const fullName = customer ? `${customer.first_name} ${customer.last_name}`.trim() : (user?.name ?? '');
     const email = customer?.user?.email ?? user?.email ?? null;
     const mobile = customer?.user?.mobile ?? user?.mobile ?? null;
     const countryCode = customer?.user?.country_code ?? null;
@@ -2457,15 +2324,15 @@ export default function CustomerProfile() {
         }
         switch (section) {
             case 'orders':
-                return <OrderHistorySection />;
+                return <OrderHistorySection orders={orders} />;
             case 'addresses':
                 return <AddressesSection addresses={addresses} />;
             case 'favorites':
-                return <OrderHistorySection />;
-                // return <FavoritesSection />;
+                return <OrderHistorySection orders={orders} />;
+            // return <FavoritesSection />;
             case 'payments':
-                return <OrderHistorySection />;
-                // return <PaymentsSection onAddNew={() => setAddingCard(true)} />;
+                return <OrderHistorySection orders={orders} />;
+            // return <PaymentsSection onAddNew={() => setAddingCard(true)} />;
             case 'settings':
                 return <SettingsSection onDeleteAccount={() => setDeleteOpen(true)} />;
             case 'privacy':
@@ -2473,8 +2340,8 @@ export default function CustomerProfile() {
             case 'terms':
                 return <TermsSection />;
             case 'help':
-                return <OrderHistorySection />;
-                // return <HelpSection />;
+                return <OrderHistorySection orders={orders} />;
+            // return <HelpSection />;
         }
     };
 
@@ -2486,15 +2353,10 @@ export default function CustomerProfile() {
 
             <main className="flex-1 py-6 sm:py-8">
                 <div className="mx-auto max-w-[1600px] space-y-6 px-4 sm:px-6 lg:px-8">
-                    <ProfileHeader
-                        name={fullName || 'Customer'}
-                        email={email}
-                        photo={photo}
-                        onEdit={() => setEditOpen(true)}
-                    />
+                    <ProfileHeader name={fullName || 'Customer'} email={email} photo={photo} onEdit={() => setEditOpen(true)} />
 
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_1fr]">
-                        <aside className="rounded-2xl bg-background p-3 shadow-sm lg:sticky lg:top-20 lg:self-start">
+                        <aside className="bg-background rounded-2xl p-3 shadow-sm lg:sticky lg:top-20 lg:self-start">
                             <ul className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:gap-1.5 lg:overflow-visible">
                                 {SIDEBAR_ITEMS.map((item) => {
                                     const Icon = item.icon;
@@ -2508,10 +2370,8 @@ export default function CustomerProfile() {
                                                     setAddingCard(false);
                                                 }}
                                                 className={
-                                                    'flex w-full items-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-base font-medium transition ' +
-                                                    (active
-                                                        ? 'bg-primary/10 text-primary'
-                                                        : 'text-foreground hover:bg-muted')
+                                                    'flex w-full items-center gap-3 rounded-lg px-4 py-3 text-base font-medium whitespace-nowrap transition ' +
+                                                    (active ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted')
                                                 }
                                             >
                                                 <Icon className="size-5" />
@@ -2520,11 +2380,11 @@ export default function CustomerProfile() {
                                         </li>
                                     );
                                 })}
-                                <li className="shrink-0 lg:mt-2 lg:shrink lg:border-t lg:border-border lg:pt-2">
+                                <li className="lg:border-border shrink-0 lg:mt-2 lg:shrink lg:border-t lg:pt-2">
                                     <button
                                         type="button"
                                         onClick={handleLogout}
-                                        className="flex w-full items-center gap-3 whitespace-nowrap rounded-lg px-4 py-3 text-base font-medium text-destructive transition hover:bg-destructive/10"
+                                        className="text-destructive hover:bg-destructive/10 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-base font-medium whitespace-nowrap transition"
                                     >
                                         <LogOut className="size-5" />
                                         Logout
@@ -2533,9 +2393,7 @@ export default function CustomerProfile() {
                             </ul>
                         </aside>
 
-                        <section className="rounded-2xl bg-background p-5 shadow-sm sm:p-8">
-                            {renderSection()}
-                        </section>
+                        <section className="bg-background rounded-2xl p-5 shadow-sm sm:p-8">{renderSection()}</section>
                     </div>
                 </div>
             </main>
@@ -2553,11 +2411,7 @@ export default function CustomerProfile() {
                 initialPhoto={photo}
             />
 
-            <DeleteAccountDialog
-                open={deleteOpen}
-                onOpenChange={setDeleteOpen}
-                reasons={reasons}
-            />
+            <DeleteAccountDialog open={deleteOpen} onOpenChange={setDeleteOpen} reasons={reasons} />
         </div>
     );
 }
