@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Restaurant\DashboardController;
 use App\Http\Controllers\Restaurant\MenuManagementController;
 use App\Http\Controllers\Restaurant\ModifierController;
 use App\Http\Controllers\Restaurant\SettingsController;
@@ -10,7 +11,9 @@ Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
     ->prefix('restaurant')
     ->name('restaurant.')
     ->group(function () {
-        Route::get('dashboard', fn () => Inertia::render('restaurant/dashboard'))->name('dashboard');
+        Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::patch('accepting-orders', [DashboardController::class, 'toggleAcceptingOrders'])
+            ->name('accepting-orders.toggle');
         Route::get('orders', fn () => Inertia::render('restaurant/orders'))->name('orders');
 
         /*
@@ -57,5 +60,9 @@ Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
         Route::controller(SettingsController::class)->prefix('settings')->group(function () {
             Route::get('/', 'show')->name('settings');
             Route::post('profile', 'updateProfile')->name('settings.profile.update');
+            // Edit onboarding details post-submission (identity / location /
+            // legal / categories, plus document re-uploads).
+            Route::post('section', 'updateSection')->name('settings.section.update');
+            Route::post('documents/{type}', 'uploadDocument')->name('settings.documents.upload');
         });
     });

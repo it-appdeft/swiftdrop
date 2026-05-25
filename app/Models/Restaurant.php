@@ -37,6 +37,7 @@ class Restaurant extends Model
         'cover_photo_path',
         'status',
         'approval_status',
+        'is_accepting_orders',
         'rating',
         'total_reviews',
         'commission_rate',
@@ -54,6 +55,7 @@ class Restaurant extends Model
             'accepts_cooking_requests' => 'boolean',
             'rating' => 'decimal:2',
             'commission_rate' => 'decimal:2',
+            'is_accepting_orders' => 'boolean',
             'branches' => 'integer',
             'seating_capacity' => 'integer',
             'application_step' => 'integer',
@@ -65,6 +67,12 @@ class Restaurant extends Model
     public function hasSubmittedApplication(): bool
     {
         return $this->application_submitted_at !== null;
+    }
+
+    /** Admin has approved the partner application. */
+    public function isApproved(): bool
+    {
+        return $this->approval_status === 'approved';
     }
 
     // ─── Query scopes ────────────────────────────────────────────────────────

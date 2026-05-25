@@ -104,6 +104,8 @@ class SavePartnerApplicationRequest extends FormRequest
                 'data.fullAddress' => ['required', 'string', 'max:1000'],
                 'data.city' => ['required', 'string', 'max:120'],
                 'data.pinCode' => ['required', 'string', 'max:12'],
+                'data.lat' => ['nullable', 'numeric', 'between:-90,90'],
+                'data.lng' => ['nullable', 'numeric', 'between:-180,180'],
                 'data.hours' => ['nullable', 'array'],
                 'data.hours.*.open' => ['nullable', 'boolean'],
                 'data.hours.*.from' => ['nullable', 'date_format:H:i'],

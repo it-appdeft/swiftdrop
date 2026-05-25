@@ -53,6 +53,10 @@ class HandleInertiaRequests extends Middleware
                 // selected → default → newest so single-address customers are
                 // always represented.
                 'selected_address' => fn () => $this->customerSelectedAddress($user),
+                // Restaurant-owner only: approval + accepting-orders state that
+                // drives the dashboard banner and the header "Accepting orders"
+                // toggle (which stays disabled until admin approval lands).
+                'restaurant' => fn () => $this->restaurantState($user),
             ],
             // Lightweight cart badge for the header — just the total item
             // count. The full cart payload is delivered per-page (restaurant
@@ -71,6 +75,24 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
             ],
         ]);
+    }
+
+    protected function restaurantState(mixed $user): ?array
+    {
+        // loadProfileRelation() eager-loads `restaurant` for owners only, so
+        // gate on the loaded relation to avoid a stray query for other roles.
+        $restaurant = $user?->relationLoaded('restaurant') ? $user->restaurant : null;
+        if (! $restaurant) {
+            return null;
+        }
+
+        return [
+            'id' => $restaurant->id,
+            'name' => $restaurant->name,
+            'status' => $restaurant->status,
+            'approval_status' => $restaurant->approval_status,
+            'is_accepting_orders' => (bool) $restaurant->is_accepting_orders,
+        ];
     }
 
     /**
