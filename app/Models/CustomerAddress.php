@@ -15,6 +15,7 @@ class CustomerAddress extends Model
         'city',
         'county',
         'postcode',
+        'delivery_instructions',
         'lat',
         'lng',
         'is_default',

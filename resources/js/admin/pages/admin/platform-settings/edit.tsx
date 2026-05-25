@@ -19,6 +19,10 @@ interface Props {
     settings: {
         customer_dashboard_radius_miles: number;
         customer_dashboard_fallback_limit: number;
+        base_delivery_fee_gbp: number;
+        delivery_fee_per_mile_gbp: number;
+        free_delivery_threshold_gbp: number;
+        order_tax_rate_percent: number;
     };
 }
 
@@ -26,6 +30,10 @@ export default function PlatformSettingsEdit({ settings }: Props) {
     const { data, setData, put, processing, errors, recentlySuccessful } = useForm({
         customer_dashboard_radius_miles: String(settings.customer_dashboard_radius_miles),
         customer_dashboard_fallback_limit: String(settings.customer_dashboard_fallback_limit),
+        base_delivery_fee_gbp: String(settings.base_delivery_fee_gbp),
+        delivery_fee_per_mile_gbp: String(settings.delivery_fee_per_mile_gbp),
+        free_delivery_threshold_gbp: String(settings.free_delivery_threshold_gbp),
+        order_tax_rate_percent: String(settings.order_tax_rate_percent),
     });
 
     const submit = (e: React.FormEvent) => {
@@ -83,10 +91,79 @@ export default function PlatformSettingsEdit({ settings }: Props) {
                         </CardContent>
                     </Card>
 
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Delivery &amp; charges</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <FormField
+                                label="Base delivery fee (£)"
+                                error={errors.base_delivery_fee_gbp}
+                                hint="Flat amount added to every delivery before the per-mile charge."
+                                required
+                            >
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value={data.base_delivery_fee_gbp}
+                                    onChange={(e) => setData('base_delivery_fee_gbp', e.target.value)}
+                                />
+                            </FormField>
+
+                            <FormField
+                                label="Delivery fee per mile (£)"
+                                error={errors.delivery_fee_per_mile_gbp}
+                                hint="Charged per mile between the customer address and the restaurant."
+                                required
+                            >
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value={data.delivery_fee_per_mile_gbp}
+                                    onChange={(e) => setData('delivery_fee_per_mile_gbp', e.target.value)}
+                                />
+                            </FormField>
+
+                            <FormField
+                                label="Free delivery threshold (£)"
+                                error={errors.free_delivery_threshold_gbp}
+                                hint="Orders with an item subtotal at or above this get free delivery."
+                                required
+                            >
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="1000"
+                                    value={data.free_delivery_threshold_gbp}
+                                    onChange={(e) => setData('free_delivery_threshold_gbp', e.target.value)}
+                                />
+                            </FormField>
+
+                            <FormField
+                                label="Taxes & charges (%)"
+                                error={errors.order_tax_rate_percent}
+                                hint="Applied to the item subtotal and shown as 'Taxes & Charges' at checkout."
+                                required
+                            >
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value={data.order_tax_rate_percent}
+                                    onChange={(e) => setData('order_tax_rate_percent', e.target.value)}
+                                />
+                            </FormField>
+                        </CardContent>
+                    </Card>
+
                     <div className="flex items-center justify-end gap-3">
-                        {recentlySuccessful ? (
-                            <span className="text-sm text-emerald-600">Saved.</span>
-                        ) : null}
+                        {recentlySuccessful ? <span className="text-sm text-emerald-600">Saved.</span> : null}
                         <Button type="submit" leftIcon={<Save />} loading={processing}>
                             Save changes
                         </Button>

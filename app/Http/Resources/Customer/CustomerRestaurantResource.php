@@ -50,6 +50,36 @@ class CustomerRestaurantResource extends JsonResource
             'is_veg' => (bool) $item->is_veg,
             'image_url' => $this->dishImageUrl($item),
             'rating' => $rating,
+            // Drives the "Add" → customise popup. Empty array → the dish adds
+            // to the cart directly with no modal.
+            'modifier_groups' => $item->relationLoaded('modifierGroups')
+                ? $item->modifierGroups->map(fn ($group) => $this->modifierGroup($group))->values()->all()
+                : [],
+        ];
+    }
+
+    /**
+     * One customisation group (Size, Toppings-Veg, Cheese & Dip…) with its
+     * selectable options. selection_type drives radios vs. checkboxes; the
+     * required + min/max fields let the frontend gate the "Add Item" button.
+     *
+     * @return array<string, mixed>
+     */
+    protected function modifierGroup(\App\Models\ModifierGroup $group): array
+    {
+        return [
+            'id' => $group->id,
+            'name' => $group->name,
+            'description' => $group->description,
+            'selection_type' => $group->selection_type, // 'single' | 'multiple'
+            'is_required' => (bool) $group->is_required,
+            'min_selections' => (int) $group->min_selections,
+            'max_selections' => $group->max_selections !== null ? (int) $group->max_selections : null,
+            'options' => $group->options->map(fn ($option) => [
+                'id' => $option->id,
+                'name' => $option->name,
+                'price_delta' => (float) $option->price_delta,
+            ])->values()->all(),
         ];
     }
 

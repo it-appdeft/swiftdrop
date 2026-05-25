@@ -11,10 +11,12 @@ use App\Exceptions\ResourceNotFoundException;
 use App\Models\CustomerAccountDeletionLog;
 use App\Models\CustomerAddress;
 use App\Models\DeletionReason;
+use App\Models\Order;
 use App\Models\User;
 use App\Services\Files\ImageUploadService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CustomerProfileService extends BaseProfileService implements CustomerProfileServiceInterface
 {
@@ -68,10 +70,16 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
                 $profile->addresses()->update(['is_default' => false]);
             }
 
-            // First-ever address is auto-selected so radius-based search works
-            // without the customer having to pick one. Subsequent additions
-            // keep whatever selection is already in place.
-            $isSelected = ! $hasAny;
+            // The map flow passes is_selected=true to make the new address the
+            // active delivery address. Otherwise only the first-ever address is
+            // auto-selected so radius-based search has something to work with.
+            $isSelected = $data['is_selected'] ?? (! $hasAny);
+
+            if ($isSelected) {
+                $profile->addresses()->update(['is_selected' => false]);
+            }
+
+            unset($data['is_default'], $data['is_selected']);
 
             return $profile->addresses()->create(array_merge($data, [
                 'is_default' => $isDefault,
@@ -125,6 +133,21 @@ class CustomerProfileService extends BaseProfileService implements CustomerProfi
 
             if (! $address) {
                 throw ResourceNotFoundException::for('Address');
+            }
+
+            // Block deletion while the address is tied to a live order. Once
+            // every linked order is delivered / cancelled it can be removed
+            // (the order's address_id then nulls out via the FK).
+            $hasActiveOrders = Order::query()
+                ->where('user_id', $user->id)
+                ->where('address_id', $addressId)
+                ->whereIn('status', Order::ACTIVE_STATUSES)
+                ->exists();
+
+            if ($hasActiveOrders) {
+                throw ValidationException::withMessages([
+                    'address' => 'This address is linked to an active order and can’t be deleted until that order is delivered or cancelled.',
+                ]);
             }
 
             // Move the default + selected flags onto a sibling when removing

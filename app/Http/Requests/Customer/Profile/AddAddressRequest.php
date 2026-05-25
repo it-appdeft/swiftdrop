@@ -14,15 +14,20 @@ class AddAddressRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'label' => ['required', 'string', 'in:Home,Work,Other', 'max:50'],
+            // Free-text label so customers can name addresses ("school", "gym")
+            // alongside the Home/Work presets.
+            'label' => ['required', 'string', 'max:50'],
             'address_line_1' => ['required', 'string', 'min:5', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],
             'city' => ['required', 'string', 'min:2', 'max:100'],
             'county' => ['required', 'string', 'min:2', 'max:100'],
             'postcode' => ['required', 'string', 'regex:/^[a-zA-Z0-9\s\-]{3,20}$/', 'max:20'],
+            'delivery_instructions' => ['nullable', 'string', 'max:500'],
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
             'is_default' => ['nullable', 'boolean'],
+            // The map flow makes the newly added address the active one.
+            'is_selected' => ['nullable', 'boolean'],
         ];
     }
 }
