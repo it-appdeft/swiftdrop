@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { toast } from '@/hooks/use-toast';
+
 // ─── Navigation config ────────────────────────────────────────────────────
 
 export type NavKey =
@@ -76,8 +78,19 @@ const NAV: NavEntry[] = [
     { key: 'settings', label: 'Settings', icon: ClipboardList, href: route('restaurant.settings') },
 ];
 
+interface RestaurantState {
+    id: number;
+    name: string;
+    status: string;
+    approval_status: 'pending' | 'approved' | 'rejected';
+    is_accepting_orders: boolean;
+}
+
 interface SharedProps {
-    auth: { user: { id: number; name: string; email: string | null } | null };
+    auth: {
+        user: { id: number; name: string; email: string | null } | null;
+        restaurant?: RestaurantState | null;
+    };
     [key: string]: unknown;
 }
 
@@ -461,7 +474,43 @@ function TopBar({
     email: string | null;
     onOpenMenu: () => void;
 }) {
-    const [accepting, setAccepting] = useState(true);
+    const { auth } = usePage<SharedProps>().props;
+    const restaurant = auth.restaurant ?? null;
+    const approved = restaurant?.approval_status === 'approved';
+    const accepting = approved && !!restaurant?.is_accepting_orders;
+    const [processing, setProcessing] = useState(false);
+
+    // The switch is hard-gated on approval: an unapproved partner can't flip it
+    // (the server enforces this too). Once approved it persists the choice.
+    const toggleAccepting = () => {
+        if (!approved || processing) return;
+        const next = !accepting;
+        setProcessing(true);
+        router.patch(
+            route('restaurant.accepting-orders.toggle'),
+            { is_accepting_orders: next },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () =>
+                    next
+                        ? toast.success('New orders will now appear in your queue.', {
+                              title: 'Accepting orders',
+                          })
+                        : toast.warning('Customers can no longer place orders here.', {
+                              title: 'Orders paused',
+                          }),
+                onError: () =>
+                    toast.error('Could not update your order status. Please try again.', {
+                        title: 'Something went wrong',
+                    }),
+                onFinish: () => setProcessing(false),
+            },
+        );
+    };
+
+    const dotClass = !approved ? 'bg-amber-500' : accepting ? 'bg-primary' : 'bg-rose-500';
+    const statusLabel = !approved ? 'Pending approval' : accepting ? 'Accepting orders' : 'Paused';
 
     return (
         <header className="flex h-16 items-center gap-2 border-b border-border bg-background px-3 sm:gap-3 sm:px-6">
@@ -492,33 +541,37 @@ function TopBar({
             </button>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
-                <button
-                    type="button"
-                    onClick={() => setAccepting((v) => !v)}
-                    className="hidden items-center gap-2 text-sm font-medium md:inline-flex"
-                >
-                    <span className="flex items-center gap-1.5">
-                        <span
-                            className={
-                                'size-2 rounded-full ' + (accepting ? 'bg-primary' : 'bg-rose-500')
-                            }
-                        />
-                        {accepting ? 'Accepting orders' : 'Paused'}
-                    </span>
-                    <span
-                        className={
-                            'relative inline-flex h-6 w-11 cursor-pointer items-center rounded-full transition ' +
-                            (accepting ? 'bg-primary' : 'bg-muted')
-                        }
+                {restaurant && (
+                    <button
+                        type="button"
+                        onClick={toggleAccepting}
+                        disabled={!approved || processing}
+                        title={!approved ? 'Your restaurant must be approved before you can accept orders.' : undefined}
+                        className="hidden items-center gap-2 text-sm font-medium md:inline-flex disabled:cursor-not-allowed"
                     >
+                        <span className="flex items-center gap-1.5">
+                            <span className={'size-2 rounded-full ' + dotClass} />
+                            {statusLabel}
+                        </span>
                         <span
                             className={
-                                'inline-block size-5 rounded-full bg-background shadow transition ' +
-                                (accepting ? 'translate-x-5' : 'translate-x-0.5')
+                                'relative inline-flex h-6 w-11 items-center rounded-full transition ' +
+                                (!approved
+                                    ? 'cursor-not-allowed bg-muted opacity-60'
+                                    : accepting
+                                      ? 'cursor-pointer bg-primary'
+                                      : 'cursor-pointer bg-muted')
                             }
-                        />
-                    </span>
-                </button>
+                        >
+                            <span
+                                className={
+                                    'inline-block size-5 rounded-full bg-background shadow transition ' +
+                                    (accepting ? 'translate-x-5' : 'translate-x-0.5')
+                                }
+                            />
+                        </span>
+                    </button>
+                )}
 
                 <button
                     type="button"

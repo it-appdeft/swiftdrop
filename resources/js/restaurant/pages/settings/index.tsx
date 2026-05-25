@@ -2,6 +2,17 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { BadgeCheck, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import AppLayout from '../../layouts/app-layout';
+import {
+    AccountRestaurantStep,
+    CategoriesStep,
+    DEFAULT_STATE,
+    DocumentsStep,
+    LegalBankStep,
+    LocationHoursStep,
+    type DocSlot,
+    type FoodItemOption,
+    type FormState,
+} from '../partner/apply';
 
 const COUNTRY_CODE_OPTIONS: { value: string; label: string }[] = [
     { value: '+44', label: '🇬🇧 +44' },
@@ -12,14 +23,13 @@ const COUNTRY_CODE_OPTIONS: { value: string; label: string }[] = [
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type TabKey = 'profile' | 'restaurant' | 'notifications' | 'security' | 'billing';
+type TabKey = 'profile' | 'restaurant' | 'notifications' | 'security';
 
 const TABS: { key: TabKey; label: string }[] = [
     { key: 'profile', label: 'Profile' },
     { key: 'restaurant', label: 'Restaurant' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'security', label: 'Security' },
-    { key: 'billing', label: 'Billing' },
 ];
 
 interface SharedProps {
@@ -31,6 +41,11 @@ interface SharedProps {
         mobile: string;
         role: string;
     };
+    /** Flattened onboarding snapshot powering the Restaurant tab sub-sections. */
+    application?: FormState | null;
+    documents?: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
+    foodItems?: FoodItemOption[];
+    googleMapsApiKey?: string | null;
     [key: string]: unknown;
 }
 
@@ -38,33 +53,6 @@ interface SharedProps {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
     return <label className="text-sm font-medium text-foreground">{children}</label>;
-}
-
-function TextField({
-    label,
-    value,
-    onChange,
-    placeholder,
-    type = 'text',
-}: {
-    label: string;
-    value: string;
-    onChange: (v: string) => void;
-    placeholder?: string;
-    type?: string;
-}) {
-    return (
-        <div className="space-y-1.5">
-            <FieldLabel>{label}</FieldLabel>
-            <input
-                type={type}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-        </div>
-    );
 }
 
 function ToggleSwitch({
@@ -263,52 +251,150 @@ function ProfileTab({ profile }: { profile: ProfileData }) {
     );
 }
 
-function RestaurantTab() {
-    const [displayName, setDisplayName] = useState('Spice Route');
-    const [phone, setPhone] = useState('+91 80 1234 5678');
-    const [address, setAddress] = useState('100 Ft Road, Indiranagar, Bengaluru — 560038');
-    const [autoAccept, setAutoAccept] = useState(true);
-    const [paused, setPaused] = useState(false);
-    const [scheduled, setScheduled] = useState(true);
+// Onboarding sections, managed post-submission. `step` matches the partner
+// application's per-step save contract; documents use their own upload route.
+type SectionKey = 'identity' | 'location' | 'legal' | 'documents' | 'categories';
+const RESTAURANT_SECTIONS: { key: SectionKey; label: string; step: number }[] = [
+    { key: 'identity', label: 'Identity', step: 1 },
+    { key: 'location', label: 'Location & Hours', step: 2 },
+    { key: 'legal', label: 'Legal & Bank', step: 3 },
+    { key: 'documents', label: 'Documents', step: 4 },
+    { key: 'categories', label: 'Categories', step: 5 },
+];
+
+function RestaurantTab({
+    application,
+    documents,
+    foodItems,
+    googleMapsApiKey,
+}: {
+    application?: FormState | null;
+    documents?: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
+    foodItems: FoodItemOption[];
+    googleMapsApiKey: string | null;
+}) {
+    const seeded: FormState = { ...DEFAULT_STATE, ...(application ?? {}) };
+    if (!seeded.categories || seeded.categories.length === 0) {
+        seeded.categories = [{ name: '', diet: 'veg' }];
+    }
+
+    const [data, setData] = useState<FormState>(seeded);
+    const [docs, setDocs] = useState<Partial<Record<DocSlot, { uploaded: boolean } | null>>>(
+        documents ?? {},
+    );
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [saving, setSaving] = useState(false);
+    const [section, setSection] = useState<SectionKey>('identity');
+
+    const update = (patch: Partial<FormState>) => {
+        setData((prev) => ({ ...prev, ...patch }));
+        setErrors((prev) => {
+            const next = { ...prev };
+            for (const key of Object.keys(patch)) delete next[key];
+            return next;
+        });
+    };
+
+    const normalizeErrors = (serverErrors: Record<string, string>) => {
+        const out: Record<string, string> = {};
+        for (const [key, message] of Object.entries(serverErrors)) {
+            out[key.startsWith('data.') ? key.slice('data.'.length) : key] = message;
+        }
+        return out;
+    };
+
+    const saveSection = (step: number) => {
+        setSaving(true);
+        router.post(
+            route('restaurant.settings.section.update'),
+            { step, data } as never,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: (serverErrors) =>
+                    setErrors(normalizeErrors(serverErrors as Record<string, string>)),
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    const uploadDoc = (type: DocSlot, file: File) => {
+        setDocs((prev) => ({ ...prev, [type]: { uploaded: true } }));
+        router.post(
+            route('restaurant.settings.documents.upload', { type }),
+            { file },
+            { preserveScroll: true, preserveState: true, forceFormData: true },
+        );
+    };
+
+    const activeStep = RESTAURANT_SECTIONS.find((s) => s.key === section)?.step ?? 1;
 
     return (
         <div className="space-y-5">
-            <SettingsCard title="Restaurant details">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <TextField label="Display name" value={displayName} onChange={setDisplayName} />
-                    <TextField label="Phone" value={phone} onChange={setPhone} />
-                </div>
-                <div className="space-y-1.5">
-                    <FieldLabel>Address</FieldLabel>
-                    <textarea
-                        rows={2}
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                </div>
-            </SettingsCard>
+            <div className="flex flex-wrap gap-1 rounded-full border border-border bg-background p-1 sm:w-fit">
+                {RESTAURANT_SECTIONS.map((s) => {
+                    const isActive = section === s.key;
+                    return (
+                        <button
+                            key={s.key}
+                            type="button"
+                            onClick={() => {
+                                setSection(s.key);
+                                setErrors({});
+                            }}
+                            className={
+                                'rounded-full px-4 py-1.5 text-sm font-semibold transition ' +
+                                (isActive
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:text-foreground')
+                            }
+                        >
+                            {s.label}
+                        </button>
+                    );
+                })}
+            </div>
 
-            <SettingsCard title="Order preferences">
-                <ToggleRow
-                    title="Auto accept orders"
-                    description="Accept new orders automatically when received."
-                    checked={autoAccept}
-                    onChange={setAutoAccept}
-                />
-                <ToggleRow
-                    title="Pause new orders"
-                    description="Temporarily stop accepting orders."
-                    checked={paused}
-                    onChange={setPaused}
-                />
-                <ToggleRow
-                    title="Allow scheduled orders"
-                    description="Customers can place orders for later."
-                    checked={scheduled}
-                    onChange={setScheduled}
-                />
-            </SettingsCard>
+            <section className="rounded-2xl border border-border bg-background p-5 sm:p-6">
+                {section === 'identity' && (
+                    <AccountRestaurantStep
+                        data={data}
+                        update={update}
+                        errors={errors}
+                        foodItems={foodItems}
+                    />
+                )}
+                {section === 'location' && (
+                    <LocationHoursStep
+                        data={data}
+                        update={update}
+                        errors={errors}
+                        googleMapsApiKey={googleMapsApiKey}
+                    />
+                )}
+                {section === 'legal' && (
+                    <LegalBankStep data={data} update={update} errors={errors} />
+                )}
+                {section === 'documents' && (
+                    <DocumentsStep documents={docs} onUploadDoc={uploadDoc} errors={errors} />
+                )}
+                {section === 'categories' && (
+                    <CategoriesStep data={data} update={update} errors={errors} />
+                )}
+
+                {section !== 'documents' && (
+                    <div className="mt-6 flex justify-end border-t border-border pt-4">
+                        <button
+                            type="button"
+                            onClick={() => saveSection(activeStep)}
+                            disabled={saving}
+                            className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                        >
+                            {saving ? 'Saving…' : 'Save changes'}
+                        </button>
+                    </div>
+                )}
+            </section>
         </div>
     );
 }
@@ -350,17 +436,10 @@ function NotificationsTab() {
 }
 
 function SecurityTab() {
-    const [twoFactor, setTwoFactor] = useState(true);
     const [rememberDevices, setRememberDevices] = useState(false);
 
     return (
         <SettingsCard title="Login & security">
-            <ToggleRow
-                title="Two-factor authentication"
-                description="Require OTP for every new device."
-                checked={twoFactor}
-                onChange={setTwoFactor}
-            />
             <ToggleRow
                 title="Remember devices"
                 description="Skip OTP on trusted browsers for 30 days."
@@ -387,33 +466,11 @@ function SecurityTab() {
     );
 }
 
-function BillingTab() {
-    return (
-        <SettingsCard title="Plan">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <p className="text-base font-bold tracking-tight">
-                        Growth · 15% per order
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Renews automatically with every weekly payout.
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    className="inline-flex h-10 shrink-0 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                >
-                    Change plan
-                </button>
-            </div>
-        </SettingsCard>
-    );
-}
-
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 export default function RestaurantSettings() {
-    const { auth, profile } = usePage<SharedProps>().props;
+    const { auth, profile, application, documents, foodItems, googleMapsApiKey } =
+        usePage<SharedProps>().props;
     const profileData: ProfileData = profile ?? {
         ownerName: '',
         email: auth?.user?.email ?? '',
@@ -457,10 +514,16 @@ export default function RestaurantSettings() {
                 </div>
 
                 {tab === 'profile' && <ProfileTab profile={profileData} />}
-                {tab === 'restaurant' && <RestaurantTab />}
+                {tab === 'restaurant' && (
+                    <RestaurantTab
+                        application={application}
+                        documents={documents}
+                        foodItems={foodItems ?? []}
+                        googleMapsApiKey={googleMapsApiKey ?? null}
+                    />
+                )}
                 {tab === 'notifications' && <NotificationsTab />}
                 {tab === 'security' && <SecurityTab />}
-                {tab === 'billing' && <BillingTab />}
             </div>
         </AppLayout>
     );

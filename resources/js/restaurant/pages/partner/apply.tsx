@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { SwiftdropWordmark } from '../../../web/components/swiftdrop-wordmark';
+import { AddressAutocomplete } from '../../components/address-autocomplete';
+import { LocationMapPicker } from '../../components/location-map-picker';
 
 // ─── Types & static data ────────────────────────────────────────────────────
 
@@ -74,7 +76,7 @@ const DAYS: { key: DayKey; label: string }[] = [
     { key: 'sun', label: 'Sun' },
 ];
 
-type DocSlot =
+export type DocSlot =
     | 'gstCert'
     | 'fssai'
     | 'pan'
@@ -102,7 +104,7 @@ interface CategoryRow {
     diet: 'veg' | 'non_veg';
 }
 
-interface FormState {
+export interface FormState {
     // Step 1
     ownerName: string;
     contactEmail: string;
@@ -118,6 +120,8 @@ interface FormState {
     fullAddress: string;
     city: string;
     pinCode: string;
+    lat: number | null;
+    lng: number | null;
     hours: Record<DayKey, DayHours>;
     // Step 3
     gst: string;
@@ -133,7 +137,7 @@ interface FormState {
     termsAccepted: boolean;
 }
 
-const DEFAULT_STATE: FormState = {
+export const DEFAULT_STATE: FormState = {
     ownerName: '',
     contactEmail: '',
     contactCountryCode: '+44',
@@ -147,6 +151,8 @@ const DEFAULT_STATE: FormState = {
     fullAddress: '',
     city: '',
     pinCode: '',
+    lat: null,
+    lng: null,
     hours: {
         mon: { open: true, from: '11:00', to: '23:00' },
         tue: { open: false, from: '11:00', to: '23:00' },
@@ -167,7 +173,7 @@ const DEFAULT_STATE: FormState = {
     termsAccepted: false,
 };
 
-interface FoodItemOption {
+export interface FoodItemOption {
     id: number;
     name: string;
     slug: string;
@@ -180,6 +186,8 @@ interface PartnerApplyProps {
     initialDocuments?: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
     /** Catalog of food items managed by the admin — picker for Step 1. */
     foodItems?: FoodItemOption[];
+    /** Browser key for the Step 2 location picker. Null hides the map. */
+    googleMapsApiKey?: string | null;
     /** When true, render the post-submit celebration instead of the form. */
     completed?: boolean;
 }
@@ -420,7 +428,7 @@ function ToggleSwitch({
 
 // ─── Step 1 — Account & Restaurant ─────────────────────────────────────────
 
-function AccountRestaurantStep({
+export function AccountRestaurantStep({
     data,
     update,
     errors,
@@ -536,7 +544,7 @@ function AccountRestaurantStep({
                     options={RESTAURANT_TYPE_OPTIONS}
                     error={errors.restaurantType}
                 />
-                <TextField
+                {/* <TextField
                     label="Branches"
                     type="number"
                     placeholder="1"
@@ -551,7 +559,7 @@ function AccountRestaurantStep({
                     value={data.seating}
                     onChange={(v) => update({ seating: v })}
                     error={errors.seating}
-                />
+                /> */}
             </div>
 
             <div className="space-y-2">
@@ -611,14 +619,16 @@ function AccountRestaurantStep({
 
 // ─── Step 2 — Location & Hours ─────────────────────────────────────────────
 
-function LocationHoursStep({
+export function LocationHoursStep({
     data,
     update,
     errors,
+    googleMapsApiKey,
 }: {
     data: FormState;
     update: (patch: Partial<FormState>) => void;
     errors: Record<string, string>;
+    googleMapsApiKey: string | null;
 }) {
     const setDay = (day: DayKey, patch: Partial<DayHours>) => {
         update({ hours: { ...data.hours, [day]: { ...data.hours[day], ...patch } } });
@@ -635,18 +645,21 @@ function LocationHoursStep({
 
             <div className="space-y-1.5">
                 <FieldLabel required>Full address</FieldLabel>
-                <textarea
-                    rows={2}
+                <AddressAutocomplete
+                    apiKey={googleMapsApiKey}
                     value={data.fullAddress}
-                    onChange={(e) => update({ fullAddress: e.target.value })}
-                    placeholder="100 Ft Road, Indiranagar, Bengaluru — 560038"
-                    aria-invalid={errors.fullAddress ? true : undefined}
-                    className={
-                        'w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 ' +
-                        (errors.fullAddress
-                            ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-200'
-                            : 'border-input focus:border-primary focus:ring-primary/30')
+                    onChange={(v) => update({ fullAddress: v })}
+                    onSelect={(place) =>
+                        update({
+                            fullAddress: place.address,
+                            lat: place.lat,
+                            lng: place.lng,
+                            ...(place.city ? { city: place.city } : {}),
+                            ...(place.postcode ? { pinCode: place.postcode } : {}),
+                        })
                     }
+                    placeholder="Start typing your address…"
+                    invalid={!!errors.fullAddress}
                 />
                 {errors.fullAddress && (
                     <p className="text-xs text-rose-600">{errors.fullAddress}</p>
@@ -674,10 +687,13 @@ function LocationHoursStep({
 
             <div className="space-y-1.5">
                 <FieldLabel>Pin location on map</FieldLabel>
-                <div className="flex h-36 items-center justify-center rounded-lg border border-dashed border-input bg-muted/30 text-sm text-muted-foreground">
-                    <MapPin className="mr-2 size-4 text-primary" />
-                    Drag pin to set exact location
-                </div>
+                <LocationMapPicker
+                    apiKey={googleMapsApiKey}
+                    lat={data.lat}
+                    lng={data.lng}
+                    address={[data.fullAddress, data.city, data.pinCode].filter(Boolean).join(', ')}
+                    onChange={(lat, lng) => update({ lat, lng })}
+                />
             </div>
 
             <section className="space-y-3">
@@ -719,7 +735,7 @@ function LocationHoursStep({
 
 // ─── Step 3 — Legal & Bank ─────────────────────────────────────────────────
 
-function LegalBankStep({
+export function LegalBankStep({
     data,
     update,
     errors,
@@ -810,7 +826,7 @@ function LegalBankStep({
 
 // ─── Step 4 — Documents ────────────────────────────────────────────────────
 
-function DocumentsStep({
+export function DocumentsStep({
     documents,
     onUploadDoc,
     errors,
@@ -878,7 +894,7 @@ function DocumentsStep({
 
 // ─── Step 5 — Categories ───────────────────────────────────────────────────
 
-function CategoriesStep({
+export function CategoriesStep({
     data,
     update,
     errors,
@@ -1173,6 +1189,7 @@ export default function PartnerApply({
     initialData = {},
     initialDocuments = {},
     foodItems = [],
+    googleMapsApiKey = null,
     completed = false,
 }: PartnerApplyProps) {
     if (completed) {
@@ -1286,7 +1303,14 @@ export default function PartnerApply({
                     />
                 );
             case 2:
-                return <LocationHoursStep data={data} update={update} errors={errors} />;
+                return (
+                    <LocationHoursStep
+                        data={data}
+                        update={update}
+                        errors={errors}
+                        googleMapsApiKey={googleMapsApiKey}
+                    />
+                );
             case 3:
                 return <LegalBankStep data={data} update={update} errors={errors} />;
             case 4:

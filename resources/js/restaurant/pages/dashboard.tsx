@@ -7,9 +7,11 @@ import {
     Download,
     Megaphone,
     Plus,
+    ShieldCheck,
     ShoppingBag,
     Star,
     TrendingUp,
+    XCircle,
 } from 'lucide-react';
 import AppLayout from '../layouts/app-layout';
 
@@ -55,9 +57,54 @@ function formatINR(n: number): string {
     return '₹ ' + n.toLocaleString('en-IN');
 }
 
+interface RestaurantState {
+    id: number;
+    name: string;
+    status: string;
+    approval_status: 'pending' | 'approved' | 'rejected';
+    is_accepting_orders: boolean;
+}
+
 interface SharedProps {
-    auth: { user: { id: number; name: string; email: string | null } | null };
+    auth: {
+        user: { id: number; name: string; email: string | null } | null;
+        restaurant?: RestaurantState | null;
+    };
     [key: string]: unknown;
+}
+
+// Approval banner shown above the dashboard until the restaurant is live.
+function ApprovalBanner({ approval }: { approval: RestaurantState['approval_status'] }) {
+    if (approval === 'approved') return null;
+
+    if (approval === 'rejected') {
+        return (
+            <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <XCircle className="mt-0.5 size-5 shrink-0 text-rose-600" />
+                <div>
+                    <p className="text-sm font-semibold text-rose-800">Application not approved</p>
+                    <p className="mt-0.5 text-sm text-rose-700">
+                        Your partner application was rejected. Please contact support to resolve the
+                        issues with your documents before you can start receiving orders.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // pending
+    return (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-amber-600" />
+            <div>
+                <p className="text-sm font-semibold text-amber-800">Application under review</p>
+                <p className="mt-0.5 text-sm text-amber-700">
+                    You can explore the dashboard. You'll start receiving orders once your documents
+                    are verified by our team (usually under 24h).
+                </p>
+            </div>
+        </div>
+    );
 }
 
 
@@ -372,12 +419,16 @@ function QuickActions() {
 export default function RestaurantDashboard() {
     const { auth } = usePage<SharedProps>().props;
     const firstName = (auth?.user?.name ?? 'Partner').split(' ')[0] || 'Partner';
+    const restaurant = auth?.restaurant ?? null;
+    const restaurantName = restaurant?.name ?? 'your restaurant';
 
     return (
         <AppLayout active="dashboard">
             <Head title="Dashboard — Swift Drop Partner" />
 
             <div className="space-y-6">
+                        {restaurant && <ApprovalBanner approval={restaurant.approval_status} />}
+
                         {/* Header row */}
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div>
@@ -385,7 +436,7 @@ export default function RestaurantDashboard() {
                                     Good evening, {firstName}
                                 </h1>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    Here's how Spice Route — Indiranagar is doing today.
+                                    Here's how {restaurantName} is doing today.
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
