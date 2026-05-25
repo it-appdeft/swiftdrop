@@ -16,6 +16,10 @@ class UpdatePlatformSettingsRequest extends FormRequest
         return [
             'customer_dashboard_radius_miles' => ['required', 'numeric', 'min:0.5', 'max:200'],
             'customer_dashboard_fallback_limit' => ['required', 'integer', 'min:1', 'max:100'],
+            'base_delivery_fee_gbp' => ['required', 'numeric', 'min:0', 'max:100'],
+            'delivery_fee_per_mile_gbp' => ['required', 'numeric', 'min:0', 'max:100'],
+            'free_delivery_threshold_gbp' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'order_tax_rate_percent' => ['required', 'numeric', 'min:0', 'max:100'],
         ];
     }
 }

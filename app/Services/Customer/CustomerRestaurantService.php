@@ -23,7 +23,7 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
         $menuItems = MenuItem::query()
             ->forRestaurant($restaurant->id)
             ->available()
-            ->with('foodItem')
+            ->with(['foodItem', 'modifierGroups.options'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();

@@ -79,6 +79,14 @@ class AppServiceProvider extends ServiceProvider
             \App\Contracts\Customer\CustomerRestaurantServiceInterface::class,
             \App\Services\Customer\CustomerRestaurantService::class,
         );
+        $this->app->bind(
+            \App\Contracts\Customer\CustomerCartServiceInterface::class,
+            \App\Services\Customer\CustomerCartService::class,
+        );
+        $this->app->bind(
+            \App\Contracts\Customer\CheckoutServiceInterface::class,
+            \App\Services\Customer\CheckoutService::class,
+        );
         $this->app->singleton(\App\Services\Files\ImageUploadService::class);
         $this->app->singleton(\App\Services\Platform\PlatformConfigService::class);
     }

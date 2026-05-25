@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrderItem extends Model
 {
@@ -34,5 +35,11 @@ class OrderItem extends Model
     public function menuItem(): BelongsTo
     {
         return $this->belongsTo(MenuItem::class);
+    }
+
+    /** Add-ons the customer chose for this line, snapshotted at placement. */
+    public function modifiers(): HasMany
+    {
+        return $this->hasMany(OrderItemModifier::class);
     }
 }

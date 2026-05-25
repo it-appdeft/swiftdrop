@@ -1,0 +1,191 @@
+<?php
+
+namespace App\Services\Customer;
+
+use App\Contracts\Customer\CustomerCartServiceInterface;
+use App\DTO\Customer\CustomerCartData;
+use App\Models\Cart;
+use App\Models\CartItem;
+use App\Models\MenuItem;
+use App\Models\ModifierOption;
+use App\Models\User;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class CustomerCartService implements CustomerCartServiceInterface
+{
+    /** Hard cap on a single line's quantity — keeps totals + UI sane. */
+    private const MAX_QUANTITY = 99;
+
+    public function getCart(User $user): CustomerCartData
+    {
+        return new CustomerCartData($this->loadCart($user));
+    }
+
+    public function addItem(User $user, int $menuItemId, int $quantity, array $optionIds): CustomerCartData
+    {
+        // Only live, switched-on dishes can be added.
+        $menuItem = MenuItem::query()
+            ->available()
+            ->with('modifierGroups.options')
+            ->findOrFail($menuItemId);
+
+        $quantity = max(1, $quantity);
+
+        // Resolve the submitted option ids against the dish's own groups. The
+        // AddCartItemRequest already enforced selection rules; here we just
+        // build the priced snapshot and ignore anything not on this dish.
+        $selected = $this->resolveSelections($menuItem, $optionIds);
+        $unitPrice = round((float) $menuItem->price + $selected->sum('price_delta'), 2);
+        $signature = $this->signature($optionIds);
+
+        return DB::transaction(function () use ($user, $menuItem, $quantity, $selected, $unitPrice, $signature) {
+            $cart = Cart::firstOrCreate(['user_id' => $user->id]);
+
+            // A cart holds one restaurant at a time. Block mixing once it has
+            // contents; an empty cart simply adopts the new restaurant.
+            if ($cart->restaurant_id && $cart->restaurant_id !== $menuItem->restaurant_id && $cart->items()->exists()) {
+                throw ValidationException::withMessages([
+                    'menu_item_id' => 'Your cart already has items from another restaurant. Clear it before adding this dish.',
+                ]);
+            }
+
+            if ($cart->restaurant_id !== $menuItem->restaurant_id) {
+                $cart->update(['restaurant_id' => $menuItem->restaurant_id]);
+            }
+
+            // Merge into an identical existing line (same dish + same exact
+            // options) instead of creating a duplicate row.
+            $existing = $cart->items()
+                ->where('menu_item_id', $menuItem->id)
+                ->with('modifiers')
+                ->get()
+                ->first(fn (CartItem $item) => $this->lineSignature($item) === $signature);
+
+            if ($existing) {
+                $existing->update([
+                    'quantity' => min(self::MAX_QUANTITY, $existing->quantity + $quantity),
+                    'unit_price' => $unitPrice,
+                ]);
+
+                return $this->getCart($user);
+            }
+
+            $line = $cart->items()->create([
+                'menu_item_id' => $menuItem->id,
+                'quantity' => min(self::MAX_QUANTITY, $quantity),
+                'unit_price' => $unitPrice,
+            ]);
+
+            if ($selected->isNotEmpty()) {
+                $line->modifiers()->createMany($selected->all());
+            }
+
+            return $this->getCart($user);
+        });
+    }
+
+    public function updateItemQuantity(User $user, int $cartItemId, int $quantity): CustomerCartData
+    {
+        $item = $this->ownedItem($user, $cartItemId);
+
+        if ($quantity <= 0) {
+            return $this->removeItem($user, $cartItemId);
+        }
+
+        $item->update(['quantity' => min(self::MAX_QUANTITY, $quantity)]);
+
+        return $this->getCart($user);
+    }
+
+    public function removeItem(User $user, int $cartItemId): CustomerCartData
+    {
+        $item = $this->ownedItem($user, $cartItemId);
+        $cart = $item->cart;
+
+        $item->delete(); // cart_item_modifiers cascade on delete.
+
+        // An emptied cart releases its restaurant lock so the customer can
+        // start fresh somewhere else.
+        if ($cart && ! $cart->items()->exists()) {
+            $cart->update(['restaurant_id' => null]);
+        }
+
+        return $this->getCart($user);
+    }
+
+    public function clear(User $user): CustomerCartData
+    {
+        $cart = $user->cart;
+
+        if ($cart) {
+            $cart->items()->delete();
+            $cart->update(['restaurant_id' => null]);
+        }
+
+        return $this->getCart($user);
+    }
+
+    // ── Internals ────────────────────────────────────────────────────────────
+
+    private function loadCart(User $user): ?Cart
+    {
+        return Cart::query()
+            ->where('user_id', $user->id)
+            ->with([
+                'restaurant',
+                'items' => fn ($q) => $q->orderBy('id'),
+                'items.menuItem.foodItem',
+                'items.modifiers' => fn ($q) => $q->orderBy('id'),
+            ])
+            ->first();
+    }
+
+    /** Fetch a cart line, asserting it belongs to this customer. */
+    private function ownedItem(User $user, int $cartItemId): CartItem
+    {
+        return CartItem::query()
+            ->whereHas('cart', fn ($q) => $q->where('user_id', $user->id))
+            ->findOrFail($cartItemId);
+    }
+
+    /**
+     * Map submitted option ids to priced snapshot rows, pulling name + price
+     * straight off the dish's loaded groups so the cart freezes them.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function resolveSelections(MenuItem $menuItem, array $optionIds): Collection
+    {
+        $ids = array_map('intval', $optionIds);
+
+        return $menuItem->modifierGroups
+            ->flatMap(fn ($group) => $group->options
+                ->whereIn('id', $ids)
+                ->map(fn (ModifierOption $opt) => [
+                    'modifier_group_id' => $group->id,
+                    'modifier_option_id' => $opt->id,
+                    'group_name' => $group->name,
+                    'option_name' => $opt->name,
+                    'price_delta' => (float) $opt->price_delta,
+                ]))
+            ->values();
+    }
+
+    /** Order-independent fingerprint of a selection set, for line merging. */
+    private function signature(array $optionIds): string
+    {
+        $ids = array_values(array_unique(array_map('intval', $optionIds)));
+        sort($ids);
+
+        return implode(',', $ids);
+    }
+
+    private function lineSignature(CartItem $item): string
+    {
+        return $this->signature(
+            $item->modifiers->pluck('modifier_option_id')->filter()->all(),
+        );
+    }
+}

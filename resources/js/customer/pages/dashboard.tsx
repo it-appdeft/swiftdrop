@@ -110,7 +110,7 @@ function ExploreSection({ items }: { items: FoodItem[] }) {
                 {items.map((item) => (
                     <Link
                         key={item.id}
-                        href={`/customer/food-items/${item.slug}`}
+                        href={`/customer/search?q=${encodeURIComponent(item.name)}`}
                         className="flex shrink-0 flex-col items-center gap-2.5 transition"
                     >
                         <span className="flex size-20 items-center justify-center overflow-hidden rounded-full bg-amber-50 sm:size-24">

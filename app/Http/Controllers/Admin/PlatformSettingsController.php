@@ -28,6 +28,10 @@ class PlatformSettingsController extends Controller
                     PlatformConfigService::KEY_DASHBOARD_FALLBACK_LIMIT,
                     12,
                 ),
+                'base_delivery_fee_gbp' => $this->config->float(PlatformConfigService::KEY_BASE_DELIVERY_FEE, 1.99),
+                'delivery_fee_per_mile_gbp' => $this->config->float(PlatformConfigService::KEY_DELIVERY_FEE_PER_MILE, 0.80),
+                'free_delivery_threshold_gbp' => $this->config->float(PlatformConfigService::KEY_FREE_DELIVERY_THRESHOLD, 25.0),
+                'order_tax_rate_percent' => $this->config->float(PlatformConfigService::KEY_ORDER_TAX_RATE, 5.0),
             ],
         ]);
     }

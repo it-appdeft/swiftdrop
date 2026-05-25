@@ -54,13 +54,62 @@ class HandleInertiaRequests extends Middleware
                 // always represented.
                 'selected_address' => fn () => $this->customerSelectedAddress($user),
             ],
+            // Lightweight cart badge for the header — just the total item
+            // count. The full cart payload is delivered per-page (restaurant
+            // detail) or via the cart endpoint.
+            'cart_summary' => fn () => $this->customerCartSummary($user),
+            // Saved addresses for the header's "change address" map flow.
+            'customer_addresses' => fn () => $this->customerAddresses($user),
             // Surface one-shot session flashes so the frontend can fire a
             // toast on the next visit (see app.tsx → router.on('success')).
+            // Both keys are forwarded: customer controllers flash `status`,
+            // admin/partner controllers flash `success` — the frontend toasts
+            // either one (see app.tsx).
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
+                'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
         ]);
+    }
+
+    /**
+     * Saved addresses for the header map flow's "Saved Addresses" list.
+     * Minimal shape — selecting one only needs its id; lat/lng stay server-side.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function customerAddresses(mixed $user): array
+    {
+        $profile = $user?->customerProfile ?? null;
+        if (! $profile) {
+            return [];
+        }
+
+        return $profile->addresses()
+            ->orderByDesc('is_selected')
+            ->orderByDesc('is_default')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'label' => $a->label,
+                'address_line_1' => $a->address_line_1,
+                'city' => $a->city,
+                'postcode' => $a->postcode,
+                'is_selected' => (bool) $a->is_selected,
+            ])
+            ->all();
+    }
+
+    /** @return array{item_count: int} */
+    protected function customerCartSummary(mixed $user): array
+    {
+        $cart = $user?->cart;
+
+        return [
+            'item_count' => $cart ? (int) $cart->items()->sum('quantity') : 0,
+        ];
     }
 
     protected function customerSelectedAddress(mixed $user): ?array
