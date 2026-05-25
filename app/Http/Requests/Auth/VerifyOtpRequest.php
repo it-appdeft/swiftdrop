@@ -57,8 +57,8 @@ class VerifyOtpRequest extends FormRequest
             'channel' => ['required', Rule::enum(OtpChannelEnum::class)],
             'email' => [Rule::requiredIf($needsEmail), 'nullable', 'email', 'max:255'],
             'country_code' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+[0-9]{1,4}$/'],
-            // Optional even for SMS — see SendOtpRequest::rules() for why.
-            'country_iso' => ['nullable', 'string', 'size:2', new ValidCountryIso()],
+            // Required for every SMS flow — see SendOtpRequest::rules() for why.
+            'country_iso' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'size:2', new ValidCountryIso()],
             'mobile' => [Rule::requiredIf($needsMobile), 'nullable', 'string', 'regex:/^\+?[0-9]{6,11}$/'],
             'code' => ['required', 'string', 'regex:/^[0-9]{4,8}$/'],
         ];

@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, ChevronRight, Heart, MapPin, Search as SearchIcon, Star, Trash2, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Heart, Search as SearchIcon, Star, Trash2, UtensilsCrossed } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 
@@ -70,6 +70,13 @@ interface Props {
 
 type Tab = 'restaurants' | 'dishes';
 
+/** Restaurant detail URL, carrying the active search keyword so the detail
+ *  page can populate its "Recommended" (related to your search) list. */
+function restaurantHref(id: number, keyword: string): string {
+    const q = keyword.trim();
+    return q ? `/customer/restaurants/${id}?q=${encodeURIComponent(q)}` : `/customer/restaurants/${id}`;
+}
+
 export default function CustomerSearch({ results }: Props) {
     const [query, setQuery] = useState(results.keyword);
     const [tab, setTab] = useState<Tab>('restaurants');
@@ -105,64 +112,45 @@ export default function CustomerSearch({ results }: Props) {
             <CustomerHeader />
 
             <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-                {hasQuery ? (
-                    <div className="mb-4 flex items-center gap-3">
+                <form
+                    onSubmit={submit}
+                    className="flex h-14 items-center gap-1.5 rounded-md border border-zinc-200 bg-background px-3 transition focus-within:border-primary"
+                >
+                    {hasQuery ? (
                         <Link
                             href="/customer/search"
                             aria-label="Back"
-                            className="flex size-9 items-center justify-center rounded-full text-foreground hover:bg-zinc-100"
+                            className="flex size-8 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-zinc-100"
                         >
-                            <ArrowLeft className="size-5" />
+                            <ChevronLeft className="size-5" />
                         </Link>
-                        <h1 className="truncate text-lg font-semibold capitalize sm:text-xl">{results.keyword}</h1>
-                    </div>
-                ) : null}
-
-                <form onSubmit={submit} className="relative">
+                    ) : null}
                     <input
-                        type="search"
+                        type="text"
                         value={query}
-                        autoFocus
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search dishes & restaurants"
-                        className="h-14 w-full rounded-md border border-zinc-200 bg-background pl-5 pr-14 text-base outline-none transition focus:border-primary"
+                        className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
                     />
                     <button
                         type="submit"
                         aria-label="Search"
-                        className="absolute right-2 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-md text-zinc-500 hover:text-primary"
+                        className="flex size-9 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:text-primary"
                     >
                         <SearchIcon className="size-5" />
                     </button>
                 </form>
 
-                {results.address ? (
-                    <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <MapPin className="size-3.5" />
-                        Showing results within {results.radius_miles} mi of {results.address.label ?? results.address.city ?? 'your saved address'}
-                    </p>
-                ) : (
-                    <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <MapPin className="size-3.5" />
-                        Add a delivery address in your profile to see results near you.
-                    </p>
-                )}
-
                 {!hasQuery ? (
                     <RecentSearches recent={results.recent} onPick={runKeyword} onClear={clearHistory} />
                 ) : (
                     <>
-                        <Tabs
-                            tab={tab}
-                            setTab={setTab}
-                            restaurantCount={restaurantCount}
-                            dishCount={dishCount}
-                        />
+                        <Tabs tab={tab} setTab={setTab} />
 
                         {tab === 'restaurants' ? (
-                            <RestaurantsList restaurants={results.restaurants} />
+                            <RestaurantsList restaurants={results.restaurants} keyword={results.keyword} />
                         ) : (
-                            <DishesList groups={results.dishes_by_restaurant} />
+                            <DishesList groups={results.dishes_by_restaurant} keyword={results.keyword} />
                         )}
 
                         {noResults ? (
@@ -226,25 +214,15 @@ function RecentSearches({
     );
 }
 
-function Tabs({
-    tab,
-    setTab,
-    restaurantCount,
-    dishCount,
-}: {
-    tab: Tab;
-    setTab: (t: Tab) => void;
-    restaurantCount: number;
-    dishCount: number;
-}) {
+function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
     return (
         <div className="mt-6 border-b border-zinc-200">
-            <div className="flex gap-8">
+            <div className="flex gap-10">
                 <TabButton active={tab === 'restaurants'} onClick={() => setTab('restaurants')}>
-                    Restaurants {restaurantCount > 0 ? <span className="text-muted-foreground">({restaurantCount})</span> : null}
+                    Restaurants
                 </TabButton>
                 <TabButton active={tab === 'dishes'} onClick={() => setTab('dishes')}>
-                    Dishes {dishCount > 0 ? <span className="text-muted-foreground">({dishCount})</span> : null}
+                    Dishes
                 </TabButton>
             </div>
         </div>
@@ -270,116 +248,120 @@ function TabButton({
             }
         >
             <span className="inline-flex items-center gap-1.5">{children}</span>
-            {active ? (
-                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" />
-            ) : null}
+            {active ? <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary" /> : null}
         </button>
     );
 }
 
-function RestaurantsList({ restaurants }: { restaurants: SearchRestaurant[] }) {
+/** Clock icon + "20-30 min" | distance, shared by restaurant cards and dish-group headers. */
+function MetaLine({ distanceMiles, city }: { distanceMiles: number | null; city: string | null }) {
+    const right = distanceMiles !== null ? `${distanceMiles} mi` : (city ?? '');
+
+    return (
+        <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="size-3.5" />
+            <span>20-30 min</span>
+            {right ? (
+                <>
+                    <span className="h-3 w-px bg-zinc-300" />
+                    <span>{right}</span>
+                </>
+            ) : null}
+        </p>
+    );
+}
+
+function RestaurantsList({ restaurants, keyword }: { restaurants: SearchRestaurant[]; keyword: string }) {
     if (restaurants.length === 0) {
         return (
-            <div className="mt-8 rounded-xl border border-dashed bg-zinc-50 p-10 text-center text-sm text-muted-foreground">
+            <div className="mt-6 rounded-xl border border-dashed bg-zinc-50 p-10 text-center text-sm text-muted-foreground">
                 No matching restaurants.
             </div>
         );
     }
 
     return (
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
-            {restaurants.map((r) => (
-                <Link key={r.id} href={`/customer/restaurants/${r.id}`} className="group block">
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-zinc-200">
-                        {r.cover_url || r.logo_url ? (
-                            <img
-                                src={(r.cover_url ?? r.logo_url)!}
-                                alt={r.name}
-                                className="h-full w-full object-cover transition group-hover:scale-105"
-                                loading="lazy"
-                            />
-                        ) : (
-                            <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
-                                {r.name.charAt(0)}
-                            </div>
-                        )}
-                        <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
-                            20% OFF select items
-                        </span>
-                        {r.rating !== null ? (
-                            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
-                                <Star className="size-3 fill-current text-amber-500" /> {r.rating.toFixed(1)}
+        <div className="mt-6 rounded-2xl bg-zinc-50 p-4 sm:p-6">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
+                {restaurants.map((r) => (
+                    <Link key={r.id} href={restaurantHref(r.id, keyword)} className="group block">
+                        <div className="relative aspect-[7/4] overflow-hidden rounded-2xl bg-zinc-200">
+                            {r.cover_url || r.logo_url ? (
+                                <img
+                                    src={(r.cover_url ?? r.logo_url)!}
+                                    alt={r.name}
+                                    className="h-full w-full object-cover transition group-hover:scale-105"
+                                    loading="lazy"
+                                />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
+                                    {r.name.charAt(0)}
+                                </div>
+                            )}
+                            <span className="absolute bottom-3 left-3 rounded-full bg-rose-500 px-3 py-1 text-xs font-medium text-white shadow">
+                                20% OFF select items
                             </span>
-                        ) : null}
-                    </div>
-                    <div className="flex items-center justify-between pt-3">
-                        <div className="min-w-0">
-                            <p className="truncate text-base font-semibold">{r.name}</p>
-                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                20-30 min
-                                {r.distance_miles !== null
-                                    ? ` · ${r.distance_miles} mi`
-                                    : r.city
-                                      ? ` · ${r.city}`
-                                      : ''}
-                            </p>
+                            {r.rating !== null ? (
+                                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-zinc-900 shadow">
+                                    <Star className="size-3 fill-amber-400 text-amber-400" /> {r.rating.toFixed(1)}
+                                </span>
+                            ) : null}
                         </div>
-                        <button
-                            type="button"
-                            aria-label="Save"
-                            onClick={(e) => e.preventDefault()}
-                            className="shrink-0 text-muted-foreground transition hover:text-rose-500"
-                        >
-                            <Heart className="size-5" />
-                        </button>
-                    </div>
-                </Link>
-            ))}
+                        <div className="flex items-start justify-between gap-2 pt-3">
+                            <div className="min-w-0">
+                                <p className="truncate text-base font-semibold text-foreground">{r.name}</p>
+                                <MetaLine distanceMiles={r.distance_miles} city={r.city} />
+                            </div>
+                            <button
+                                type="button"
+                                aria-label="Save"
+                                onClick={(e) => e.preventDefault()}
+                                className="shrink-0 text-zinc-400 transition hover:text-rose-500"
+                            >
+                                <Heart className="size-5" />
+                            </button>
+                        </div>
+                    </Link>
+                ))}
+            </div>
         </div>
     );
 }
 
-function DishesList({ groups }: { groups: DishGroup[] }) {
+function DishesList({ groups, keyword }: { groups: DishGroup[]; keyword: string }) {
     if (groups.length === 0) {
         return (
-            <div className="mt-8 rounded-xl border border-dashed bg-zinc-50 p-10 text-center text-sm text-muted-foreground">
+            <div className="mt-6 rounded-xl border border-dashed bg-zinc-50 p-10 text-center text-sm text-muted-foreground">
                 No matching dishes.
             </div>
         );
     }
 
     return (
-        <div className="mt-8 space-y-10">
+        <div className="mt-6 space-y-4 rounded-2xl bg-zinc-50 p-3 sm:p-4">
             {groups.map((group) => (
-                <section key={group.restaurant.id}>
+                <section key={group.restaurant.id} className="rounded-2xl bg-white p-4 sm:p-6">
                     <Link
-                        href={`/customer/restaurants/${group.restaurant.id}`}
-                        className="group mb-4 flex items-center justify-between gap-3"
+                        href={restaurantHref(group.restaurant.id, keyword)}
+                        className="group flex items-center justify-between gap-3 border-b border-zinc-100 pb-4"
                     >
                         <div className="min-w-0">
-                            <p className="truncate text-base font-semibold group-hover:text-primary sm:text-lg">
+                            <p className="truncate text-lg font-bold text-foreground group-hover:text-primary">
                                 {group.restaurant.name}
                             </p>
-                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                {group.restaurant.rating !== null ? (
-                                    <span className="mr-2 inline-flex items-center gap-1 text-emerald-700">
-                                        <Star className="size-3 fill-current text-amber-500" />
-                                        {group.restaurant.rating.toFixed(1)}
-                                    </span>
-                                ) : null}
-                                20-30 min
-                                {group.restaurant.distance_miles !== null
-                                    ? ` · ${group.restaurant.distance_miles} mi`
-                                    : group.restaurant.city
-                                      ? ` · ${group.restaurant.city}`
-                                      : ''}
-                            </p>
+                            <MetaLine distanceMiles={group.restaurant.distance_miles} city={group.restaurant.city} />
                         </div>
                         <ChevronRight className="size-5 shrink-0 text-muted-foreground group-hover:text-primary" />
                     </Link>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 md:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3">
                         {group.dishes.map((dish) => (
-                            <DishCard key={dish.id} dish={dish} restaurantId={group.restaurant.id} />
+                            <DishCard
+                                key={dish.id}
+                                dish={dish}
+                                restaurantId={group.restaurant.id}
+                                rating={group.restaurant.rating}
+                                keyword={keyword}
+                            />
                         ))}
                     </div>
                 </section>
@@ -388,41 +370,68 @@ function DishesList({ groups }: { groups: DishGroup[] }) {
     );
 }
 
-function DishCard({ dish, restaurantId }: { dish: DishItem; restaurantId: number }) {
+function DishCard({
+    dish,
+    restaurantId,
+    rating,
+    keyword,
+}: {
+    dish: DishItem;
+    restaurantId: number;
+    rating: number | null;
+    keyword: string;
+}) {
     return (
-        <article className="relative overflow-hidden rounded-xl border border-zinc-200 bg-background transition hover:border-primary/40 hover:shadow-sm">
-            <Link href={`/customer/restaurants/${restaurantId}`} className="block">
-                <div className="aspect-[4/3] overflow-hidden bg-amber-50">
-                    {dish.image_url ? (
-                        <img
-                            src={dish.image_url}
-                            alt={dish.name}
-                            className="h-full w-full object-cover transition group-hover:scale-105"
-                            loading="lazy"
-                        />
-                    ) : (
-                        <div className="flex h-full w-full items-center justify-center text-amber-600">
-                            <UtensilsCrossed className="size-10" />
-                        </div>
-                    )}
-                </div>
-                <div className="space-y-1 p-3">
-                    <p className="truncate text-sm font-semibold">{dish.name}</p>
-                    <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold tabular-nums">£{dish.price.toFixed(2)}</span>
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                router.visit(`/customer/restaurants/${restaurantId}`);
-                            }}
-                            className="rounded-md border border-primary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary transition hover:bg-primary hover:text-primary-foreground"
-                        >
-                            Add
-                        </button>
+        <article className="rounded-xl border border-zinc-200 bg-white p-3">
+            <div className="flex gap-3">
+                <div className="relative shrink-0">
+                    <div className="size-28 overflow-hidden rounded-lg bg-amber-50">
+                        {dish.image_url ? (
+                            <img src={dish.image_url} alt={dish.name} className="h-full w-full object-cover" loading="lazy" />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center text-amber-600">
+                                <UtensilsCrossed className="size-9" />
+                            </div>
+                        )}
                     </div>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            router.visit(restaurantHref(restaurantId, keyword));
+                        }}
+                        className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500 bg-white px-5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-600 shadow-sm transition hover:bg-emerald-500 hover:text-white"
+                    >
+                        Add
+                    </button>
                 </div>
-            </Link>
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex items-start justify-between gap-2">
+                        <p className="line-clamp-2 text-sm font-semibold text-foreground">{dish.name}</p>
+                        <VegBadge isVeg={dish.is_veg} />
+                    </div>
+                    <p className="mt-1 text-sm font-semibold text-foreground tabular-nums">£{dish.price.toFixed(2)}</p>
+                    {rating !== null ? (
+                        <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-zinc-700">
+                            <Star className="size-3 fill-amber-400 text-amber-400" /> {rating.toFixed(1)}
+                        </span>
+                    ) : null}
+                </div>
+            </div>
         </article>
+    );
+}
+
+function VegBadge({ isVeg }: { isVeg: boolean }) {
+    const border = isVeg ? 'border-emerald-600' : 'border-rose-600';
+    const dot = isVeg ? 'bg-emerald-600' : 'bg-rose-600';
+
+    return (
+        <span
+            className={`flex size-4 shrink-0 items-center justify-center rounded-[3px] border ${border}`}
+            aria-label={isVeg ? 'Vegetarian' : 'Non-vegetarian'}
+        >
+            <span className={`size-1.5 rounded-full ${dot}`} />
+        </span>
     );
 }

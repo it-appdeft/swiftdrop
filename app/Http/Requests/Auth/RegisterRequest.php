@@ -36,10 +36,10 @@ class RegisterRequest extends FormRequest
                 new HasVerifiedOtp($this->canonicalEmail(), 'email'),
             ],
             'country_code' => ['required', 'string', 'regex:/^\+[0-9]{1,4}$/'],
-            // Nullable for backwards-compatibility — this is the API customer /
-            // driver signup. RegistrationService derives a fallback ISO from the
-            // dialling code when an older client omits it.
-            'country_iso' => ['nullable', 'string', 'size:2', new ValidCountryIso()],
+            // Required — the API customer / driver signup client picks a country,
+            // so it always sends the exact ISO. We persist it verbatim instead of
+            // deriving it from the dial code (shared prefixes map to many countries).
+            'country_iso' => ['required', 'string', 'size:2', new ValidCountryIso()],
             'mobile' => [
                 'required',
                 'string',

@@ -565,6 +565,7 @@ function EditProfileDialog({
                 type: 'verify_current_phone',
                 channel: 'sms',
                 country_code: phoneCountry,
+                country_iso: phoneIso,
                 mobile: initialMobile,
             },
             {
@@ -595,6 +596,7 @@ function EditProfileDialog({
                 type: 'verify_current_phone',
                 channel: 'sms',
                 country_code: phoneCountry,
+                country_iso: phoneIso,
                 mobile: initialMobile,
                 code: phoneDigits.join(''),
             },

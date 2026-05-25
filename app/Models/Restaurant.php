@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -62,6 +63,58 @@ class Restaurant extends Model
     public function hasSubmittedApplication(): bool
     {
         return $this->application_submitted_at !== null;
+    }
+
+    // ─── Query scopes ────────────────────────────────────────────────────────
+
+    /** Restaurants that are live (not suspended / paused). */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', 'active');
+    }
+
+    /** Restaurants whose partner application has been approved. */
+    public function scopeApproved(Builder $query): Builder
+    {
+        return $query->where('approval_status', 'approved');
+    }
+
+    /**
+     * Restaurants within `$radiusMiles` of a coordinate, selecting the
+     * Haversine distance as `distance_miles` so callers can order by it.
+     * Distance is computed SQL-side so the radius filter stays index-friendly
+     * and never pulls every row into PHP.
+     */
+    public function scopeWithinRadius(Builder $query, float $lat, float $lng, float $radiusMiles): Builder
+    {
+        $distance = static::distanceMilesExpression($lat, $lng);
+
+        return $query
+            ->whereNotNull('restaurants.lat')
+            ->whereNotNull('restaurants.lng')
+            ->selectRaw("restaurants.*, {$distance} as distance_miles")
+            ->whereRaw("{$distance} <= ?", [$radiusMiles]);
+    }
+
+    /**
+     * Haversine great-circle distance in miles between a fixed coordinate and
+     * each row's lat/lng columns, as a raw SQL expression. Single source of
+     * truth for {@see scopeWithinRadius()} and the search service's distance
+     * ordering (which joins `restaurants` and so passes qualified columns).
+     */
+    public static function distanceMilesExpression(
+        float $lat,
+        float $lng,
+        string $latColumn = 'restaurants.lat',
+        string $lngColumn = 'restaurants.lng',
+    ): string {
+        $earth = 3958.7613; // miles
+
+        return "({$earth} * acos("
+            ."cos(radians({$lat})) * cos(radians({$latColumn})) * "
+            ."cos(radians({$lngColumn}) - radians({$lng})) + "
+            ."sin(radians({$lat})) * sin(radians({$latColumn}))"
+            ."))";
     }
 
     public function user(): BelongsTo

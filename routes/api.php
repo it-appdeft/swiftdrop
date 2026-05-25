@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Auth\AuthController as ApiAuthController;
 use App\Http\Controllers\Api\Customer\CustomerDashboardController;
 use App\Http\Controllers\Api\Customer\CustomerProfileController;
+use App\Http\Controllers\Api\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Api\Customer\CustomerSearchController;
 use App\Http\Controllers\Api\DeletionReasonController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
@@ -27,6 +28,8 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
 
     Route::get('search', [CustomerSearchController::class, 'index']);
     Route::delete('search/history', [CustomerSearchController::class, 'clear']);
+
+    Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])->whereNumber('id');
 
     Route::controller(CustomerProfileController::class)->prefix('profile')->group(function () {
         Route::get('/', 'show');
