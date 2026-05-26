@@ -514,16 +514,18 @@ export default function PartnerApply({
                             {/* On mobile: full-width stacked buttons with Continue on top
                                 (primary action) and Back below — `flex-col-reverse` reverses
                                 the DOM order so this layout works while keeping the
-                                desktop pattern (Back left, Continue right) when `sm:` kicks in. */}
-                            <div className="mt-8 flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
-                                <button
-                                    type="button"
-                                    onClick={goBack}
-                                    disabled={step === 1}
-                                    className="inline-flex h-11 w-full items-center justify-center rounded-md border border-input bg-background px-5 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:w-auto"
-                                >
-                                    Back
-                                </button>
+                                desktop pattern (Back left, Continue right) when `sm:` kicks in.
+                                Back is hidden on step 1 — there's nothing to go back to. */}
+                            <div className="mt-8 flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-end">
+                                {step > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={goBack}
+                                        className="inline-flex h-11 w-full items-center justify-center rounded-md border border-input bg-background px-5 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary sm:mr-auto sm:h-10 sm:w-auto"
+                                    >
+                                        Back
+                                    </button>
+                                )}
                                 {step < 6 ? (
                                     <button
                                         type="button"
