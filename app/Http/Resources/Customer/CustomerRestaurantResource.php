@@ -15,7 +15,11 @@ class CustomerRestaurantResource extends JsonResource
         /** @var CustomerRestaurantData $data */
         $data = $this->resource;
         $restaurant = $data->restaurant;
-        $rating = $restaurant->rating !== null ? (float) $restaurant->rating : null;
+        // rating defaults to 0.00 in the DB; treat "no reviews yet" as unrated
+        // so the frontend's 4.0+ filter and TOP RATED badge don't trip on it.
+        $rating = ((int) $restaurant->total_reviews) > 0 && $restaurant->rating !== null
+            ? (float) $restaurant->rating
+            : null;
 
         // Reuse the dashboard/search restaurant shape, then layer on the two
         // detail-only fields the header needs (description + TOP RATED badge).

@@ -32,15 +32,23 @@ class CouponService
     {
         return Offer::query()
             ->active()
-            ->currentlyValid()
+            ->notExpired()
             ->orderByDesc('value')
             ->get()
             ->filter(fn (Offer $offer) => $this->isApplicableToRestaurant($offer, $restaurant)
                 && $this->triggerEligible($offer, $user))
-            ->map(fn (Offer $offer) => [
-                'offer' => $offer,
-                'eligible' => $this->minOrderMet($offer, $subtotal) && $this->withinUsageLimits($offer, $user),
-            ])
+            ->map(function (Offer $offer) use ($user, $subtotal) {
+                $upcoming = $offer->valid_from !== null && $offer->valid_from->isFuture();
+
+                return [
+                    'offer' => $offer,
+                    // Upcoming coupons are shown but not applyable yet.
+                    'eligible' => ! $upcoming
+                        && $this->minOrderMet($offer, $subtotal)
+                        && $this->withinUsageLimits($offer, $user),
+                    'upcoming' => $upcoming,
+                ];
+            })
             ->values();
     }
 

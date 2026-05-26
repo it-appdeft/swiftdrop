@@ -80,6 +80,14 @@ class Offer extends Model
             ->where(fn (Builder $q) => $q->whereNull('valid_until')->orWhere('valid_until', '>=', $at));
     }
 
+    /** Not yet expired — valid_until is in the future or open-ended. Includes coupons whose valid_from is still in the future (those are "upcoming"). */
+    public function scopeNotExpired(Builder $query, ?Carbon $at = null): Builder
+    {
+        $at ??= Carbon::now();
+
+        return $query->where(fn (Builder $q) => $q->whereNull('valid_until')->orWhere('valid_until', '>=', $at));
+    }
+
     public function scopeFilter(Builder $query, array $f): Builder
     {
         return $query
