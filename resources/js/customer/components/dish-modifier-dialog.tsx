@@ -94,8 +94,8 @@ export function DishModifierDialog({ dish, submitting = false, onClose, onAdd }:
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-h-[90vh] gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[480px]">
-                <div className="max-h-[90vh] overflow-y-auto">
+            <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[480px]">
+                <div className="min-h-0 flex-1 overflow-y-auto">
                     {/* Hero image */}
                     <div className="aspect-[16/9] w-full overflow-hidden bg-amber-50">
                         {dish.image_url ? (
@@ -125,9 +125,9 @@ export function DishModifierDialog({ dish, submitting = false, onClose, onAdd }:
                     </div>
                 </div>
 
-                {/* Sticky footer: quantity + add */}
-                <div className="bg-background flex items-center gap-3 border-t border-zinc-100 px-5 py-3">
-                    <div className="flex items-center gap-3 rounded-md border border-emerald-500 px-3 py-2">
+                {/* Sticky footer: quantity (left) + add (right) */}
+                <div className="bg-background flex shrink-0 items-center justify-between gap-3 border-t border-zinc-100 px-5 py-3">
+                    <div className="flex items-center gap-3 rounded-md border border-emerald-500 px-3 py-1.5">
                         <button
                             type="button"
                             aria-label="Decrease quantity"
@@ -151,7 +151,7 @@ export function DishModifierDialog({ dish, submitting = false, onClose, onAdd }:
                         type="button"
                         disabled={!canAdd || submitting}
                         onClick={() => onAdd(selectedIds, quantity)}
-                        className="flex-1 rounded-md bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         Add Item £{(unitPrice * quantity).toFixed(2)}
                     </button>
