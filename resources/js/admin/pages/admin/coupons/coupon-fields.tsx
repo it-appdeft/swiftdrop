@@ -64,11 +64,12 @@ export function CouponFields({ data, setData, errors, options }: Props) {
                     <CardTitle>Coupon</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <FormField label="Code" error={errors.code} required hint="Type a code or generate one. Letters, numbers, - and _ only.">
+                    <FormField label="Code" error={errors.code} required hint="Type a code or generate one. Letters, numbers, - and _ only. No spaces.">
                         <div className="flex gap-2">
                             <Input
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value.toUpperCase())}
+                                onChange={(e) => setData('code', e.target.value.replace(/\s+/g, '').toUpperCase())}
+                                onKeyDown={(e) => e.key === ' ' && e.preventDefault()}
                                 placeholder="WEEKEND20"
                                 className="flex-1"
                             />

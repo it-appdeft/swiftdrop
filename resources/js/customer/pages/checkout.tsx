@@ -39,8 +39,10 @@ interface AvailableCoupon {
     headline: string;
     min_order_value: number | null;
     trigger: string;
+    valid_from: string | null;
     valid_until: string | null;
     eligible: boolean;
+    upcoming: boolean;
 }
 
 interface Checkout {
@@ -531,13 +533,29 @@ function CouponModal({
                         {coupons.length === 0 ? (
                             <p className="text-muted-foreground py-6 text-center text-sm">No coupons available for this order.</p>
                         ) : (
-                            coupons.map((c) =>
-                                c.trigger === 'welcome' ? (
-                                    <WelcomeCouponCard key={c.code} coupon={c} onApply={() => onApply(c.code)} />
-                                ) : (
-                                    <CouponCard key={c.code} coupon={c} onApply={() => onApply(c.code)} />
-                                ),
-                            )
+                            <>
+                                {coupons
+                                    .filter((c) => !c.upcoming)
+                                    .map((c) =>
+                                        c.trigger === 'welcome' ? (
+                                            <WelcomeCouponCard key={c.code} coupon={c} onApply={() => onApply(c.code)} />
+                                        ) : (
+                                            <CouponCard key={c.code} coupon={c} onApply={() => onApply(c.code)} />
+                                        ),
+                                    )}
+                                {coupons.some((c) => c.upcoming) ? (
+                                    <>
+                                        <h3 className="text-muted-foreground pt-2 text-xs font-semibold uppercase tracking-wide">
+                                            Upcoming coupons
+                                        </h3>
+                                        {coupons
+                                            .filter((c) => c.upcoming)
+                                            .map((c) => (
+                                                <CouponCard key={c.code} coupon={c} onApply={() => onApply(c.code)} />
+                                            ))}
+                                    </>
+                                ) : null}
+                            </>
                         )}
                     </div>
                 </div>
@@ -547,6 +565,7 @@ function CouponModal({
 }
 
 function couponCondition(c: AvailableCoupon): string | null {
+    if (c.upcoming && c.valid_from) return `Starts ${c.valid_from}`;
     if (c.trigger === 'weekend') return 'Weekend only';
     if (c.min_order_value) return `Valid on orders > £${c.min_order_value.toFixed(0)}`;
     if (c.valid_until) return `Valid until ${c.valid_until}`;
@@ -557,21 +576,35 @@ function CouponCard({ coupon, onApply }: { coupon: AvailableCoupon; onApply: () 
     const condition = couponCondition(coupon);
 
     return (
-        <div className="rounded-xl border border-zinc-100 bg-[#F6F8FA] p-4">
+        <div className={'rounded-xl border border-zinc-100 bg-[#F6F8FA] p-4 ' + (coupon.upcoming ? 'opacity-80' : '')}>
             <div className="flex items-start justify-between gap-3">
                 <span className="flex size-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
                     <Ticket className="size-4" />
                 </span>
-                <span className="bg-background text-foreground rounded-md border border-zinc-200 px-2 py-0.5 font-mono text-xs font-semibold">
-                    {coupon.code}
-                </span>
+                <div className="flex items-center gap-1.5">
+                    {coupon.upcoming ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                            Upcoming
+                        </span>
+                    ) : null}
+                    <span className="bg-background text-foreground rounded-md border border-zinc-200 px-2 py-0.5 font-mono text-xs font-semibold">
+                        {coupon.code}
+                    </span>
+                </div>
             </div>
             <p className="text-foreground mt-2 text-sm font-bold">{coupon.headline}</p>
             {coupon.title ? <p className="text-foreground text-sm font-medium">{coupon.title}</p> : null}
             {coupon.description ? <p className="text-muted-foreground mt-0.5 text-xs">{coupon.description}</p> : null}
             <div className="mt-2 flex items-center justify-between">
                 {condition ? (
-                    <span className={'text-xs ' + (coupon.eligible ? 'text-muted-foreground' : 'text-rose-600')}>{condition}</span>
+                    <span
+                        className={
+                            'text-xs ' +
+                            (coupon.upcoming ? 'text-amber-700' : coupon.eligible ? 'text-muted-foreground' : 'text-rose-600')
+                        }
+                    >
+                        {condition}
+                    </span>
                 ) : (
                     <span />
                 )}

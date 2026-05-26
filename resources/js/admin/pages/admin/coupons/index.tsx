@@ -30,7 +30,25 @@ interface Coupon {
     trigger: string;
     is_active: boolean;
     usages_count: number;
+    valid_from: string | null;
     valid_until: string | null;
+}
+
+type CouponStatus = 'inactive' | 'scheduled' | 'expired' | 'active';
+
+const STATUS_STYLES: Record<CouponStatus, { label: string; cls: string }> = {
+    inactive: { label: 'Inactive', cls: 'bg-zinc-100 text-zinc-600' },
+    scheduled: { label: 'Scheduled', cls: 'bg-amber-100 text-amber-700' },
+    expired: { label: 'Expired', cls: 'bg-rose-100 text-rose-700' },
+    active: { label: 'Active', cls: 'bg-emerald-100 text-emerald-700' },
+};
+
+function couponStatus(c: Coupon): CouponStatus {
+    if (!c.is_active) return 'inactive';
+    const now = Date.now();
+    if (c.valid_from && new Date(c.valid_from).getTime() > now) return 'scheduled';
+    if (c.valid_until && new Date(c.valid_until).getTime() < now) return 'expired';
+    return 'active';
 }
 
 interface Props {
@@ -103,16 +121,10 @@ export default function CouponsIndex({ coupons, filters }: Props) {
         {
             id: 'status',
             header: 'Status',
-            cell: (row) => (
-                <span
-                    className={
-                        'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ' +
-                        (row.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-600')
-                    }
-                >
-                    {row.is_active ? 'Active' : 'Inactive'}
-                </span>
-            ),
+            cell: (row) => {
+                const { label, cls } = STATUS_STYLES[couponStatus(row)];
+                return <span className={'inline-flex rounded-full px-2 py-0.5 text-xs font-medium ' + cls}>{label}</span>;
+            },
         },
         {
             id: 'actions',

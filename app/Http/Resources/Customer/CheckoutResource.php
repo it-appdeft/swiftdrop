@@ -49,7 +49,7 @@ class CheckoutResource extends JsonResource
             ] : null,
             'coupon_error' => $data->couponError,
             'available_coupons' => $data->availableCoupons
-                ->map(fn (array $row) => $this->coupon($row['offer'], (bool) $row['eligible']))
+                ->map(fn (array $row) => $this->coupon($row['offer'], (bool) $row['eligible'], (bool) ($row['upcoming'] ?? false)))
                 ->values()->all(),
             'bill' => [
                 'item_total' => $data->itemTotal,
@@ -79,7 +79,7 @@ class CheckoutResource extends JsonResource
     }
 
     /** @return array<string, mixed> */
-    protected function coupon(Offer $offer, bool $eligible): array
+    protected function coupon(Offer $offer, bool $eligible, bool $upcoming): array
     {
         return [
             'code' => $offer->code,
@@ -90,8 +90,10 @@ class CheckoutResource extends JsonResource
             'headline' => $this->headline($offer),
             'min_order_value' => $offer->min_order_value !== null ? (float) $offer->min_order_value : null,
             'trigger' => $offer->trigger,
+            'valid_from' => optional($offer->valid_from)->toDateString(),
             'valid_until' => optional($offer->valid_until)->toDateString(),
             'eligible' => $eligible,
+            'upcoming' => $upcoming,
         ];
     }
 
