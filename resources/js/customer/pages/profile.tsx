@@ -2346,7 +2346,7 @@ export default function CustomerProfile() {
     };
 
     return (
-        <div className="flex min-h-screen flex-col bg-zinc-50">
+        <div className="flex min-h-screen flex-col bg-[#F6F8FA]">
             <Head title="Profile" />
 
             <CustomerHeader />

@@ -50,6 +50,9 @@ class CheckoutController extends Controller
             $request->specialInstructions(),
         );
 
-        return redirect()->route('customer.dashboard')->with('status', 'Order placed! 🎉');
+        // Flash a dedicated key so the dashboard can show a success modal
+        // (see customer/pages/dashboard.tsx). We avoid 'status' here so the
+        // global toast listener in app.tsx doesn't fire a duplicate toast.
+        return redirect()->route('customer.dashboard')->with('order_placed', true);
     }
 }

@@ -69,6 +69,8 @@ class HandleInertiaRequests extends Middleware
                 'status' => fn () => $request->session()->get('status'),
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                // Sentinel flag for one-shot success modals (e.g. order placed).
+                'order_placed' => fn () => (bool) $request->session()->get('order_placed', false),
             ],
         ]);
     }

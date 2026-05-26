@@ -267,11 +267,11 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                 ) : null}
             </main>
 
-            {/* Sticky "cart added" bar */}
+            {/* Sticky "cart added" bar — floating rounded card above the page edge */}
             {cartIsThisRestaurant ? (
-                <div className="sticky bottom-0 z-20 border-t border-emerald-700/20">
-                    <div className="mx-auto flex max-w-[1100px] items-center gap-4 bg-emerald-600 px-4 py-3 text-white sm:px-6">
-                        <div className="size-11 shrink-0 overflow-hidden rounded-full bg-white/20">
+                <div className="pointer-events-none sticky bottom-4 z-20 px-4 sm:px-6">
+                    <div className="pointer-events-auto mx-auto flex max-w-[1100px] items-center gap-4 rounded-xl bg-emerald-600 px-4 py-3 text-white shadow-lg shadow-emerald-900/20 ring-1 ring-emerald-700/20 sm:px-5">
+                        <div className="size-11 shrink-0 overflow-hidden rounded-full bg-white/20 ring-2 ring-white/40">
                             {(cart.restaurant?.logo_url ?? r.logo_url) ? (
                                 <img
                                     src={(cart.restaurant?.logo_url ?? r.logo_url)!}
@@ -285,14 +285,15 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                             )}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="truncate font-semibold">{cart.restaurant?.name ?? r.name}</p>
-                            <p className="text-sm text-white/85">
-                                {cart.item_count} item{cart.item_count === 1 ? '' : 's'}
+                            <p className="truncate text-sm font-semibold sm:text-base">{cart.restaurant?.name ?? r.name}</p>
+                            <p className="text-xs text-white/90 sm:text-sm">
+                                {cart.item_count} item{cart.item_count === 1 ? '' : 's'} <span className="opacity-60">·</span>{' '}
+                                <span className="tabular-nums">£{cart.subtotal.toFixed(2)}</span>
                             </p>
                         </div>
                         <Link
                             href={route('customer.cart')}
-                            className="rounded-md bg-white px-5 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                            className="shrink-0 rounded-md bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
                         >
                             View Cart
                         </Link>

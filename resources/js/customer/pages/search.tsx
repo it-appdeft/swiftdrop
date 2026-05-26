@@ -154,7 +154,7 @@ export default function CustomerSearch({ results }: Props) {
                         )}
 
                         {noResults ? (
-                            <div className="mt-10 rounded-xl border border-dashed bg-zinc-50 p-10 text-center text-sm text-muted-foreground">
+                            <div className="mt-10 rounded-xl border border-dashed bg-[#F6F8FA] p-10 text-center text-sm text-muted-foreground">
                                 No matches for <strong className="font-semibold">“{results.keyword}”</strong>
                                 {!results.using_fallback ? ` within ${results.radius_miles} mi.` : '.'}
                             </div>
@@ -274,14 +274,14 @@ function MetaLine({ distanceMiles, city }: { distanceMiles: number | null; city:
 function RestaurantsList({ restaurants, keyword }: { restaurants: SearchRestaurant[]; keyword: string }) {
     if (restaurants.length === 0) {
         return (
-            <div className="mt-6 rounded-xl border border-dashed bg-zinc-50 p-10 text-center text-sm text-muted-foreground">
+            <div className="mt-6 rounded-xl border border-dashed bg-[#F6F8FA] p-10 text-center text-sm text-muted-foreground">
                 No matching restaurants.
             </div>
         );
     }
 
     return (
-        <div className="mt-6 rounded-2xl bg-zinc-50 p-4 sm:p-6">
+        <div className="mt-6 rounded-2xl bg-[#F6F8FA] p-4 sm:p-6">
             <div className="grid grid-cols-1 gap-x-6 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
                 {restaurants.map((r) => (
                     <Link key={r.id} href={restaurantHref(r.id, keyword)} className="group block">
@@ -331,14 +331,14 @@ function RestaurantsList({ restaurants, keyword }: { restaurants: SearchRestaura
 function DishesList({ groups, keyword }: { groups: DishGroup[]; keyword: string }) {
     if (groups.length === 0) {
         return (
-            <div className="mt-6 rounded-xl border border-dashed bg-zinc-50 p-10 text-center text-sm text-muted-foreground">
+            <div className="mt-6 rounded-xl border border-dashed bg-[#F6F8FA] p-10 text-center text-sm text-muted-foreground">
                 No matching dishes.
             </div>
         );
     }
 
     return (
-        <div className="mt-6 space-y-4 rounded-2xl bg-zinc-50 p-3 sm:p-4">
+        <div className="mt-6 space-y-4 rounded-2xl bg-[#F6F8FA] p-3 sm:p-4">
             {groups.map((group) => (
                 <section key={group.restaurant.id} className="rounded-2xl bg-white p-4 sm:p-6">
                     <Link

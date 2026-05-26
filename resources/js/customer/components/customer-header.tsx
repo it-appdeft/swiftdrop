@@ -44,7 +44,7 @@ export function CustomerHeader() {
 
     return (
         <>
-            <header className="sticky top-0 z-30 bg-zinc-50">
+            <header className="sticky top-0 z-30 bg-[#F6F8FA]">
                 <div className="mx-auto flex h-20 max-w-[1600px] items-center gap-4 px-4 sm:gap-8 sm:px-6 lg:gap-10 lg:px-8">
                     <Link href={route('customer.dashboard')} aria-label="SwiftDrop home" className="flex shrink-0 items-center leading-none">
                         <img src="/brand/Container.png" alt="" aria-hidden className="h-9 w-auto sm:h-10" />

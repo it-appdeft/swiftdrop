@@ -149,7 +149,7 @@ export default function CustomerCart({ cart }: Props) {
                         <button
                             type="button"
                             onClick={() => setPendingDelete(null)}
-                            className="text-foreground h-10 rounded-md border border-zinc-300 px-4 text-sm font-semibold hover:bg-zinc-50"
+                            className="text-foreground h-10 rounded-md border border-zinc-300 px-4 text-sm font-semibold hover:bg-[#F6F8FA]"
                         >
                             Cancel
                         </button>

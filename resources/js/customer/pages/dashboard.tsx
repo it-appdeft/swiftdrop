@@ -1,6 +1,7 @@
-import { Head, Link } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Heart, MapPin, Star, UtensilsCrossed } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { Check, ChevronLeft, ChevronRight, Heart, MapPin, Star, UtensilsCrossed } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 
 // ─── Types (mirror App\Http\Resources\Customer\CustomerDashboardResource) ────
@@ -83,7 +84,7 @@ const PROMOS = [
 // canvas). `tone` controls which side of that zebra a section sits on.
 function Section({ tone, children }: { tone: 'white' | 'gray'; children: React.ReactNode }) {
     return (
-        <section className={tone === 'gray' ? 'bg-zinc-100' : 'bg-background'}>
+        <section className={tone === 'gray' ? 'bg-[#F6F8FA]' : 'bg-background'}>
             <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6 sm:py-10 lg:px-8">{children}</div>
         </section>
     );
@@ -168,7 +169,7 @@ function TopPicksSection({ restaurants }: { restaurants: DashboardRestaurant[] }
                                 aria-label="Previous"
                                 onClick={prev}
                                 disabled={start === 0}
-                                className="flex size-9 items-center justify-center rounded-full border border-zinc-300 bg-background text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="flex size-9 items-center justify-center rounded-full border border-zinc-300 bg-background text-zinc-700 transition hover:bg-[#F6F8FA] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <ChevronLeft className="size-4" />
                             </button>
@@ -177,7 +178,7 @@ function TopPicksSection({ restaurants }: { restaurants: DashboardRestaurant[] }
                                 aria-label="Next"
                                 onClick={next}
                                 disabled={start >= maxStart}
-                                className="flex size-9 items-center justify-center rounded-full border border-zinc-300 bg-background text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="flex size-9 items-center justify-center rounded-full border border-zinc-300 bg-background text-zinc-700 transition hover:bg-[#F6F8FA] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <ChevronRight className="size-4" />
                             </button>
@@ -370,6 +371,22 @@ function AllRestaurantsSection({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function CustomerHome({ dashboard }: DashboardProps) {
+    // Show a brief success modal when landing here from a just-placed order.
+    // The flash is one-shot server-side; we mirror it locally so we can also
+    // auto-dismiss after ~2.5 s (or on user click).
+    const flash = (usePage().props as { flash?: { order_placed?: boolean } }).flash;
+    const [orderPlacedOpen, setOrderPlacedOpen] = useState(false);
+
+    useEffect(() => {
+        if (flash?.order_placed) setOrderPlacedOpen(true);
+    }, [flash?.order_placed]);
+
+    useEffect(() => {
+        if (!orderPlacedOpen) return;
+        const t = window.setTimeout(() => setOrderPlacedOpen(false), 2500);
+        return () => window.clearTimeout(t);
+    }, [orderPlacedOpen]);
+
     return (
         <div className="flex min-h-screen flex-col bg-background">
             <Head title="Home" />
@@ -387,6 +404,30 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
                     usingFallback={dashboard.using_fallback}
                 />
             </main>
+
+            <OrderPlacedDialog open={orderPlacedOpen} onClose={() => setOrderPlacedOpen(false)} />
         </div>
+    );
+}
+
+/**
+ * One-shot success modal shown when the user lands on the dashboard after
+ * placing an order. Self-dismisses on a timer in the parent.
+ */
+function OrderPlacedDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[400px]">
+                <div className="flex flex-col items-center px-8 pt-10 pb-10 text-center">
+                    <span className="flex size-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-500/30">
+                        <Check className="size-10" strokeWidth={3} />
+                    </span>
+                    <h2 className="text-foreground mt-6 text-xl font-bold">Order Placed Successfully</h2>
+                    <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                        Your order has been confirmed and<br />is being prepared.
+                    </p>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
