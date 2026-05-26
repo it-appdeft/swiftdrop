@@ -5,9 +5,16 @@
  * a static dependency of another chunk, which drops it from the Vite manifest
  * (pages are dynamic glob entries) and 500s the route. */
 import { BadgeCheck, Check, ChevronDown, Plus, Trash2, Upload } from 'lucide-react';
+import { useState } from 'react';
 
 import { AddressAutocomplete } from './address-autocomplete';
 import { LocationMapPicker } from './location-map-picker';
+
+// Server caps uploads at 5MB (UploadPartnerDocumentRequest → 'max:5120' in KB).
+// Mirrored client-side so partners get instant feedback instead of a 422 after
+// a wasted upload. Keep these two values in sync if either side changes.
+const MAX_DOC_BYTES = 5 * 1024 * 1024;
+const MAX_DOC_LABEL = '5MB';
 
 const RESTAURANT_TYPE_OPTIONS = [
     'Casual Dining',
@@ -171,6 +178,8 @@ function TextField({
     type = 'text',
     error,
     suffix,
+    inputMode,
+    maxLength,
 }: {
     label: string;
     required?: boolean;
@@ -181,6 +190,8 @@ function TextField({
     type?: string;
     error?: string;
     suffix?: React.ReactNode;
+    inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+    maxLength?: number;
 }) {
     return (
         <div className="space-y-1.5">
@@ -191,6 +202,8 @@ function TextField({
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={placeholder}
+                    inputMode={inputMode}
+                    maxLength={maxLength}
                     aria-invalid={error ? true : undefined}
                     className={
                         'h-11 w-full rounded-md border bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 ' +
@@ -670,10 +683,13 @@ export function LegalBankStep({
                     />
                     <TextField
                         label="Account number"
-                        placeholder="XXXX XXXX XXXX"
+                        placeholder="e.g. 1234567890"
                         value={data.accountNumber}
-                        onChange={(v) => update({ accountNumber: v })}
+                        // Strip non-digits on every change (covers typing AND paste).
+                        onChange={(v) => update({ accountNumber: v.replace(/\D/g, '') })}
                         error={errors.accountNumber}
+                        inputMode="numeric"
+                        maxLength={20}
                     />
                     <TextField
                         label="IFSC / SWIFT code"
@@ -699,19 +715,46 @@ export function DocumentsStep({
     onUploadDoc: (type: DocSlot, file: File) => void;
     errors: Record<string, string>;
 }) {
+    // Client-side validation errors (file too large, wrong type) per slot.
+    // Server errors still come in through the `errors` prop; either is shown.
+    const [localErrors, setLocalErrors] = useState<Partial<Record<DocSlot, string>>>({});
+
+    const handleFile = (type: DocSlot, file: File, input: HTMLInputElement) => {
+        // Reset the input so picking the SAME file again still triggers change
+        // (useful when the user picks an oversized file, then re-selects it).
+        input.value = '';
+
+        if (file.size > MAX_DOC_BYTES) {
+            const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+            setLocalErrors((prev) => ({
+                ...prev,
+                [type]: `File is ${sizeMb}MB — max allowed is ${MAX_DOC_LABEL}.`,
+            }));
+            return;
+        }
+
+        setLocalErrors((prev) => {
+            if (!prev[type]) return prev;
+            const next = { ...prev };
+            delete next[type];
+            return next;
+        });
+        onUploadDoc(type, file);
+    };
+
     return (
         <div className="space-y-6">
             <header>
                 <h2 className="text-xl font-bold tracking-tight">Documents</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Upload clear scans or photos. PDF, JPG or PNG up to 5MB each.
+                    Upload clear scans or photos. PDF, JPG or PNG up to {MAX_DOC_LABEL} each.
                 </p>
             </header>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {DOC_FIELDS.map((doc) => {
                     const uploaded = documents[doc.key]?.uploaded === true;
-                    const error = errors[`doc.${doc.key}`];
+                    const error = localErrors[doc.key] ?? errors[`doc.${doc.key}`];
                     return (
                         <div key={doc.key}>
                             <label
@@ -730,7 +773,7 @@ export function DocumentsStep({
                                                 : 'text-muted-foreground')
                                         }
                                     >
-                                        {uploaded ? 'Uploaded' : 'PDF, JPG or PNG. Max 5MB.'}
+                                        {uploaded ? 'Uploaded' : `PDF, JPG or PNG. Max ${MAX_DOC_LABEL}.`}
                                     </p>
                                 </div>
                                 <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary">
@@ -741,10 +784,10 @@ export function DocumentsStep({
                                     type="file"
                                     accept=".pdf,.jpg,.jpeg,.png"
                                     className="sr-only"
-                                    onChange={(e) =>
-                                        e.target.files?.[0] &&
-                                        onUploadDoc(doc.key, e.target.files[0])
-                                    }
+                                    onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        if (f) handleFile(doc.key, f, e.target);
+                                    }}
                                 />
                             </label>
                             {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
