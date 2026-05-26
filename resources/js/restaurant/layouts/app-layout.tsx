@@ -523,14 +523,14 @@ function TopBar({
                 <Menu className="size-4" />
             </button>
 
-            <div className="relative hidden flex-1 sm:block sm:max-w-xl">
+            {/* <div className="relative hidden flex-1 sm:block sm:max-w-xl">
                 <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                     type="search"
                     placeholder="Search orders, items, customers..."
                     className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
-            </div>
+            </div> */}
 
             <button
                 type="button"

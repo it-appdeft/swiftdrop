@@ -673,12 +673,17 @@ function AddItemDialog({
                     </div>
 
                     <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Item name</label>
+                        <label className="text-sm font-medium">
+                            Item name
+                            <span className="ml-0.5 text-rose-500">*</span>
+                        </label>
                         <input
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="e.g. Paneer Tikka"
+                            required
+                            aria-required="true"
                             className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                     </div>
@@ -686,25 +691,35 @@ function AddItemDialog({
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium">Category</label>
-                            <select
-                                value={categoryId}
-                                onChange={(e) => setCategoryId(e.target.value)}
-                                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            >
-                                {categories.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <select
+                                    value={categoryId}
+                                    onChange={(e) => setCategoryId(e.target.value)}
+                                    className="h-11 w-full appearance-none rounded-md border border-input bg-background pl-3 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                >
+                                    {categories.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            </div>
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-sm font-medium">Price (₹)</label>
+                            <label className="text-sm font-medium">
+                                Price (₹)
+                                <span className="ml-0.5 text-rose-500">*</span>
+                            </label>
                             <input
                                 type="number"
                                 value={price}
                                 onChange={(e) => setPrice(e.target.value)}
                                 placeholder="220"
+                                required
+                                aria-required="true"
+                                min="0"
+                                step="0.01"
                                 className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                             />
                         </div>

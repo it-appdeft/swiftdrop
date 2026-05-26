@@ -31,6 +31,16 @@ class UploadPartnerDocumentRequest extends FormRequest
         ];
     }
 
+    public function messages(): array
+    {
+        return [
+            'file.required' => 'Pick a file to upload.',
+            'file.file' => 'The upload was not a valid file.',
+            'file.max' => 'File is too large — max allowed is 5MB.',
+            'file.mimes' => 'File must be a PDF, JPG or PNG.',
+        ];
+    }
+
     public function documentType(): string
     {
         return (string) $this->input('type');

@@ -439,7 +439,7 @@ export default function RestaurantDashboard() {
                                     Here's how {restaurantName} is doing today.
                                 </p>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
+                            {/* <div className="flex flex-wrap items-center gap-2">
                                 <button
                                     type="button"
                                     className="inline-flex h-10 items-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-semibold hover:border-primary hover:text-primary"
@@ -454,7 +454,7 @@ export default function RestaurantDashboard() {
                                     <Plus className="size-4" />
                                     Add menu item
                                 </button>
-                            </div>
+                            </div> */}
                         </div>
 
                         {/* Metric cards */}

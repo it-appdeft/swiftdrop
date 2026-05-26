@@ -76,6 +76,7 @@ class SavePartnerApplicationRequest extends FormRequest
             'data.gst.regex' => 'GST must be 15 alphanumeric characters.',
             'data.fssai.regex' => 'FSSAI should be 14 digits.',
             'data.pan.regex' => 'PAN format should be ABCDE1234F.',
+            'data.accountNumber.regex' => 'Account number must be 6–20 digits with no letters or spaces.',
         ];
     }
 
@@ -117,7 +118,10 @@ class SavePartnerApplicationRequest extends FormRequest
                 'data.pan' => ['required', 'string', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]$/i'],
                 'data.bankAccountHolder' => ['nullable', 'string', 'max:200'],
                 'data.bankName' => ['nullable', 'string', 'max:200'],
-                'data.accountNumber' => ['nullable', 'string', 'max:50'],
+                // Bank account numbers vary by country (Indian: typically 9–18
+                // digits, generally 6–20 covers the realistic range). Digits
+                // only — the UI strips non-digits before submit.
+                'data.accountNumber' => ['nullable', 'string', 'regex:/^\d{6,20}$/'],
                 'data.ifsc' => ['nullable', 'string', 'max:20'],
             ],
             5 => [
