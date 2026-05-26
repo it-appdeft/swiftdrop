@@ -511,38 +511,40 @@ export default function PartnerApply({
 
                             <div className="mt-5">{renderStep()}</div>
 
-                            <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
+                            {/* On mobile: full-width stacked buttons with Continue on top
+                                (primary action) and Back below — `flex-col-reverse` reverses
+                                the DOM order so this layout works while keeping the
+                                desktop pattern (Back left, Continue right) when `sm:` kicks in. */}
+                            <div className="mt-8 flex flex-col-reverse gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
                                 <button
                                     type="button"
                                     onClick={goBack}
                                     disabled={step === 1}
-                                    className="text-sm font-semibold text-foreground hover:text-primary disabled:opacity-50"
+                                    className="inline-flex h-11 w-full items-center justify-center rounded-md border border-input bg-background px-5 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:w-auto"
                                 >
                                     Back
                                 </button>
-                                <div className="flex items-center gap-3">
-                                    {step < 6 ? (
-                                        <button
-                                            type="button"
-                                            onClick={goNext}
-                                            disabled={saving}
-                                            className="h-10 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                                        >
-                                            {saving ? 'Saving…' : 'Continue'}
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={handleSubmit}
-                                            disabled={!data.termsAccepted || submitting}
-                                            className="h-10 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-                                        >
-                                            {submitting
-                                                ? 'Submitting…'
-                                                : 'Submit & go to dashboard'}
-                                        </button>
-                                    )}
-                                </div>
+                                {step < 6 ? (
+                                    <button
+                                        type="button"
+                                        onClick={goNext}
+                                        disabled={saving}
+                                        className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50 sm:h-10 sm:w-auto"
+                                    >
+                                        {saving ? 'Saving…' : 'Continue'}
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        disabled={!data.termsAccepted || submitting}
+                                        className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50 sm:h-10 sm:w-auto"
+                                    >
+                                        {submitting
+                                            ? 'Submitting…'
+                                            : 'Submit & go to dashboard'}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </section>

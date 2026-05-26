@@ -331,28 +331,33 @@ function RestaurantTab({
 
     return (
         <div className="space-y-5">
-            <div className="flex flex-wrap gap-1 rounded-full border border-border bg-background p-1 sm:w-fit">
-                {RESTAURANT_SECTIONS.map((s) => {
-                    const isActive = section === s.key;
-                    return (
-                        <button
-                            key={s.key}
-                            type="button"
-                            onClick={() => {
-                                setSection(s.key);
-                                setErrors({});
-                            }}
-                            className={
-                                'rounded-full px-4 py-1.5 text-sm font-semibold transition ' +
-                                (isActive
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'text-muted-foreground hover:text-foreground')
-                            }
-                        >
-                            {s.label}
-                        </button>
-                    );
-                })}
+            {/* Mobile: horizontal-scroll pill strip (no wrap, so the rounded
+                container keeps its shape). `sm:w-fit` collapses to content
+                width on desktop where everything fits in one line. */}
+            <div className="-mx-1 overflow-x-auto px-1 sm:mx-0 sm:overflow-visible sm:px-0">
+                <div className="inline-flex w-max gap-1 rounded-full border border-border bg-background p-1 sm:w-fit">
+                    {RESTAURANT_SECTIONS.map((s) => {
+                        const isActive = section === s.key;
+                        return (
+                            <button
+                                key={s.key}
+                                type="button"
+                                onClick={() => {
+                                    setSection(s.key);
+                                    setErrors({});
+                                }}
+                                className={
+                                    'whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition ' +
+                                    (isActive
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'text-muted-foreground hover:text-foreground')
+                                }
+                            >
+                                {s.label}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
             <section className="rounded-2xl border border-border bg-background p-5 sm:p-6">
@@ -492,25 +497,30 @@ export default function RestaurantSettings() {
                     </p>
                 </header>
 
-                <div className="flex flex-wrap gap-1 rounded-full border border-border bg-background p-1 sm:w-fit">
-                    {TABS.map((t) => {
-                        const isActive = tab === t.key;
-                        return (
-                            <button
-                                key={t.key}
-                                type="button"
-                                onClick={() => setTab(t.key)}
-                                className={
-                                    'rounded-full px-4 py-1.5 text-sm font-semibold transition ' +
-                                    (isActive
-                                        ? 'bg-foreground text-background'
-                                        : 'text-muted-foreground hover:text-foreground')
-                                }
-                            >
-                                {t.label}
-                            </button>
-                        );
-                    })}
+                {/* Mobile-friendly tab strip: scrolls horizontally on narrow
+                    viewports so the rounded-full pill never wraps onto a
+                    second line and breaks its shape. */}
+                <div className="-mx-1 overflow-x-auto px-1 sm:mx-0 sm:overflow-visible sm:px-0">
+                    <div className="inline-flex w-max gap-1 rounded-full border border-border bg-background p-1 sm:w-fit">
+                        {TABS.map((t) => {
+                            const isActive = tab === t.key;
+                            return (
+                                <button
+                                    key={t.key}
+                                    type="button"
+                                    onClick={() => setTab(t.key)}
+                                    className={
+                                        'whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition ' +
+                                        (isActive
+                                            ? 'bg-foreground text-background'
+                                            : 'text-muted-foreground hover:text-foreground')
+                                    }
+                                >
+                                    {t.label}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {tab === 'profile' && <ProfileTab profile={profileData} />}

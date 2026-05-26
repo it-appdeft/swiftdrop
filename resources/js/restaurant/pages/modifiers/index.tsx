@@ -466,8 +466,8 @@ function GroupEditor({
             </section>
 
             <section className="rounded-2xl border border-border bg-background p-5 sm:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
                         <h3 className="text-base font-bold tracking-tight">Options</h3>
                         <p className="text-xs text-muted-foreground">
                             Drag to reorder. Price is the surcharge added to the base item.
@@ -476,7 +476,7 @@ function GroupEditor({
                     <button
                         type="button"
                         onClick={addOption}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-semibold hover:border-primary hover:text-primary"
+                        className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-semibold hover:border-primary hover:text-primary"
                     >
                         <Plus className="size-4" />
                         Add option
