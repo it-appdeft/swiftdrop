@@ -2,9 +2,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import {
     BarChart3,
     Bell,
-    Check,
     ChevronDown,
-    ChevronsUpDown,
     ClipboardList,
     Clock,
     FileText,
@@ -13,14 +11,12 @@ import {
     LogOut,
     Menu,
     Package,
-    Plus,
     Receipt,
     ScrollText,
     Search,
     ShoppingBag,
     SlidersHorizontal,
     Star,
-    Store,
     UserCog,
     UtensilsCrossed,
     Wallet,
@@ -105,135 +101,26 @@ function initialsFrom(name: string): string {
     );
 }
 
-// ─── Branch switcher ──────────────────────────────────────────────────────
+// ─── Active branch panel ──────────────────────────────────────────────────
 
-interface Branch {
-    id: string;
-    name: string;
-    status: 'open' | 'paused';
-    orders: number;
-}
-
-// Mock branches until a restaurant-branches model lands. The active branch is
-// held in local state so the switcher feels live.
-const BRANCHES: Branch[] = [
-    { id: 'indiranagar', name: 'Spice Route — Indiranagar', status: 'open', orders: 94 },
-    { id: 'koramangala', name: 'Spice Route — Koramangala', status: 'open', orders: 62 },
-    { id: 'whitefield', name: 'Spice Route — Whitefield', status: 'paused', orders: 0 },
-];
-
+/**
+ * Sidebar header showing the partner's restaurant. The branch concept is
+ * single-tenant for now — one restaurant per partner — so we render a static
+ * label rather than a switcher dropdown. When a multi-branch model lands,
+ * replace this with the previous dropdown-style picker.
+ */
 function BranchSwitcher() {
-    const [open, setOpen] = useState(false);
-    const [activeId, setActiveId] = useState(BRANCHES[0]?.id ?? '');
-    const wrapperRef = useRef<HTMLDivElement>(null);
-
-    const active = BRANCHES.find((b) => b.id === activeId) ?? BRANCHES[0];
-
-    useEffect(() => {
-        if (!open) return;
-        const onDocClick = (e: MouseEvent) => {
-            if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
-        };
-        const onEsc = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setOpen(false);
-        };
-        document.addEventListener('mousedown', onDocClick);
-        document.addEventListener('keydown', onEsc);
-        return () => {
-            document.removeEventListener('mousedown', onDocClick);
-            document.removeEventListener('keydown', onEsc);
-        };
-    }, [open]);
-
-    const statusLabel = (b: Branch) =>
-        `${b.status === 'open' ? 'Open' : 'Paused'} · ${b.orders} order${b.orders === 1 ? '' : 's'}`;
+    const { auth } = usePage<SharedProps>().props;
+    const name = auth.restaurant?.name ?? '—';
 
     return (
-        <div ref={wrapperRef} className="relative">
-            <button
-                type="button"
-                onClick={() => setOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={open}
-                className="flex w-full items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-left text-sm hover:border-primary"
-            >
-                <span className="min-w-0 flex-1">
-                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                        Active branch
-                    </span>
-                    <span className="truncate text-sm font-semibold text-white">
-                        {active?.name}
-                    </span>
-                </span>
-                <ChevronsUpDown className="ml-2 size-4 shrink-0 text-zinc-500" />
-            </button>
-
-            {open && (
-                <div
-                    role="menu"
-                    className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl"
-                >
-                    <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                        Switch branch
-                    </p>
-                    <ul className="pb-1">
-                        {BRANCHES.map((b) => {
-                            const isActive = b.id === active?.id;
-                            return (
-                                <li key={b.id}>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveId(b.id);
-                                            setOpen(false);
-                                        }}
-                                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-zinc-800"
-                                    >
-                                        <span
-                                            className={
-                                                'flex size-7 shrink-0 items-center justify-center rounded-md ' +
-                                                (b.status === 'open'
-                                                    ? 'bg-zinc-800 text-zinc-300'
-                                                    : 'bg-zinc-800 text-zinc-500')
-                                            }
-                                        >
-                                            <Store className="size-3.5" />
-                                        </span>
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block truncate text-sm font-medium text-white">
-                                                {b.name}
-                                            </span>
-                                            <span
-                                                className={
-                                                    'block text-[11px] ' +
-                                                    (b.status === 'open'
-                                                        ? 'text-emerald-400'
-                                                        : 'text-zinc-500')
-                                                }
-                                            >
-                                                {statusLabel(b)}
-                                            </span>
-                                        </span>
-                                        {isActive && (
-                                            <Check className="size-4 shrink-0 text-primary" />
-                                        )}
-                                    </button>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                    <div className="border-t border-zinc-800">
-                        <button
-                            type="button"
-                            onClick={() => setOpen(false)}
-                            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                        >
-                            <Plus className="size-4" />
-                            Manage branches
-                        </button>
-                    </div>
-                </div>
-            )}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                Active branch
+            </p>
+            <p className="truncate text-sm font-semibold text-white" title={name}>
+                {name}
+            </p>
         </div>
     );
 }
