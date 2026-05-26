@@ -369,11 +369,15 @@ export function AccountRestaurantStep({
                         </span>
                     </div>
                     <div className="flex gap-2">
-                        <div className="relative">
+                        {/* Fixed width so flag-emoji rendering differences across
+                            OSes (Linux: color emoji ~narrow, Windows older builds:
+                            two-letter regional codes ~wider) don't squeeze the
+                            phone input and clip the number. */}
+                        <div className="relative w-24 shrink-0">
                             <select
                                 value={data.contactCountryCode}
                                 disabled
-                                className="h-11 cursor-not-allowed appearance-none rounded-md border border-input bg-muted/40 pl-3 pr-8 text-sm text-muted-foreground"
+                                className="h-11 w-full cursor-not-allowed appearance-none rounded-md border border-input bg-muted/40 pl-3 pr-8 text-sm text-muted-foreground"
                             >
                                 {COUNTRY_CODE_OPTIONS.some(
                                     (o) => o.value === data.contactCountryCode,
@@ -394,7 +398,10 @@ export function AccountRestaurantStep({
                             type="tel"
                             value={data.contactPhone}
                             readOnly
-                            className="h-11 flex-1 cursor-not-allowed rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground"
+                            // `min-w-0` lets the flex item shrink past its
+                            // intrinsic min content width on narrow viewports
+                            // so the number never gets pushed off-screen.
+                            className="h-11 min-w-0 flex-1 cursor-not-allowed rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground"
                         />
                     </div>
                 </div>
@@ -577,31 +584,38 @@ export function LocationHoursStep({
                 <h3 className="text-sm font-semibold text-foreground">Operating hours</h3>
                 {DAYS.map(({ key, label }) => {
                     const h = data.hours[key];
+                    // Mobile: 2 compact rows per day (label+toggle, then from–to).
+                    // Desktop: `sm:contents` collapses the inner groupings so all
+                    // five controls render inline as a single flex row.
                     return (
                         <div
                             key={key}
-                            className="flex flex-col gap-3 rounded-xl border border-border bg-background p-3 sm:flex-row sm:items-center"
+                            className="flex flex-col gap-3 rounded-xl border border-border bg-background p-3 sm:flex-row sm:items-center sm:gap-3"
                         >
-                            <span className="w-12 shrink-0 text-sm font-semibold">{label}</span>
-                            <ToggleSwitch
-                                checked={h.open}
-                                onChange={(v) => setDay(key, { open: v })}
-                            />
-                            <input
-                                type="time"
-                                value={h.from}
-                                onChange={(e) => setDay(key, { from: e.target.value })}
-                                disabled={!h.open}
-                                className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
-                            />
-                            <span className="text-xs text-muted-foreground">to</span>
-                            <input
-                                type="time"
-                                value={h.to}
-                                onChange={(e) => setDay(key, { to: e.target.value })}
-                                disabled={!h.open}
-                                className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
-                            />
+                            <div className="flex items-center justify-between sm:contents">
+                                <span className="w-12 shrink-0 text-sm font-semibold">{label}</span>
+                                <ToggleSwitch
+                                    checked={h.open}
+                                    onChange={(v) => setDay(key, { open: v })}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2 sm:contents">
+                                <input
+                                    type="time"
+                                    value={h.from}
+                                    onChange={(e) => setDay(key, { from: e.target.value })}
+                                    disabled={!h.open}
+                                    className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+                                />
+                                <span className="text-xs text-muted-foreground">to</span>
+                                <input
+                                    type="time"
+                                    value={h.to}
+                                    onChange={(e) => setDay(key, { to: e.target.value })}
+                                    disabled={!h.open}
+                                    className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+                                />
+                            </div>
                         </div>
                     );
                 })}
@@ -861,35 +875,41 @@ export function CategoriesStep({
                                     <p className="text-xs text-rose-600">{nameError}</p>
                                 )}
                             </div>
-                            <div className="space-y-1.5">
-                                {idx === 0 && <FieldLabel>Diet</FieldLabel>}
-                                <div className="relative">
-                                    <select
-                                        value={row.diet}
-                                        onChange={(e) =>
-                                            setRow(idx, {
-                                                diet: e.target.value as CategoryRow['diet'],
-                                            })
-                                        }
-                                        className="h-11 w-full appearance-none rounded-md border border-input bg-background pl-3 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                    >
-                                        {DIET_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            {/* Diet + delete share a row on mobile (flex wrapper);
+                                on `sm:` the wrapper collapses via `sm:contents` so
+                                both become direct grid children of the parent's
+                                `[1fr_160px_auto]` track layout. */}
+                            <div className="flex items-end gap-3 sm:contents">
+                                <div className="min-w-0 flex-1 space-y-1.5">
+                                    {idx === 0 && <FieldLabel>Diet</FieldLabel>}
+                                    <div className="relative">
+                                        <select
+                                            value={row.diet}
+                                            onChange={(e) =>
+                                                setRow(idx, {
+                                                    diet: e.target.value as CategoryRow['diet'],
+                                                })
+                                            }
+                                            className="h-11 w-full appearance-none rounded-md border border-input bg-background pl-3 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                        >
+                                            {DIET_OPTIONS.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                    </div>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={() => removeRow(idx)}
+                                    aria-label="Remove category"
+                                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:border-rose-500 hover:text-rose-500"
+                                >
+                                    <Trash2 className="size-4" />
+                                </button>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => removeRow(idx)}
-                                aria-label="Remove category"
-                                className="inline-flex size-11 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:border-rose-500 hover:text-rose-500"
-                            >
-                                <Trash2 className="size-4" />
-                            </button>
                         </div>
                     );
                 })}
