@@ -185,9 +185,10 @@ function GroupBlock({
     return (
         <section className="mt-5 border-t border-zinc-100 pt-4">
             <h3 className="text-foreground text-base font-bold">{group.name}</h3>
-            {group.is_required ? (
-                <p className="text-xs font-medium text-amber-600">Required</p>
-            ) : group.max_selections ? (
+            {/* "Required" caption intentionally suppressed — required single-select
+                groups already pre-select their first option (see defaultSelection
+                above), so the customer never sees an unsatisfied required field. */}
+            {!group.is_required && group.max_selections ? (
                 <p className="text-muted-foreground text-xs">Select up to {group.max_selections}</p>
             ) : null}
 

@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
 class CustomerRestaurantData
 {
     /**
-     * @param  Collection<int, \App\Models\MenuItem>  $menuItems              Full menu, partner sort order.
+     * @param  Collection<int, \App\Models\MenuItem>  $menuItems              Paginated slice of the menu, partner sort order.
      * @param  Collection<int, \App\Models\MenuItem>  $recommended            Menu items matching the search keyword.
      * @param  array<int, int>                         $favoriteMenuItemIds    menu_item ids the customer has favourited.
      */
@@ -25,6 +25,10 @@ class CustomerRestaurantData
         public readonly ?float $distanceMiles = null,
         public readonly bool $isFavorite = false,
         public readonly array $favoriteMenuItemIds = [],
+        public readonly int $menuCurrentPage = 1,
+        public readonly int $menuLastPage = 1,
+        public readonly int $menuPerPage = 10,
+        public readonly int $menuTotal = 0,
     ) {
     }
 }

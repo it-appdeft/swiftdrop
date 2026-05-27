@@ -11,6 +11,7 @@ use App\Http\Resources\Customer\CustomerCartResource;
 use App\Http\Resources\Customer\CustomerRestaurantResource;
 use App\Http\Resources\Customer\DashboardRestaurantResource;
 use App\Services\Customer\CustomerDashboardService;
+use App\Services\Customer\CustomerRestaurantService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Inertia\Inertia;
@@ -64,17 +65,32 @@ class CustomerRestaurantController extends Controller
         return Inertia::render('customer/restaurants/index', $payload);
     }
 
-    public function show(SearchRequest $request, int $id): Response
+    public function show(SearchRequest $request, int $id): Response|JsonResponse
     {
-        $data = $this->restaurants->show($request->user(), $id, $request->keyword());
+        $menuPage = max(1, (int) $request->query('page', 1));
+        $data = $this->restaurants->show(
+            $request->user(),
+            $id,
+            $request->keyword(),
+            menuPage: $menuPage,
+            menuPerPage: CustomerRestaurantService::MENU_PER_PAGE,
+        );
         $cart = $this->cart->getCart($request->user());
 
-        return Inertia::render('customer/restaurant', [
+        $payload = [
             'restaurant' => (new CustomerRestaurantResource($data))->resolve($request),
             // Embedded so the page renders qty steppers + the sticky cart bar
             // without a second request. Refreshed on every cart mutation
             // (which redirects back here).
             'cart' => (new CustomerCartResource($cart))->resolve($request),
-        ]);
+        ];
+
+        // Subsequent menu pages are fetched as JSON (infinite scroll) so we
+        // can append rows without re-rendering the whole Inertia page.
+        if ($request->wantsJson()) {
+            return response()->json($payload['restaurant']);
+        }
+
+        return Inertia::render('customer/restaurant', $payload);
     }
 }

@@ -25,10 +25,30 @@ class CustomerCartController extends Controller
     ) {
     }
 
+    /** Default page size for cart line items. */
+    protected const CART_ITEMS_PER_PAGE = 10;
+
     public function index(Request $request): JsonResponse
     {
+        // Paginate items at the controller layer (not the resource) — store,
+        // update, destroy and clear keep returning the full cart so callers
+        // can render the entire cart after a mutation.
+        $payload = (new CustomerCartResource($this->cart->getCart($request->user())))->resolve($request);
+
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = max(1, min(50, (int) $request->query('per_page', self::CART_ITEMS_PER_PAGE)));
+        $total = count($payload['items']);
+
+        $payload['items'] = array_slice($payload['items'], ($page - 1) * $perPage, $perPage);
+        $payload['items_meta'] = [
+            'current_page' => $page,
+            'last_page' => max(1, (int) ceil($total / $perPage)),
+            'per_page' => $perPage,
+            'total' => $total,
+        ];
+
         return $this->success(
-            data: new CustomerCartResource($this->cart->getCart($request->user())),
+            data: $payload,
             message: 'Cart retrieved.',
         );
     }

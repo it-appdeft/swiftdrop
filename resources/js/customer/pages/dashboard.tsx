@@ -1,7 +1,7 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Head, Link, usePage } from '@inertiajs/react';
-import { Check, ChevronLeft, ChevronRight, Heart, MapPin, Star, UtensilsCrossed } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Check, ChevronLeft, ChevronRight, Heart, MapPin, Star, UtensilsCrossed, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 
@@ -46,7 +46,19 @@ interface DashboardProps {
         address: DashboardAddress | null;
         radius_miles: number;
         using_fallback: boolean;
+        selected_food_item: FoodItem | null;
     };
+}
+
+/**
+ * Drives the dashboard's food-item filter — clicking a chip narrows the
+ * restaurant list in place (re-fetches via Inertia GET) and highlights the
+ * chip. Clicking the already-selected chip clears the filter.
+ */
+function setFoodItemFilter(id: number | null) {
+    const params: Record<string, number | string> = { restaurants_page: 1 };
+    if (id !== null) params.food_item_id = id;
+    router.get('/customer/dashboard', params, { preserveScroll: true, preserveState: false });
 }
 
 // ─── Static (cuisines / promos remain static for now) ───────────────────────
@@ -103,34 +115,52 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 
 // ─── Sections ────────────────────────────────────────────────────────────────
 
-function ExploreSection({ items }: { items: FoodItem[] }) {
+function ExploreSection({ items, selectedId }: { items: FoodItem[]; selectedId: number | null }) {
     if (items.length === 0) return null;
 
     return (
         <Section tone="white">
             <SectionHeader title="Explore" />
             <div className="flex gap-8 overflow-x-auto pb-1 sm:gap-10">
-                {items.map((item) => (
-                    <Link
-                        key={item.id}
-                        href={`/customer/search?search=${encodeURIComponent(item.name)}`}
-                        className="flex shrink-0 flex-col items-center gap-2.5 transition"
-                    >
-                        <span className="flex size-20 items-center justify-center overflow-hidden rounded-full bg-amber-50 sm:size-24">
-                            {item.image_url ? (
-                                <img
-                                    src={item.image_url}
-                                    alt={item.name}
-                                    className="h-full w-full object-cover"
-                                    loading="lazy"
-                                />
-                            ) : (
-                                <UtensilsCrossed className="size-8 text-amber-600 sm:size-10" />
-                            )}
-                        </span>
-                        <span className="text-sm font-medium text-foreground">{item.name}</span>
-                    </Link>
-                ))}
+                {items.map((item) => {
+                    const active = item.id === selectedId;
+                    return (
+                        <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setFoodItemFilter(active ? null : item.id)}
+                            aria-pressed={active}
+                            className="flex shrink-0 flex-col items-center gap-2.5 text-center transition"
+                        >
+                            <span
+                                className={
+                                    'flex size-20 items-center justify-center overflow-hidden rounded-full bg-amber-50 transition sm:size-24 ' +
+                                    (active
+                                        ? 'ring-3 ring-emerald-500 ring-offset-2 ring-offset-background'
+                                        : 'ring-0 hover:ring-2 hover:ring-emerald-300 hover:ring-offset-2 hover:ring-offset-background')
+                                }
+                            >
+                                {item.image_url ? (
+                                    <img
+                                        src={item.image_url}
+                                        alt={item.name}
+                                        className="h-full w-full object-cover"
+                                        loading="lazy"
+                                    />
+                                ) : (
+                                    <UtensilsCrossed className="size-8 text-amber-600 sm:size-10" />
+                                )}
+                            </span>
+                            <span
+                                className={
+                                    'text-sm font-medium ' + (active ? 'text-emerald-700' : 'text-foreground')
+                                }
+                            >
+                                {item.name}
+                            </span>
+                        </button>
+                    );
+                })}
             </div>
         </Section>
     );
@@ -293,11 +323,13 @@ function AllRestaurantsSection({
     address,
     radiusMiles,
     usingFallback,
+    selectedFoodItem,
 }: {
     restaurants: DashboardRestaurant[];
     address: DashboardAddress | null;
     radiusMiles: number;
     usingFallback: boolean;
+    selectedFoodItem: FoodItem | null;
 }) {
     // Local mirror of which cards are currently favorited so the heart can
     // flip instantly. Server is source of truth; we roll back on error.
@@ -338,7 +370,15 @@ function AllRestaurantsSection({
         <Section tone="gray">
             <div className="mb-5 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 className="text-xl font-bold tracking-tight sm:text-2xl">All Restaurants</h2>
+                    <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
+                        {selectedFoodItem ? (
+                            <>
+                                Restaurants offering <span className="text-emerald-700">{selectedFoodItem.name}</span>
+                            </>
+                        ) : (
+                            'All Restaurants'
+                        )}
+                    </h2>
                     {!usingFallback && address ? (
                         <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                             <MapPin className="size-3.5" />
@@ -346,14 +386,27 @@ function AllRestaurantsSection({
                         </p>
                     ) : null}
                 </div>
-                <Link href="/customer/restaurants" className="text-sm font-semibold text-primary hover:underline">
-                    View all
-                </Link>
+                <div className="flex items-center gap-3">
+                    {selectedFoodItem ? (
+                        <button
+                            type="button"
+                            onClick={() => setFoodItemFilter(null)}
+                            className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"
+                        >
+                            <X className="size-3.5" /> Clear filter
+                        </button>
+                    ) : null}
+                    <Link href="/customer/restaurants" className="text-sm font-semibold text-primary hover:underline">
+                        View all
+                    </Link>
+                </div>
             </div>
 
             {restaurants.length === 0 ? (
                 <div className="rounded-xl border border-dashed bg-background p-10 text-center text-sm text-muted-foreground">
-                    No restaurants {usingFallback ? 'available yet' : 'within range of your default address'}.
+                    {selectedFoodItem
+                        ? `No restaurants nearby are serving ${selectedFoodItem.name} right now.`
+                        : `No restaurants ${usingFallback ? 'available yet' : 'within range of your default address'}.`}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
@@ -463,7 +516,10 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
             <CustomerHeader />
 
             <main className="flex-1">
-                <ExploreSection items={dashboard.food_items} />
+                <ExploreSection
+                    items={dashboard.food_items}
+                    selectedId={dashboard.selected_food_item?.id ?? null}
+                />
                 <TopPicksSection restaurants={dashboard.restaurants} />
                 <CuisinesAndPromoSection />
                 <AllRestaurantsSection
@@ -471,6 +527,7 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
                     address={dashboard.address}
                     radiusMiles={dashboard.radius_miles}
                     usingFallback={dashboard.using_fallback}
+                    selectedFoodItem={dashboard.selected_food_item}
                 />
             </main>
 

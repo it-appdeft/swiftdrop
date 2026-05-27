@@ -46,6 +46,12 @@ class CustomerRestaurantResource extends JsonResource
             'menu' => $data->menuItems
                 ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id])))
                 ->values()->all(),
+            'menu_meta' => [
+                'current_page' => $data->menuCurrentPage,
+                'last_page' => $data->menuLastPage,
+                'per_page' => $data->menuPerPage,
+                'total' => $data->menuTotal,
+            ],
             'recommended' => $data->recommended
                 ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id])))
                 ->values()->all(),

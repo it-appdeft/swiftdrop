@@ -23,8 +23,7 @@ import {
     UtensilsCrossed,
     X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { SiteFooter } from '../../web/components/site-footer';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish, type ModifierGroup } from '../components/dish-modifier-dialog';
 
@@ -90,13 +89,23 @@ interface Cart {
     subtotal: number;
 }
 
+interface MenuMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+}
+
+interface RestaurantPayload {
+    restaurant: RestaurantHeader;
+    keyword: string;
+    menu: Dish[];
+    menu_meta: MenuMeta;
+    recommended: Dish[];
+}
+
 interface Props {
-    restaurant: {
-        restaurant: RestaurantHeader;
-        keyword: string;
-        menu: Dish[];
-        recommended: Dish[];
-    };
+    restaurant: RestaurantPayload;
     cart: Cart;
 }
 
@@ -135,6 +144,58 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
 
     const [storeInfoOpen, setStoreInfoOpen] = useState(false);
 
+    // Paginated menu — first page from props, subsequent pages appended via
+    // JSON fetch (infinite scroll). Reset whenever the underlying menu changes
+    // (e.g. a new keyword search re-renders the page).
+    const [menuItems, setMenuItems] = useState<Dish[]>(data.menu);
+    const [menuMeta, setMenuMeta] = useState<MenuMeta>(data.menu_meta);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        setMenuItems(data.menu);
+        setMenuMeta(data.menu_meta);
+    }, [data.menu, data.menu_meta]);
+
+    const hasMoreMenu = menuMeta.current_page < menuMeta.last_page;
+
+    const loadMoreMenu = useCallback(async () => {
+        if (loadingMore || !hasMoreMenu) return;
+        setLoadingMore(true);
+        try {
+            const params = new URLSearchParams({ page: String(menuMeta.current_page + 1) });
+            if (data.keyword) params.set('search', data.keyword);
+            const res = await fetch(`/customer/restaurants/${r.id}?${params.toString()}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error();
+            const json = (await res.json()) as RestaurantPayload;
+            setMenuItems((prev) => {
+                const seen = new Set(prev.map((d) => d.id));
+                return [...prev, ...json.menu.filter((d) => !seen.has(d.id))];
+            });
+            setMenuMeta(json.menu_meta);
+        } catch {
+            toast.error('Could not load more dishes.');
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [data.keyword, hasMoreMenu, loadingMore, menuMeta.current_page, r.id]);
+
+    useEffect(() => {
+        if (!sentinelRef.current || !hasMoreMenu) return;
+        const el = sentinelRef.current;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((e) => e.isIntersecting)) loadMoreMenu();
+            },
+            { rootMargin: '400px 0px' },
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [hasMoreMenu, loadMoreMenu]);
+
     const submitSearch = (e: React.FormEvent) => {
         e.preventDefault();
         router.get(`/customer/restaurants/${r.id}`, { search: query }, { preserveScroll: true, preserveState: false });
@@ -144,7 +205,7 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         router.get(`/customer/restaurants/${r.id}`, {}, { preserveScroll: true, preserveState: false });
     };
 
-    const menu = useMemo(() => filterDishes(data.menu, diet, minRating), [data.menu, diet, minRating]);
+    const menu = useMemo(() => filterDishes(menuItems, diet, minRating), [menuItems, diet, minRating]);
     const recommended = useMemo(() => filterDishes(data.recommended, diet, minRating), [data.recommended, diet, minRating]);
 
     // Dishes the customer already searched-matched should not also appear in the
@@ -468,6 +529,24 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                             otherItems.map((dish) => renderRow(dish, 'menu'))
                         )}
                     </div>
+
+                    {menuItems.length > 0 ? (
+                        <div ref={sentinelRef} className="flex items-center justify-center py-6">
+                            {loadingMore ? (
+                                <span className="text-muted-foreground text-xs">Loading more…</span>
+                            ) : hasMoreMenu ? (
+                                <button
+                                    type="button"
+                                    onClick={loadMoreMenu}
+                                    className="hover:border-primary rounded-md border border-zinc-300 px-4 py-1.5 text-xs font-semibold"
+                                >
+                                    Load more
+                                </button>
+                            ) : menuMeta.total > menuMeta.per_page ? (
+                                <span className="text-muted-foreground text-xs">You've reached the end.</span>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </section>
             </main>
 
@@ -505,7 +584,6 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                 </div>
             ) : null}
 
-            <SiteFooter />
 
             {openDish ? (
                 <DishModifierDialog
