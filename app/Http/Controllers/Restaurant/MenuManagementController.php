@@ -234,7 +234,7 @@ class MenuManagementController extends Controller
             'is_available'    => ['sometimes', 'boolean'],
             'is_veg'          => ['sometimes', 'boolean'],
             'prep_time'       => ['nullable', 'integer', 'min:0', 'max:240'],
-            'image'           => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'image'           => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
 
             'modifier_group_ids'   => ['sometimes', 'array'],
             'modifier_group_ids.*' => ['integer', Rule::in($modifierGroupIds)],
