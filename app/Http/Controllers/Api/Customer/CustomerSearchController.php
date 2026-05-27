@@ -20,7 +20,8 @@ class CustomerSearchController extends Controller
 
     public function index(SearchRequest $request): JsonResponse
     {
-        $results = $this->search->search($request->user(), $request->keyword());
+        $page = max(1, (int) $request->query('page', 1));
+        $results = $this->search->search($request->user(), $request->keyword(), page: $page);
 
         return $this->success(
             data: new CustomerSearchResource($results),

@@ -19,6 +19,12 @@ class CustomerSearchResource extends JsonResource
         return [
             'keyword' => $data->keyword,
             'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
+            'restaurants_meta' => [
+                'current_page' => $data->restaurantsCurrentPage,
+                'last_page' => $data->restaurantsLastPage,
+                'per_page' => $data->restaurantsPerPage,
+                'total' => $data->restaurantsTotal,
+            ],
             'dishes_by_restaurant' => $data->dishesByRestaurant->map(function (array $row) {
                 /** @var Restaurant $restaurant */
                 $restaurant = $row['restaurant'];
@@ -41,6 +47,24 @@ class CustomerSearchResource extends JsonResource
                         'price' => (float) $m->price,
                         'is_veg' => (bool) $m->is_veg,
                         'image_url' => $this->dishImageUrl($m),
+                        // Drives the customise dialog on the search dish-card.
+                        // Empty array → dish adds straight to cart.
+                        'modifier_groups' => $m->relationLoaded('modifierGroups')
+                            ? $m->modifierGroups->map(fn ($g) => [
+                                'id' => $g->id,
+                                'name' => $g->name,
+                                'description' => $g->description,
+                                'selection_type' => $g->selection_type,
+                                'is_required' => (bool) $g->is_required,
+                                'min_selections' => (int) $g->min_selections,
+                                'max_selections' => $g->max_selections !== null ? (int) $g->max_selections : null,
+                                'options' => $g->options->map(fn ($o) => [
+                                    'id' => $o->id,
+                                    'name' => $o->name,
+                                    'price_delta' => (float) $o->price_delta,
+                                ])->values()->all(),
+                            ])->values()->all()
+                            : [],
                     ])->values()->all(),
                 ];
             })->values()->all(),

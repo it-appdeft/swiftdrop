@@ -13,8 +13,9 @@ use Illuminate\Support\Collection;
 class CustomerRestaurantData
 {
     /**
-     * @param  Collection<int, \App\Models\MenuItem>  $menuItems   Full menu, partner sort order.
-     * @param  Collection<int, \App\Models\MenuItem>  $recommended Menu items matching the search keyword.
+     * @param  Collection<int, \App\Models\MenuItem>  $menuItems              Full menu, partner sort order.
+     * @param  Collection<int, \App\Models\MenuItem>  $recommended            Menu items matching the search keyword.
+     * @param  array<int, int>                         $favoriteMenuItemIds    menu_item ids the customer has favourited.
      */
     public function __construct(
         public readonly Restaurant $restaurant,
@@ -22,6 +23,8 @@ class CustomerRestaurantData
         public readonly Collection $recommended,
         public readonly string $keyword,
         public readonly ?float $distanceMiles = null,
+        public readonly bool $isFavorite = false,
+        public readonly array $favoriteMenuItemIds = [],
     ) {
     }
 }

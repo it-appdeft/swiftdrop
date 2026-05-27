@@ -30,6 +30,9 @@ class DashboardRestaurantResource extends JsonResource
             'rating' => $r->rating !== null ? (float) $r->rating : null,
             'total_reviews' => (int) $r->total_reviews,
             'distance_miles' => $distance,
+            // Optional — present on dashboard / restaurants index rows so the
+            // heart icon on each card reflects the customer's saved list.
+            'is_favorited' => (bool) ($this->resource['is_favorited'] ?? false),
         ];
     }
 

@@ -10,8 +10,10 @@ use App\Http\Requests\Customer\Profile\UpdateAddressRequest;
 use App\Http\Requests\Customer\Profile\UpdateProfileRequest;
 use App\Http\Resources\Customer\AddressResource;
 use App\Http\Resources\Customer\CustomerProfileResource;
+use App\Models\Order;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class CustomerProfileController extends Controller
 {
@@ -29,6 +31,55 @@ class CustomerProfileController extends Controller
         return $this->success(
             data: new CustomerProfileResource($user->customerProfile),
             message: 'Profile retrieved.',
+        );
+    }
+
+    /**
+     * Paginated past orders for the customer. 10 per page by default.
+     */
+    public function orders(Request $request): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = max(1, min(50, (int) $request->query('per_page', 10)));
+
+        $paginator = Order::query()
+            ->where('user_id', $user->id)
+            ->with(['restaurant:id,name,city,full_address,logo_path,cover_photo_path', 'items:id,order_id,name,quantity'])
+            ->orderByDesc('placed_at')
+            ->orderByDesc('id')
+            ->paginate(perPage: $perPage, page: $page);
+
+        $rows = $paginator->getCollection()
+            ->map(function (Order $order) {
+                $restaurant = $order->restaurant;
+                $image = $restaurant?->cover_photo_path ?? $restaurant?->logo_path;
+
+                return [
+                    'id' => $order->id,
+                    'restaurant' => $restaurant?->name ?? 'Restaurant',
+                    'location' => $restaurant?->city ?? $restaurant?->full_address ?? '',
+                    'image' => $image ? '/storage/'.ltrim($image, '/') : null,
+                    'status' => $order->status,
+                    'items' => $order->items->map(fn ($i) => [
+                        'qty' => (int) $i->quantity,
+                        'name' => $i->name,
+                    ])->all(),
+                    'placed_at' => optional($order->placed_at ?? $order->created_at)->format('F j, g:i A'),
+                ];
+            })->values()->all();
+
+        return $this->success(
+            data: [
+                'orders' => $rows,
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'per_page' => $paginator->perPage(),
+                    'total' => $paginator->total(),
+                ],
+            ],
+            message: 'Orders retrieved.',
         );
     }
 

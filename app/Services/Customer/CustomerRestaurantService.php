@@ -2,6 +2,7 @@
 
 namespace App\Services\Customer;
 
+use App\Contracts\Customer\CustomerFavoriteServiceInterface;
 use App\Contracts\Customer\CustomerRestaurantServiceInterface;
 use App\DTO\Customer\CustomerRestaurantData;
 use App\Models\MenuItem;
@@ -11,12 +12,18 @@ use Illuminate\Support\Collection;
 
 class CustomerRestaurantService implements CustomerRestaurantServiceInterface
 {
+    public function __construct(
+        protected CustomerFavoriteServiceInterface $favorites,
+    ) {
+    }
+
     public function show(User $user, int $restaurantId, string $keyword = ''): CustomerRestaurantData
     {
         // Customers may only open live, approved restaurants — anything else 404s.
         $restaurant = Restaurant::query()
             ->active()
             ->approved()
+            ->with('hours')
             ->findOrFail($restaurantId);
 
         // Top list: the partner's full available menu in their configured order.
@@ -37,16 +44,21 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
                 ->forRestaurant($restaurant->id)
                 ->available()
                 ->matchingKeyword($keyword)
-                ->with('foodItem')
+                ->with(['foodItem', 'modifierGroups.options'])
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get();
+
+        $favoriteRestaurantIds = $this->favorites->favoriteRestaurantIds($user);
+        $favoriteMenuItemIds = $this->favorites->favoriteMenuItemIds($user);
 
         return new CustomerRestaurantData(
             restaurant: $restaurant,
             menuItems: $menuItems,
             recommended: $recommended,
             keyword: $keyword,
+            isFavorite: in_array($restaurant->id, $favoriteRestaurantIds, true),
+            favoriteMenuItemIds: $favoriteMenuItemIds,
         );
     }
 }

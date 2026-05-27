@@ -7,8 +7,8 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Link, router, usePage } from '@inertiajs/react';
-import { BadgePercent, ChevronDown, LayoutDashboard, LogOut, Search, ShoppingBag, UserCircle, User as UserIcon } from 'lucide-react';
-import { useState } from 'react';
+import { BadgePercent, ChevronDown, LayoutDashboard, LogOut, MapPin, Search, Search as SearchIcon, ShoppingBag, Trash2, UserCircle, User as UserIcon, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { AddressDialog } from './address-dialog';
 
 interface SharedProps {
@@ -54,22 +54,25 @@ export function CustomerHeader() {
                         type="button"
                         onClick={() => setAddressOpen(true)}
                         aria-label="Change delivery address"
-                        className="text-foreground flex min-w-0 items-center gap-2 text-sm"
+                        className="group text-foreground hover:bg-background/80 focus-visible:ring-primary/40 flex min-w-0 max-w-[420px] items-center gap-3 rounded-xl px-2.5 py-1.5 text-left transition focus-visible:ring-2 focus-visible:outline-none"
                     >
-                        <span className="font-semibold underline underline-offset-4">{addressLabel}</span>
-                        <span className="text-muted-foreground hidden truncate md:inline">{addressSummary}</span>
-                        <ChevronDown className="text-primary size-4 shrink-0" />
+                        <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full">
+                            <MapPin className="size-4.5" strokeWidth={2.2} />
+                        </span>
+                        <span className="flex min-w-0 flex-col leading-tight">
+                            <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px] font-medium tracking-wide uppercase">
+                                Deliver to
+                                <ChevronDown className="text-primary size-3 transition group-hover:translate-y-0.5" />
+                            </span>
+                            <span className="text-foreground mt-0.5 flex min-w-0 items-baseline gap-1.5 text-sm font-semibold">
+                                <span className="shrink-0">{addressLabel}</span>
+                                <span className="text-muted-foreground hidden truncate font-normal sm:inline">· {addressSummary}</span>
+                            </span>
+                        </span>
                     </button>
 
                     <nav className="ml-auto flex items-center gap-6 text-sm font-medium sm:gap-8 lg:gap-10">
-                        <Link
-                            href={route('customer.search')}
-                            aria-label="Search"
-                            className="text-foreground hover:text-primary flex items-center gap-2"
-                        >
-                            <Search className="size-5" />
-                            <span className="hidden md:inline">Search</span>
-                        </Link>
+                        <HeaderSearch />
                         <button type="button" aria-label="Offers" className="text-foreground hover:text-primary flex items-center gap-2">
                             <BadgePercent className="size-5" />
                             <span className="hidden md:inline">Offers</span>
@@ -132,5 +135,169 @@ export function CustomerHeader() {
 
             <AddressDialog open={addressOpen} onOpenChange={setAddressOpen} />
         </>
+    );
+}
+
+interface RecentSearch {
+    id: number;
+    keyword: string;
+}
+
+/**
+ * Inline search input + history dropdown. Closed state shows the icon-only
+ * button (matching the design); clicking opens an input that fetches the
+ * customer's recent search list lazily. Submitting navigates to the search
+ * results page (where the input itself stays hidden — the header owns search).
+ */
+function HeaderSearch() {
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const [recent, setRecent] = useState<RecentSearch[] | null>(null);
+    const [loading, setLoading] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Click-outside / Esc closes the inline input.
+    useEffect(() => {
+        if (!open) return;
+        const onDown = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setOpen(false);
+        };
+        document.addEventListener('mousedown', onDown);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('mousedown', onDown);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [open]);
+
+    // Lazy-load history on first open; refresh each time the panel opens so
+    // a search performed elsewhere shows up the next time.
+    useEffect(() => {
+        if (!open) return;
+        inputRef.current?.focus();
+        loadHistory();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    const loadHistory = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch('/customer/search/history', { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+            if (!res.ok) {
+                setRecent([]);
+                return;
+            }
+            const data = (await res.json()) as { recent: RecentSearch[] };
+            setRecent(data.recent ?? []);
+        } catch {
+            setRecent([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const submit = (keyword: string) => {
+        const q = keyword.trim();
+        if (!q) return;
+        setOpen(false);
+        setQuery('');
+        router.get('/customer/search', { search: q }, { preserveScroll: false, preserveState: false });
+    };
+
+    const clearHistory = async () => {
+        try {
+            const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+            await fetch('/customer/search/history', {
+                method: 'DELETE',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+        } catch {
+            // ignore — UI will just keep the stale list until reload
+        }
+        setRecent([]);
+    };
+
+    if (!open) {
+        return (
+            <button
+                type="button"
+                aria-label="Search"
+                onClick={() => setOpen(true)}
+                className="text-foreground hover:text-primary flex items-center gap-2"
+            >
+                <Search className="size-5" />
+                <span className="hidden md:inline">Search</span>
+            </button>
+        );
+    }
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    submit(query);
+                }}
+                className="bg-background flex h-10 w-72 items-center gap-2 rounded-md border border-zinc-200 px-3 focus-within:border-emerald-500 sm:w-80"
+            >
+                <SearchIcon className="text-muted-foreground size-4" />
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search dishes & restaurants"
+                    className="placeholder:text-muted-foreground h-full flex-1 bg-transparent text-sm outline-none"
+                />
+                <button
+                    type="button"
+                    aria-label="Close search"
+                    onClick={() => setOpen(false)}
+                    className="text-muted-foreground hover:text-foreground"
+                >
+                    <X className="size-4" />
+                </button>
+            </form>
+
+            <div className="bg-background absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-md border border-zinc-200 shadow-lg sm:w-80">
+                <div className="flex items-center justify-between px-3 pt-2 pb-1">
+                    <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Recent searches</span>
+                    {recent && recent.length > 0 ? (
+                        <button
+                            type="button"
+                            onClick={clearHistory}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:underline"
+                        >
+                            <Trash2 className="size-3" /> Clear
+                        </button>
+                    ) : null}
+                </div>
+                {loading && recent === null ? (
+                    <p className="text-muted-foreground px-3 py-3 text-xs">Loading…</p>
+                ) : !recent || recent.length === 0 ? (
+                    <p className="text-muted-foreground px-3 py-3 text-xs">Your recent searches will show up here.</p>
+                ) : (
+                    <ul className="max-h-72 overflow-y-auto">
+                        {recent.map((row) => (
+                            <li key={row.id}>
+                                <button
+                                    type="button"
+                                    onClick={() => submit(row.keyword)}
+                                    className="hover:bg-muted/60 flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                                >
+                                    <SearchIcon className="text-muted-foreground size-3.5" />
+                                    <span className="text-foreground truncate">{row.keyword}</span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </div>
     );
 }

@@ -169,7 +169,7 @@ export default function CustomerCheckout({ checkout }: Props) {
             <Head title="Checkout" />
             <CustomerHeader />
 
-            <main className="mx-auto grid w-full max-w-[1200px] flex-1 grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_420px]">
+            <main className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_420px]">
                 {/* Left — address selection */}
                 <section>
                     <div className="flex items-center gap-3">
@@ -262,16 +262,7 @@ export default function CustomerCheckout({ checkout }: Props) {
                         {checkout.accepts_cooking_requests && showCooking ? (
                             <div className="mt-3">
                                 <div className="bg-background rounded-lg border border-zinc-200 p-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-muted-foreground text-xs font-medium">Type cooking requests</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCooking(false)}
-                                            className="text-xs font-semibold text-emerald-600 hover:underline"
-                                        >
-                                            Save
-                                        </button>
-                                    </div>
+                                    
                                     <textarea
                                         value={instructions}
                                         onChange={(e) => setInstructions(e.target.value.slice(0, 300))}
@@ -279,7 +270,17 @@ export default function CustomerCheckout({ checkout }: Props) {
                                         className="mt-2 w-full resize-none bg-transparent text-sm outline-none"
                                         placeholder="e.g. Less spicy, no nuts (allergy)…"
                                     />
-                                    <div className="text-muted-foreground text-right text-[11px]">{instructions.length}/300</div>
+                                    <div className="flex items-center justify-between">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCooking(false)}
+                                            className="text-xs font-semibold text-emerald-600 hover:underline"
+                                        >
+                                            Save
+                                        </button>
+                                    <span className="text-muted-foreground text-right text-[11px]">{instructions.length}/300</span>
+
+                                    </div>
                                 </div>
                                 <p className="text-muted-foreground mt-1 text-[11px]">
                                     The restaurant will do its best to accommodate your request. Refunds cannot be issued for unmet special requests.

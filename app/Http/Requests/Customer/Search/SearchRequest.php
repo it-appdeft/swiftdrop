@@ -14,12 +14,14 @@ class SearchRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'q' => ['nullable', 'string', 'max:120'],
+            'search' => ['nullable', 'string', 'max:120'],
         ];
     }
 
     public function keyword(): string
     {
-        return (string) ($this->input('q') ?? '');
+        // Accept `search` (current) and `q` (legacy bookmarks) so existing
+        // links don't 404.
+        return (string) ($this->input('search') ?? $this->input('q') ?? '');
     }
 }

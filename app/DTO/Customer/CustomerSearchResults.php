@@ -20,6 +20,10 @@ class CustomerSearchResults
         public readonly ?CustomerAddress $address,
         public readonly float $radiusMiles,
         public readonly bool $usingFallback,
+        public readonly int $restaurantsCurrentPage = 1,
+        public readonly int $restaurantsLastPage = 1,
+        public readonly int $restaurantsPerPage = 10,
+        public readonly int $restaurantsTotal = 0,
     ) {
     }
 }

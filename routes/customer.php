@@ -3,6 +3,7 @@
 use App\Http\Controllers\Web\Customer\CheckoutController;
 use App\Http\Controllers\Web\Customer\CustomerCartController;
 use App\Http\Controllers\Web\Customer\CustomerDashboardController;
+use App\Http\Controllers\Web\Customer\CustomerFavoriteController;
 use App\Http\Controllers\Web\Customer\CustomerProfileController;
 use App\Http\Controllers\Web\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Web\Customer\CustomerSearchController;
@@ -12,10 +13,19 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
     Route::get('dashboard', [CustomerDashboardController::class, 'index'])->name('dashboard');
 
     Route::get('search', [CustomerSearchController::class, 'index'])->name('search');
+    Route::get('search/history', [CustomerSearchController::class, 'history'])->name('search.history');
     Route::delete('search/history', [CustomerSearchController::class, 'clear'])->name('search.clear');
 
+    Route::get('restaurants', [CustomerRestaurantController::class, 'index'])->name('restaurants.index');
     Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])
         ->whereNumber('id')->name('restaurants.show');
+
+    // Saved-favourites toggles — JSON so the heart flips without a full
+    // Inertia visit. Listing the favourites is API-only for now (mobile app).
+    Route::post('favorites/restaurants/{restaurantId}', [CustomerFavoriteController::class, 'toggleRestaurant'])
+        ->whereNumber('restaurantId')->name('favorites.restaurants.toggle');
+    Route::post('favorites/menu-items/{menuItemId}', [CustomerFavoriteController::class, 'toggleMenuItem'])
+        ->whereNumber('menuItemId')->name('favorites.menu-items.toggle');
 
     // Cart: view + mutations. Mutations redirect back so the restaurant page
     // re-renders with the refreshed `cart` prop (steppers + bottom bar).
@@ -34,6 +44,7 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
 
     Route::controller(CustomerProfileController::class)->group(function () {
         Route::get('profile', 'show')->name('profile');
+        Route::get('profile/orders', 'orders')->name('profile.orders');
         Route::put('profile', 'update')->name('profile.update');
 
         // Change phone / email — both legs of the two-step flow go through

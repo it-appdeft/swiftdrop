@@ -1,4 +1,5 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Check, ChevronLeft, ChevronRight, Heart, MapPin, Star, UtensilsCrossed } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,6 +26,7 @@ interface DashboardRestaurant {
     rating: number | null;
     total_reviews: number;
     distance_miles: number | null;
+    is_favorited: boolean;
 }
 
 interface DashboardAddress {
@@ -111,7 +113,7 @@ function ExploreSection({ items }: { items: FoodItem[] }) {
                 {items.map((item) => (
                     <Link
                         key={item.id}
-                        href={`/customer/search?q=${encodeURIComponent(item.name)}`}
+                        href={`/customer/search?search=${encodeURIComponent(item.name)}`}
                         className="flex shrink-0 flex-col items-center gap-2.5 transition"
                     >
                         <span className="flex size-20 items-center justify-center overflow-hidden rounded-full bg-amber-50 sm:size-24">
@@ -244,7 +246,7 @@ function CuisinesAndPromoSection() {
     return (
         <Section tone="white">
             <SectionHeader title="Explore Cuisines" />
-            <div className="flex gap-7 overflow-x-auto pb-1 sm:gap-8">
+            {/* <div className="flex gap-7 overflow-x-auto pb-1 sm:gap-8">
                 {CUISINES.map((c, i) => (
                     <button
                         key={`${c.label}-${i}`}
@@ -257,7 +259,7 @@ function CuisinesAndPromoSection() {
                         <span className="text-sm font-medium">{c.label}</span>
                     </button>
                 ))}
-            </div>
+            </div> */}
 
             <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {PROMOS.map((p, i) => (
@@ -297,6 +299,41 @@ function AllRestaurantsSection({
     radiusMiles: number;
     usingFallback: boolean;
 }) {
+    // Local mirror of which cards are currently favorited so the heart can
+    // flip instantly. Server is source of truth; we roll back on error.
+    const [favorited, setFavorited] = useState<Set<number>>(
+        () => new Set(restaurants.filter((r) => r.is_favorited).map((r) => r.id)),
+    );
+
+    const toggle = async (restaurantId: number) => {
+        const wasFav = favorited.has(restaurantId);
+        const optimistic = new Set(favorited);
+        if (wasFav) optimistic.delete(restaurantId);
+        else optimistic.add(restaurantId);
+        setFavorited(optimistic);
+        try {
+            const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+            const res = await fetch(`/customer/favorites/restaurants/${restaurantId}`, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error();
+            const json = (await res.json()) as { favorited: boolean };
+            const corrected = new Set(optimistic);
+            if (json.favorited) corrected.add(restaurantId);
+            else corrected.delete(restaurantId);
+            setFavorited(corrected);
+            toast.success(json.favorited ? 'Added to favourites' : 'Removed from favourites');
+        } catch {
+            const rollback = new Set(favorited);
+            if (wasFav) rollback.add(restaurantId);
+            else rollback.delete(restaurantId);
+            setFavorited(rollback);
+            toast.error('Could not update favourite.');
+        }
+    };
+
     return (
         <Section tone="gray">
             <div className="mb-5 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
@@ -321,52 +358,84 @@ function AllRestaurantsSection({
             ) : (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
                     {restaurants.map((r) => (
-                        <Link key={r.id} href={`/customer/restaurants/${r.id}`} className="group block">
-                            <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-zinc-200">
-                                {r.cover_url || r.logo_url ? (
-                                    <img
-                                        src={(r.cover_url ?? r.logo_url)!}
-                                        alt={r.name}
-                                        className="h-full w-full object-cover transition group-hover:scale-105"
-                                        loading="lazy"
-                                    />
-                                ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
-                                        {r.name.charAt(0)}
-                                    </div>
-                                )}
-                                <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
-                                    20% OFF select items
-                                </span>
-                                {r.rating !== null ? (
-                                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
-                                        <Star className="size-3 fill-current text-amber-500" /> {r.rating.toFixed(1)}
-                                    </span>
-                                ) : null}
-                            </div>
-                            <div className="flex items-center justify-between pt-3">
-                                <div className="min-w-0">
-                                    <p className="truncate text-base font-semibold">{r.name}</p>
-                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                        20-30 min
-                                        {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    aria-label="Save"
-                                    className="shrink-0 text-muted-foreground transition hover:text-rose-500"
-                                >
-                                    <Heart className="size-5" />
-                                </button>
-                            </div>
-                        </Link>
+                        <RestaurantCard
+                            key={r.id}
+                            restaurant={r}
+                            isFavorited={favorited.has(r.id)}
+                            onToggleFavorite={() => toggle(r.id)}
+                        />
                     ))}
                 </div>
             )}
         </Section>
     );
 }
+
+/** Restaurant card with an in-card heart toggle (used on home + restaurants index). */
+function RestaurantCard({
+    restaurant: r,
+    isFavorited,
+    onToggleFavorite,
+}: {
+    restaurant: DashboardRestaurant;
+    isFavorited: boolean;
+    onToggleFavorite: () => void;
+}) {
+    return (
+        <Link href={`/customer/restaurants/${r.id}`} className="group block">
+            <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-zinc-200">
+                {r.cover_url || r.logo_url ? (
+                    <img
+                        src={(r.cover_url ?? r.logo_url)!}
+                        alt={r.name}
+                        className="h-full w-full object-cover transition group-hover:scale-105"
+                        loading="lazy"
+                    />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
+                        {r.name.charAt(0)}
+                    </div>
+                )}
+                <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
+                    20% OFF select items
+                </span>
+                {r.rating !== null ? (
+                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
+                        <Star className="size-3 fill-current text-amber-500" /> {r.rating.toFixed(1)}
+                    </span>
+                ) : null}
+            </div>
+            <div className="flex items-center justify-between pt-3">
+                <div className="min-w-0">
+                    <p className="truncate text-base font-semibold">{r.name}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        20-30 min
+                        {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    aria-label={isFavorited ? 'Remove from favourites' : 'Save to favourites'}
+                    aria-pressed={isFavorited}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onToggleFavorite();
+                    }}
+                    className={
+                        'shrink-0 transition ' +
+                        (isFavorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')
+                    }
+                >
+                    <Heart className={'size-5 ' + (isFavorited ? 'fill-current' : '')} />
+                </button>
+            </div>
+        </Link>
+    );
+}
+
+export { RestaurantCard };
+export type { DashboardRestaurant };
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 

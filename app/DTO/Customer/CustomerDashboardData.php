@@ -15,7 +15,7 @@ class CustomerDashboardData
 {
     /**
      * @param  Collection<int, FoodItem>  $foodItems
-     * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float}>  $restaurants
+     * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float, is_favorited: bool}>  $restaurants
      */
     public function __construct(
         public readonly Collection $foodItems,
@@ -23,6 +23,9 @@ class CustomerDashboardData
         public readonly ?CustomerAddress $address,
         public readonly float $radiusMiles,
         public readonly bool $usingFallback,
+        public readonly int $restaurantsTotal = 0,
+        public readonly int $restaurantsPerPage = 10,
+        public readonly int $restaurantsLastPage = 1,
     ) {
     }
 }
