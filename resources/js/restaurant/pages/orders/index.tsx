@@ -231,7 +231,7 @@ const TABS: TabKey[] = [
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function inr(n: number): string {
-    return '₹ ' + n.toLocaleString('en-IN');
+    return '£ ' + n.toLocaleString('en-GB');
 }
 
 function itemsSummary(items: OrderItem[]): string {

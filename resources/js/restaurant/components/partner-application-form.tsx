@@ -310,11 +310,15 @@ export function AccountRestaurantStep({
     update,
     errors,
     foodItems,
+    documents,
+    onUploadDoc,
 }: {
     data: FormState;
     update: (patch: Partial<FormState>) => void;
     errors: Record<string, string>;
     foodItems: FoodItemOption[];
+    documents: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
+    onUploadDoc: (type: DocSlot, file: File) => void;
 }) {
     // Food categories — partner picks from the admin-managed catalog. Chip
     // selection is stored as an array of foodItem IDs on the form state.
@@ -496,6 +500,19 @@ export function AccountRestaurantStep({
                 {errors.foodItemIds && (
                     <p className="text-xs text-rose-600">{errors.foodItemIds}</p>
                 )}
+            </div>
+
+            <div className="space-y-2">
+                <FieldLabel>Restaurant photo</FieldLabel>
+                <p className="text-xs text-muted-foreground">
+                    A clear photo of your storefront or main dining area.
+                </p>
+                <DocUploadField
+                    label="Restaurant photo"
+                    uploaded={documents.restaurantPhoto?.uploaded === true}
+                    error={errors['doc.restaurantPhoto']}
+                    onUpload={(file) => onUploadDoc('restaurantPhoto', file)}
+                />
             </div>
         </div>
     );
@@ -718,7 +735,88 @@ export function LegalBankStep({
     );
 }
 
+// ─── Document upload primitives ────────────────────────────────────────────
+
+/** Single upload card. Shared between the Documents step and the Identity
+ * step (which hosts the Restaurant photo upload). Handles client-side size
+ * validation and surfaces server-side errors passed in via `error`. */
+export function DocUploadField({
+    label,
+    uploaded,
+    error,
+    onUpload,
+    helperText,
+}: {
+    label: string;
+    uploaded: boolean;
+    error?: string;
+    onUpload: (file: File) => void;
+    helperText?: string;
+}) {
+    const [localError, setLocalError] = useState<string | null>(null);
+
+    const handleFile = (file: File, input: HTMLInputElement) => {
+        // Reset so picking the SAME file again still triggers change (e.g. after
+        // an oversize rejection).
+        input.value = '';
+
+        if (file.size > MAX_DOC_BYTES) {
+            const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+            setLocalError(`File is ${sizeMb}MB — max allowed is ${MAX_DOC_LABEL}.`);
+            return;
+        }
+
+        setLocalError(null);
+        onUpload(file);
+    };
+
+    const shownError = localError ?? error;
+
+    return (
+        <div>
+            <label
+                className={
+                    'flex cursor-pointer items-center justify-between gap-3 rounded-xl border bg-background p-4 transition hover:border-primary ' +
+                    (shownError ? 'border-rose-500' : 'border-border')
+                }
+            >
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">{label}</p>
+                    <p
+                        className={
+                            'mt-0.5 truncate text-xs ' +
+                            (uploaded ? 'text-emerald-600' : 'text-muted-foreground')
+                        }
+                    >
+                        {uploaded
+                            ? 'Uploaded'
+                            : helperText ?? `PDF, JPG or PNG. Max ${MAX_DOC_LABEL}.`}
+                    </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary">
+                    <Upload className="size-3.5" />
+                    {uploaded ? 'Replace' : 'Upload'}
+                </span>
+                <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    className="sr-only"
+                    onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleFile(f, e.target);
+                    }}
+                />
+            </label>
+            {shownError && <p className="mt-1 text-xs text-rose-600">{shownError}</p>}
+        </div>
+    );
+}
+
 // ─── Step 4 — Documents ────────────────────────────────────────────────────
+
+// Restaurant photo lives on the Identity step instead of with the legal/
+// banking documents, so filter it out here.
+const DOCUMENTS_STEP_FIELDS = DOC_FIELDS.filter((d) => d.key !== 'restaurantPhoto');
 
 export function DocumentsStep({
     documents,
@@ -729,33 +827,6 @@ export function DocumentsStep({
     onUploadDoc: (type: DocSlot, file: File) => void;
     errors: Record<string, string>;
 }) {
-    // Client-side validation errors (file too large, wrong type) per slot.
-    // Server errors still come in through the `errors` prop; either is shown.
-    const [localErrors, setLocalErrors] = useState<Partial<Record<DocSlot, string>>>({});
-
-    const handleFile = (type: DocSlot, file: File, input: HTMLInputElement) => {
-        // Reset the input so picking the SAME file again still triggers change
-        // (useful when the user picks an oversized file, then re-selects it).
-        input.value = '';
-
-        if (file.size > MAX_DOC_BYTES) {
-            const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-            setLocalErrors((prev) => ({
-                ...prev,
-                [type]: `File is ${sizeMb}MB — max allowed is ${MAX_DOC_LABEL}.`,
-            }));
-            return;
-        }
-
-        setLocalErrors((prev) => {
-            if (!prev[type]) return prev;
-            const next = { ...prev };
-            delete next[type];
-            return next;
-        });
-        onUploadDoc(type, file);
-    };
-
     return (
         <div className="space-y-6">
             <header>
@@ -766,48 +837,15 @@ export function DocumentsStep({
             </header>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {DOC_FIELDS.map((doc) => {
-                    const uploaded = documents[doc.key]?.uploaded === true;
-                    const error = localErrors[doc.key] ?? errors[`doc.${doc.key}`];
-                    return (
-                        <div key={doc.key}>
-                            <label
-                                className={
-                                    'flex cursor-pointer items-center justify-between gap-3 rounded-xl border bg-background p-4 transition hover:border-primary ' +
-                                    (error ? 'border-rose-500' : 'border-border')
-                                }
-                            >
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-semibold">{doc.label}</p>
-                                    <p
-                                        className={
-                                            'mt-0.5 truncate text-xs ' +
-                                            (uploaded
-                                                ? 'text-emerald-600'
-                                                : 'text-muted-foreground')
-                                        }
-                                    >
-                                        {uploaded ? 'Uploaded' : `PDF, JPG or PNG. Max ${MAX_DOC_LABEL}.`}
-                                    </p>
-                                </div>
-                                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary">
-                                    <Upload className="size-3.5" />
-                                    {uploaded ? 'Replace' : 'Upload'}
-                                </span>
-                                <input
-                                    type="file"
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    className="sr-only"
-                                    onChange={(e) => {
-                                        const f = e.target.files?.[0];
-                                        if (f) handleFile(doc.key, f, e.target);
-                                    }}
-                                />
-                            </label>
-                            {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
-                        </div>
-                    );
-                })}
+                {DOCUMENTS_STEP_FIELDS.map((doc) => (
+                    <DocUploadField
+                        key={doc.key}
+                        label={doc.label}
+                        uploaded={documents[doc.key]?.uploaded === true}
+                        error={errors[`doc.${doc.key}`]}
+                        onUpload={(file) => onUploadDoc(doc.key, file)}
+                    />
+                ))}
             </div>
         </div>
     );
