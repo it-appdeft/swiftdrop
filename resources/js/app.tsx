@@ -70,4 +70,13 @@ router.on('success', (event) => {
 });
 
 // Apply persisted theme before paint to avoid a flash.
-initializeTheme();
+// Light/dark toggle is admin-only; customer and restaurant panels are always light.
+const applyPanelTheme = () => {
+    if (window.location.pathname.startsWith('/admin')) {
+        initializeTheme();
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+};
+applyPanelTheme();
+router.on('navigate', applyPanelTheme);
