@@ -457,6 +457,8 @@ export default function PartnerApply({
                         update={update}
                         errors={errors}
                         foodItems={foodItems}
+                        documents={documents}
+                        onUploadDoc={handleDocUpload}
                     />
                 );
             case 2:

@@ -367,6 +367,8 @@ function RestaurantTab({
                         update={update}
                         errors={errors}
                         foodItems={foodItems}
+                        documents={docs}
+                        onUploadDoc={uploadDoc}
                     />
                 )}
                 {section === 'location' && (

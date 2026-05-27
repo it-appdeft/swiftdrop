@@ -33,10 +33,10 @@ const HOUR_POINTS: { hour: string; orders: number }[] = [
 ];
 
 const TOP_ITEMS = [
-    { rank: 1, name: 'Chicken Biryani', orders: 124, sales: '₹ 28,520' },
-    { rank: 2, name: 'Paneer Tikka', orders: 86, sales: '₹ 17,200' },
-    { rank: 3, name: 'Butter Naan', orders: 212, sales: '₹ 8,480' },
-    { rank: 4, name: 'Gulab Jamun', orders: 64, sales: '₹ 3,840' },
+    { rank: 1, name: 'Chicken Biryani', orders: 124, sales: '£ 28,520' },
+    { rank: 2, name: 'Paneer Tikka', orders: 86, sales: '£ 17,200' },
+    { rank: 3, name: 'Butter Naan', orders: 212, sales: '£ 8,480' },
+    { rank: 4, name: 'Gulab Jamun', orders: 64, sales: '£ 3,840' },
 ];
 
 const REVIEWS = [
@@ -54,7 +54,7 @@ const LOW_STOCK = [
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function formatINR(n: number): string {
-    return '₹ ' + n.toLocaleString('en-IN');
+    return '£ ' + n.toLocaleString('en-GB');
 }
 
 interface RestaurantState {
@@ -195,7 +195,7 @@ function SalesTrendChart() {
                     <p className="text-xs text-muted-foreground">Last 7 days</p>
                 </div>
                 <span className="text-xs font-semibold text-foreground">
-                    ₹ 1,98,200 <span className="text-muted-foreground">this week</span>
+                    £ 198,200 <span className="text-muted-foreground">this week</span>
                 </span>
             </div>
             <svg

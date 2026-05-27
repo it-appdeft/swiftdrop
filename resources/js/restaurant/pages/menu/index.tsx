@@ -68,7 +68,7 @@ type DietFilter = 'all' | Diet;
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function inr(n: number): string {
-    return '₹ ' + n.toLocaleString('en-IN');
+    return '£ ' + n.toLocaleString('en-GB');
 }
 
 function VegDot({ diet }: { diet: Diet }) {
@@ -76,13 +76,13 @@ function VegDot({ diet }: { diet: Diet }) {
     return (
         <span
             className={
-                'inline-flex size-3.5 shrink-0 items-center justify-center rounded-sm border ' +
+                'inline-flex size-4 shrink-0 items-center justify-center rounded-[2px] border-[1.5px] bg-background ' +
                 (veg ? 'border-emerald-600' : 'border-rose-600')
             }
         >
             <span
                 className={
-                    'block size-1.5 rounded-full ' + (veg ? 'bg-emerald-600' : 'bg-rose-600')
+                    'block size-2 rounded-full ' + (veg ? 'bg-emerald-600' : 'bg-rose-600')
                 }
             />
         </span>
@@ -708,7 +708,7 @@ function AddItemDialog({
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium">
-                                Price (₹)
+                                Price (£)
                                 <span className="ml-0.5 text-rose-500">*</span>
                             </label>
                             <input
@@ -1181,7 +1181,7 @@ function FilterPanel({
                 {/* Price range */}
                 <div className="space-y-1.5">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Price range (₹)
+                        Price range (£)
                     </p>
                     <div className="flex items-center gap-2">
                         <input
