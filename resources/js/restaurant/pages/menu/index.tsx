@@ -8,6 +8,7 @@ import {
     Filter,
     FolderInput,
     ImageIcon,
+    Loader2,
     MoreHorizontal,
     Pencil,
     Plus,
@@ -455,6 +456,7 @@ function AddItemDialog({
     modifierGroups,
     editing,
     onSubmit,
+    saving = false,
 }: {
     open: boolean;
     onClose: () => void;
@@ -468,6 +470,8 @@ function AddItemDialog({
             imageFile?: File | null;
         },
     ) => void;
+    /** Parent-controlled flag: true while the save request is in flight. */
+    saving?: boolean;
 }) {
     const isEdit = !!editing;
     const [name, setName] = useState('');
@@ -590,7 +594,7 @@ function AddItemDialog({
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim() || !price) return;
+        if (!name.trim() || !price || saving) return;
         onSubmit({
             name: name.trim(),
             categoryId,
@@ -604,7 +608,8 @@ function AddItemDialog({
             modifierGroupIds,
             modifierOptionIds: optionsByGroup,
         });
-        handleClose();
+        // Parent closes the dialog once the request succeeds; if it fails the
+        // modal stays open so the partner can retry without re-entering data.
     };
 
     if (!open) return null;
@@ -624,8 +629,9 @@ function AddItemDialog({
                     <button
                         type="button"
                         onClick={handleClose}
+                        disabled={saving}
                         aria-label="Close"
-                        className="flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+                        className="flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted disabled:opacity-50"
                     >
                         <X className="size-4" />
                     </button>
@@ -921,16 +927,24 @@ function AddItemDialog({
                         <button
                             type="button"
                             onClick={handleClose}
-                            className="inline-flex h-10 items-center rounded-md px-4 text-sm font-semibold text-muted-foreground hover:text-foreground"
+                            disabled={saving}
+                            className="inline-flex h-10 items-center rounded-md px-4 text-sm font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            disabled={!name.trim() || !price}
-                            className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                            disabled={!name.trim() || !price || saving}
+                            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                         >
-                            {isEdit ? 'Save changes' : 'Add item'}
+                            {saving && <Loader2 className="size-4 animate-spin" />}
+                            {saving
+                                ? isEdit
+                                    ? 'Saving…'
+                                    : 'Adding…'
+                                : isEdit
+                                  ? 'Save changes'
+                                  : 'Add item'}
                         </button>
                     </div>
                 </form>
@@ -1396,6 +1410,7 @@ export default function Menu({
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
     const [movingItem, setMovingItem] = useState<MenuItem | null>(null);
     const [bulkOpen, setBulkOpen] = useState(false);
+    const [savingItem, setSavingItem] = useState(false);
 
     // Re-sync after every Inertia visit (POST / PUT / DELETE round-trip)
     // so freshly-saved rows replace the optimistic placeholders we
@@ -1601,6 +1616,14 @@ export default function Menu({
             preserveScroll: true,
             preserveState: false,
             forceFormData: !!data.imageFile,
+            onStart: () => setSavingItem(true),
+            // Only dismiss the modal once the server has confirmed the save —
+            // on validation/server errors we keep it open with values intact.
+            onSuccess: () => {
+                setAddOpen(false);
+                setEditingItem(null);
+            },
+            onFinish: () => setSavingItem(false),
         } as const;
 
         if (editingItem && /^\d+$/.test(editingItem.id)) {
@@ -1841,6 +1864,7 @@ export default function Menu({
                 modifierGroups={modifierGroups}
                 editing={editingItem}
                 onSubmit={submitItem}
+                saving={savingItem}
             />
             <BulkUploadDialog open={bulkOpen} onClose={() => setBulkOpen(false)} />
             <MoveCategoryDialog
