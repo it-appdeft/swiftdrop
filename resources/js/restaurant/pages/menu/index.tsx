@@ -610,9 +610,9 @@ function AddItemDialog({
     if (!open) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10">
-            <div className="relative w-full max-w-xl rounded-2xl border border-border bg-background shadow-xl">
-                <header className="flex items-start justify-between gap-3 border-b border-border px-6 py-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+            <div className="relative flex max-h-[calc(100vh-3rem)] w-full max-w-xl flex-col rounded-2xl border border-border bg-background shadow-xl">
+                <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-6 py-5">
                     <div>
                         <h2 className="text-lg font-bold tracking-tight">
                             {isEdit ? 'Edit menu item' : 'Add menu item'}
@@ -631,7 +631,8 @@ function AddItemDialog({
                     </button>
                 </header>
 
-                <form onSubmit={submit} className="space-y-4 px-6 py-5">
+                <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
                     <div className="flex items-start gap-4">
                         <label className="flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-input bg-muted/40 hover:border-primary">
                             {photoPreview ? (
@@ -914,8 +915,9 @@ function AddItemDialog({
                         </div>
                         <ToggleSwitch checked={available} onChange={setAvailable} />
                     </div>
+                    </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2">
+                    <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
                         <button
                             type="button"
                             onClick={handleClose}
