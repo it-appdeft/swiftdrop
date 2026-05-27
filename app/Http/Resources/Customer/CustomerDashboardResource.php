@@ -16,7 +16,19 @@ class CustomerDashboardResource extends JsonResource
 
         return [
             'food_items' => FoodItemResource::collection($data->foodItems)->resolve($request),
+            'food_items_meta' => [
+                'current_page' => $data->foodItemsCurrentPage,
+                'last_page' => $data->foodItemsLastPage,
+                'per_page' => $data->foodItemsPerPage,
+                'total' => $data->foodItemsTotal,
+            ],
             'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
+            'restaurants_meta' => [
+                'current_page' => $data->restaurantsCurrentPage,
+                'last_page' => $data->restaurantsLastPage,
+                'per_page' => $data->restaurantsPerPage,
+                'total' => $data->restaurantsTotal,
+            ],
             'address' => $data->address ? [
                 'id' => $data->address->id,
                 'label' => $data->address->label,
@@ -28,6 +40,15 @@ class CustomerDashboardResource extends JsonResource
             ] : null,
             'radius_miles' => $data->radiusMiles,
             'using_fallback' => $data->usingFallback,
+            // Active food-item filter (null when no filter). The frontend uses
+            // this to highlight the chip in the strip and show a banner above
+            // the restaurants section.
+            'selected_food_item' => $data->selectedFoodItem ? [
+                'id' => $data->selectedFoodItem->id,
+                'name' => $data->selectedFoodItem->name,
+                'slug' => $data->selectedFoodItem->slug,
+                'image_url' => $data->selectedFoodItem->image_url,
+            ] : null,
         ];
     }
 }

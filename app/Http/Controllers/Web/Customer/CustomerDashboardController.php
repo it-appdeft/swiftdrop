@@ -24,7 +24,11 @@ class CustomerDashboardController extends Controller
 
     public function index(Request $request): Response
     {
-        $data = $this->dashboard->build($request->user());
+        $restaurantsPage = max(1, (int) $request->query('restaurants_page', 1));
+        $foodItemsPage = max(1, (int) $request->query('food_items_page', 1));
+        $foodItemId = $request->filled('food_item_id') ? max(1, (int) $request->query('food_item_id')) : null;
+
+        $data = $this->dashboard->build($request->user(), $restaurantsPage, $foodItemsPage, $foodItemId);
 
         return Inertia::render('customer/dashboard', [
             'dashboard' => (new CustomerDashboardResource($data))->resolve($request),

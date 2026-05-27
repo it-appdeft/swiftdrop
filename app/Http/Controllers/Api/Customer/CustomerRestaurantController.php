@@ -9,6 +9,7 @@ use App\Http\Requests\Customer\Search\SearchRequest;
 use App\Http\Resources\Customer\CustomerRestaurantResource;
 use App\Http\Resources\Customer\DashboardRestaurantResource;
 use App\Services\Customer\CustomerDashboardService;
+use App\Services\Customer\CustomerRestaurantService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -52,7 +53,14 @@ class CustomerRestaurantController extends Controller
 
     public function show(SearchRequest $request, int $id): JsonResponse
     {
-        $data = $this->restaurants->show($request->user(), $id, $request->keyword());
+        $menuPage = max(1, (int) $request->query('page', 1));
+        $data = $this->restaurants->show(
+            $request->user(),
+            $id,
+            $request->keyword(),
+            menuPage: $menuPage,
+            menuPerPage: CustomerRestaurantService::MENU_PER_PAGE,
+        );
 
         return $this->success(
             data: new CustomerRestaurantResource($data),

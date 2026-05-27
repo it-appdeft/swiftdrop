@@ -26,6 +26,12 @@ class CustomerDashboardData
         public readonly int $restaurantsTotal = 0,
         public readonly int $restaurantsPerPage = 10,
         public readonly int $restaurantsLastPage = 1,
+        public readonly int $restaurantsCurrentPage = 1,
+        public readonly int $foodItemsTotal = 0,
+        public readonly int $foodItemsPerPage = 10,
+        public readonly int $foodItemsLastPage = 1,
+        public readonly int $foodItemsCurrentPage = 1,
+        public readonly ?FoodItem $selectedFoodItem = null,
     ) {
     }
 }

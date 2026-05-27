@@ -219,8 +219,10 @@ export default function CustomerCheckout({ checkout }: Props) {
                             </div>
                         ) : null}
 
-                        {/* Items */}
-                        <div className="divide-y divide-zinc-200">
+                        {/* Items — capped height so long orders stay inside the
+                            summary card; the inner div scrolls instead of
+                            pushing the bill summary off-screen. */}
+                        <div className="max-h-[360px] divide-y divide-zinc-200 overflow-y-auto pr-1">
                             {checkout.items.map((item) => (
                                 <CheckoutItemRow
                                     key={item.id}

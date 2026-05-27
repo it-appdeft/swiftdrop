@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
 import { Head, Link, router } from '@inertiajs/react';
 import { Minus, Plus, ShoppingBag, Trash2, UtensilsCrossed } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SiteFooter } from '../../web/components/site-footer';
 import { CustomerHeader } from '../components/customer-header';
 
@@ -25,11 +26,19 @@ interface CartLine {
     modifiers: CartModifier[];
 }
 
+interface ItemsMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+}
+
 interface Cart {
     id: number | null;
     restaurant_id: number | null;
     restaurant: { id: number; name: string; logo_url: string | null } | null;
     items: CartLine[];
+    items_meta: ItemsMeta;
     item_count: number;
     line_count: number;
     subtotal: number;
@@ -41,6 +50,56 @@ interface Props {
 
 export default function CustomerCart({ cart }: Props) {
     const [pendingDelete, setPendingDelete] = useState<CartLine | null>(null);
+
+    // Initial page comes from props; subsequent pages are fetched as JSON and
+    // appended. Reset whenever the underlying Inertia render changes (after a
+    // mutation, for example).
+    const [items, setItems] = useState<CartLine[]>(cart.items);
+    const [meta, setMeta] = useState<ItemsMeta>(cart.items_meta);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        setItems(cart.items);
+        setMeta(cart.items_meta);
+    }, [cart.items, cart.items_meta]);
+
+    const hasMore = meta.current_page < meta.last_page;
+
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        try {
+            const res = await fetch(`/customer/cart?page=${meta.current_page + 1}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error();
+            const json = (await res.json()) as Cart;
+            setItems((prev) => {
+                const seen = new Set(prev.map((l) => l.id));
+                return [...prev, ...json.items.filter((l) => !seen.has(l.id))];
+            });
+            setMeta(json.items_meta);
+        } catch {
+            toast.error('Could not load more items.');
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [hasMore, loadingMore, meta.current_page]);
+
+    useEffect(() => {
+        if (!sentinelRef.current || !hasMore) return;
+        const el = sentinelRef.current;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((e) => e.isIntersecting)) loadMore();
+            },
+            { rootMargin: '300px 0px' },
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [hasMore, loadMore]);
 
     const updateLine = (itemId: number, quantity: number) => {
         router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true });
@@ -105,7 +164,7 @@ export default function CustomerCart({ cart }: Props) {
                         ) : null}
 
                         <div className="mt-4 divide-y divide-zinc-100 rounded-xl border border-zinc-100">
-                            {cart.items.map((line) => (
+                            {items.map((line) => (
                                 <CartRow
                                     key={line.id}
                                     line={line}
@@ -115,6 +174,24 @@ export default function CustomerCart({ cart }: Props) {
                                 />
                             ))}
                         </div>
+
+                        {items.length > 0 ? (
+                            <div ref={sentinelRef} className="flex items-center justify-center py-4">
+                                {loadingMore ? (
+                                    <span className="text-muted-foreground text-xs">Loading more…</span>
+                                ) : hasMore ? (
+                                    <button
+                                        type="button"
+                                        onClick={loadMore}
+                                        className="hover:border-primary rounded-md border border-zinc-300 px-4 py-1.5 text-xs font-semibold"
+                                    >
+                                        Load more
+                                    </button>
+                                ) : meta.total > meta.per_page ? (
+                                    <span className="text-muted-foreground text-xs">You've reached the end.</span>
+                                ) : null}
+                            </div>
+                        ) : null}
 
                         {/* Bill summary */}
                         <div className="mt-6 rounded-xl border border-zinc-100 p-5">

@@ -61,12 +61,12 @@ export function CustomerHeader() {
                         </span>
                         <span className="flex min-w-0 flex-col leading-tight">
                             <span className="text-muted-foreground inline-flex items-center gap-1 text-[11px] font-medium tracking-wide uppercase">
-                                Deliver to
+                                Deliver to <span className="shrink-0">{addressLabel}</span>
                                 <ChevronDown className="text-primary size-3 transition group-hover:translate-y-0.5" />
                             </span>
                             <span className="text-foreground mt-0.5 flex min-w-0 items-baseline gap-1.5 text-sm font-semibold">
-                                <span className="shrink-0">{addressLabel}</span>
-                                <span className="text-muted-foreground hidden truncate font-normal sm:inline">· {addressSummary}</span>
+                                
+                                <span className="text-muted-foreground hidden truncate font-normal sm:inline"> {addressSummary}</span>
                             </span>
                         </span>
                     </button>
