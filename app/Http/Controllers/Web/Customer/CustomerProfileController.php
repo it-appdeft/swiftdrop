@@ -14,7 +14,10 @@ use App\Http\Requests\Customer\Profile\UpdateAddressRequest;
 use App\Http\Requests\Customer\Profile\UpdateProfileRequest;
 use App\Models\DeletionReason;
 use App\Models\Order;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -97,28 +100,53 @@ class CustomerProfileController extends Controller
             'sort_order' => $r->sort_order,
         ])->all();
 
+        $orders = $this->pastOrdersPaginated($user->id, page: 1);
+
         return Inertia::render('customer/profile', [
             'customer' => $customer,
             'deletionReasons' => $deletionReasons,
-            'orders' => $this->pastOrders($user->id),
+            'orders' => $this->mapOrders($orders),
+            'orders_meta' => $this->meta($orders),
         ]);
     }
 
     /**
-     * The customer's past orders for the Order History tab, newest first.
-     * Plain arrays so Inertia doesn't wrap them; shape matches the page's
-     * order card (restaurant, image, line items, status, placed time).
-     *
-     * @return array<int, array<string, mixed>>
+     * Paginated orders endpoint — backs the Profile page's "Order History"
+     * infinite scroll. Returns JSON ({ orders, meta }) so subsequent pages
+     * can be appended client-side without re-rendering the profile.
      */
-    protected function pastOrders(int $userId): array
+    public function orders(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        $page = max(1, (int) $request->query('page', 1));
+
+        $paginator = $this->pastOrdersPaginated($user->id, $page);
+
+        return response()->json([
+            'orders' => $this->mapOrders($paginator),
+            'meta' => $this->meta($paginator),
+        ]);
+    }
+
+    /** Default page size for the order history list. */
+    protected const ORDERS_PER_PAGE = 10;
+
+    protected function pastOrdersPaginated(int $userId, int $page, int $perPage = self::ORDERS_PER_PAGE): LengthAwarePaginator
     {
         return Order::query()
             ->where('user_id', $userId)
             ->with(['restaurant:id,name,city,full_address,logo_path,cover_photo_path', 'items:id,order_id,name,quantity'])
             ->orderByDesc('placed_at')
             ->orderByDesc('id')
-            ->get()
+            ->paginate(perPage: $perPage, page: $page);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function mapOrders(LengthAwarePaginator $paginator): array
+    {
+        return $paginator->getCollection()
             ->map(function (Order $order) {
                 $restaurant = $order->restaurant;
                 $image = $restaurant?->cover_photo_path ?? $restaurant?->logo_path;
@@ -138,6 +166,17 @@ class CustomerProfileController extends Controller
                 ];
             })
             ->all();
+    }
+
+    /** @return array<string, int> */
+    protected function meta(LengthAwarePaginator $paginator): array
+    {
+        return [
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+        ];
     }
 
     public function update(UpdateProfileRequest $request): RedirectResponse

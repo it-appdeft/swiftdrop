@@ -11,7 +11,9 @@ use App\Models\MenuItem;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Services\Platform\PlatformConfigService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator as LengthAwarePaginatorImpl;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -22,12 +24,14 @@ class CustomerSearchService implements CustomerSearchServiceInterface
 
     protected const RESULT_LIMIT = 30;
 
+    public const RESTAURANTS_PER_PAGE = 10;
+
     public function __construct(
         protected PlatformConfigService $config,
     ) {
     }
 
-    public function search(User $user, string $keyword): CustomerSearchResults
+    public function search(User $user, string $keyword, int $page = 1, int $perPage = self::RESTAURANTS_PER_PAGE): CustomerSearchResults
     {
         $profile = $user->customerProfile;
         $keyword = trim($keyword);
@@ -39,6 +43,8 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         ));
 
         if ($keyword === '' || ! $profile) {
+            $empty = $this->emptyPaginator($page, $perPage);
+
             return new CustomerSearchResults(
                 keyword: '',
                 restaurants: collect(),
@@ -47,25 +53,42 @@ class CustomerSearchService implements CustomerSearchServiceInterface
                 address: $address,
                 radiusMiles: $radius,
                 usingFallback: ! $address || $address->lat === null || $address->lng === null,
+                restaurantsCurrentPage: $empty->currentPage(),
+                restaurantsLastPage: $empty->lastPage(),
+                restaurantsPerPage: $empty->perPage(),
+                restaurantsTotal: $empty->total(),
             );
         }
 
-        $this->recordSearch($profile, $keyword);
+        // Only record a fresh history row on the first page — pagination
+        // requests for the same keyword shouldn't duplicate the row.
+        if ($page === 1) {
+            $this->recordSearch($profile, $keyword);
+        }
 
         $hasGeo = $address && $address->lat !== null && $address->lng !== null;
-        [$restaurants, $dishesByRestaurant] = $hasGeo
-            ? $this->searchWithinRadius($keyword, $address, $radius)
-            : $this->searchUnbounded($keyword);
+        [$restaurantsPaginator, $dishesByRestaurant] = $hasGeo
+            ? $this->searchWithinRadius($keyword, $address, $radius, $page, $perPage)
+            : $this->searchUnbounded($keyword, $page, $perPage);
 
         return new CustomerSearchResults(
             keyword: $keyword,
-            restaurants: $restaurants,
+            restaurants: collect($restaurantsPaginator->items()),
             dishesByRestaurant: $dishesByRestaurant,
             recent: $this->recentHistory($profile),
             address: $address,
             radiusMiles: $radius,
             usingFallback: ! $hasGeo,
+            restaurantsCurrentPage: $restaurantsPaginator->currentPage(),
+            restaurantsLastPage: $restaurantsPaginator->lastPage(),
+            restaurantsPerPage: $restaurantsPaginator->perPage(),
+            restaurantsTotal: $restaurantsPaginator->total(),
         );
+    }
+
+    protected function emptyPaginator(int $page, int $perPage): LengthAwarePaginator
+    {
+        return new LengthAwarePaginatorImpl(items: [], total: 0, perPage: $perPage, currentPage: $page);
     }
 
     public function clearHistory(User $user): int
@@ -78,6 +101,13 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         return CustomerSearchHistory::query()
             ->where('customer_profile_id', $profile->id)
             ->delete();
+    }
+
+    public function recentSearches(User $user): Collection
+    {
+        $profile = $user->customerProfile;
+
+        return $profile ? $this->recentHistory($profile) : collect();
     }
 
     protected function selectedAddressFor(?CustomerProfile $profile): ?CustomerAddress
@@ -117,22 +147,29 @@ class CustomerSearchService implements CustomerSearchServiceInterface
     }
 
     /**
-     * @return array{0: Collection, 1: Collection}
+     * @return array{0: LengthAwarePaginator, 1: Collection}
      */
-    protected function searchWithinRadius(string $keyword, CustomerAddress $address, float $radius): array
+    protected function searchWithinRadius(string $keyword, CustomerAddress $address, float $radius, int $page, int $perPage): array
     {
         $lat = (float) $address->lat;
         $lng = (float) $address->lng;
         $distanceExpr = Restaurant::distanceMilesExpression($lat, $lng);
 
-        $restaurants = Restaurant::query()
+        $paginator = Restaurant::query()
             ->active()
             ->approved()
             ->where(fn ($q) => $this->applyRestaurantNameOrFoodItemMatch($q, $keyword))
             ->withinRadius($lat, $lng, $radius)
             ->orderBy('distance_miles')
-            ->limit(self::RESULT_LIMIT)
-            ->get();
+            ->paginate(perPage: $perPage, page: $page);
+
+        $paginator->setCollection($paginator->getCollection()
+            ->map(fn (Restaurant $r) => [
+                'restaurant' => $r,
+                'distance_miles' => $r->distance_miles !== null
+                    ? round((float) $r->distance_miles, 2)
+                    : null,
+            ])->values());
 
         $dishesByRestaurant = $this->dishesGroupedByRestaurant(
             $keyword,
@@ -144,30 +181,23 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             distanceExpr: $distanceExpr,
         );
 
-        return [
-            $restaurants->map(fn (Restaurant $r) => [
-                'restaurant' => $r,
-                'distance_miles' => $r->distance_miles !== null
-                    ? round((float) $r->distance_miles, 2)
-                    : null,
-            ])->values(),
-            $dishesByRestaurant,
-        ];
+        return [$paginator, $dishesByRestaurant];
     }
 
     /**
-     * @return array{0: Collection, 1: Collection}
+     * @return array{0: LengthAwarePaginator, 1: Collection}
      */
-    protected function searchUnbounded(string $keyword): array
+    protected function searchUnbounded(string $keyword, int $page, int $perPage): array
     {
-        $restaurants = Restaurant::query()
+        $paginator = Restaurant::query()
             ->active()
             ->approved()
             ->where(fn ($q) => $this->applyRestaurantNameOrFoodItemMatch($q, $keyword))
-            ->limit(self::RESULT_LIMIT)
-            ->get()
+            ->paginate(perPage: $perPage, page: $page);
+
+        $paginator->setCollection($paginator->getCollection()
             ->map(fn (Restaurant $r) => ['restaurant' => $r, 'distance_miles' => null])
-            ->values();
+            ->values());
 
         $dishesByRestaurant = $this->dishesGroupedByRestaurant(
             $keyword,
@@ -175,7 +205,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             distanceExpr: null,
         );
 
-        return [$restaurants, $dishesByRestaurant];
+        return [$paginator, $dishesByRestaurant];
     }
 
     /**
@@ -210,7 +240,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
     protected function dishesGroupedByRestaurant(string $keyword, ?callable $geoFilter, ?string $distanceExpr): Collection
     {
         $menuQuery = MenuItem::query()
-            ->with('foodItem')
+            ->with(['foodItem', 'modifierGroups.options'])
             ->join('restaurants', 'restaurants.id', '=', 'menu_items.restaurant_id')
             ->leftJoin('food_items', 'food_items.id', '=', 'menu_items.food_item_id')
             ->where('restaurants.status', 'active')

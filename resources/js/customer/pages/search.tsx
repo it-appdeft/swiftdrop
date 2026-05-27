@@ -1,7 +1,9 @@
+import { toast } from '@/hooks/use-toast';
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Clock, Heart, Search as SearchIcon, Star, Trash2, UtensilsCrossed } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ChevronRight, Clock, Heart, Minus, Plus, Star, UtensilsCrossed } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
+import { DishModifierDialog, type ModifierDish } from '../components/dish-modifier-dialog';
 
 interface SearchRestaurant {
     id: number;
@@ -24,6 +26,7 @@ interface DishItem {
     price: number;
     is_veg: boolean;
     image_url: string | null;
+    modifier_groups: ModifierDish['modifier_groups'];
 }
 
 interface DishGroupRestaurant {
@@ -56,10 +59,18 @@ interface SearchAddress {
     postcode: string | null;
 }
 
+interface RestaurantsMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+}
+
 interface Props {
     results: {
         keyword: string;
         restaurants: SearchRestaurant[];
+        restaurants_meta: RestaurantsMeta;
         dishes_by_restaurant: DishGroup[];
         recent: RecentSearch[];
         address: SearchAddress | null;
@@ -74,37 +85,110 @@ type Tab = 'restaurants' | 'dishes';
  *  page can populate its "Recommended" (related to your search) list. */
 function restaurantHref(id: number, keyword: string): string {
     const q = keyword.trim();
-    return q ? `/customer/restaurants/${id}?q=${encodeURIComponent(q)}` : `/customer/restaurants/${id}`;
+    return q ? `/customer/restaurants/${id}?search=${encodeURIComponent(q)}` : `/customer/restaurants/${id}`;
 }
 
 export default function CustomerSearch({ results }: Props) {
-    const [query, setQuery] = useState(results.keyword);
     const [tab, setTab] = useState<Tab>('restaurants');
+    const [openDish, setOpenDish] = useState<{ dish: ModifierDish; restaurantId: number } | null>(null);
+    const [submitting, setSubmitting] = useState(false);
 
+    // Restaurants tab uses infinite scroll. Initial page comes from props; we
+    // append subsequent pages via JSON fetch (same /customer/search endpoint).
+    const [restaurants, setRestaurants] = useState<SearchRestaurant[]>(results.restaurants);
+    const [restaurantsMeta, setRestaurantsMeta] = useState<RestaurantsMeta>(results.restaurants_meta);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+    // Whenever the keyword changes (new Inertia render), reset the local list
+    // so we don't show stale rows from the previous keyword.
     useEffect(() => {
-        setQuery(results.keyword);
-    }, [results.keyword]);
+        setRestaurants(results.restaurants);
+        setRestaurantsMeta(results.restaurants_meta);
+    }, [results.keyword, results.restaurants, results.restaurants_meta]);
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        router.get('/customer/search', { q: query }, { preserveScroll: true, preserveState: false });
-    };
+    const hasMoreRestaurants = restaurantsMeta.current_page < restaurantsMeta.last_page;
 
-    const runKeyword = (keyword: string) => {
-        router.get('/customer/search', { q: keyword }, { preserveScroll: true, preserveState: false });
-    };
+    const loadMoreRestaurants = useCallback(async () => {
+        if (loadingMore || !hasMoreRestaurants) return;
+        setLoadingMore(true);
+        try {
+            const params = new URLSearchParams({
+                search: results.keyword,
+                page: String(restaurantsMeta.current_page + 1),
+            });
+            const res = await fetch(`/customer/search?${params.toString()}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error();
+            const json = (await res.json()) as { restaurants: SearchRestaurant[]; restaurants_meta: RestaurantsMeta };
+            setRestaurants((prev) => {
+                const seen = new Set(prev.map((r) => r.id));
+                return [...prev, ...json.restaurants.filter((r) => !seen.has(r.id))];
+            });
+            setRestaurantsMeta(json.restaurants_meta);
+        } catch {
+            toast.error('Could not load more restaurants.');
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [hasMoreRestaurants, loadingMore, restaurantsMeta.current_page, results.keyword]);
 
-    const clearHistory = () => {
-        router.delete('/customer/search/history', { preserveScroll: true });
-    };
+    // IntersectionObserver kicks off loadMore when the sentinel scrolls in.
+    useEffect(() => {
+        if (tab !== 'restaurants' || !sentinelRef.current || !hasMoreRestaurants) return;
+        const el = sentinelRef.current;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((e) => e.isIntersecting)) loadMoreRestaurants();
+            },
+            { rootMargin: '400px 0px' },
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [tab, hasMoreRestaurants, loadMoreRestaurants]);
 
     const hasQuery = results.keyword.trim() !== '';
-    const restaurantCount = results.restaurants.length;
     const dishCount = useMemo(
         () => results.dishes_by_restaurant.reduce((sum, g) => sum + g.dishes.length, 0),
         [results.dishes_by_restaurant],
     );
-    const noResults = hasQuery && restaurantCount === 0 && dishCount === 0;
+    const noResults = hasQuery && restaurants.length === 0 && dishCount === 0;
+
+    /**
+     * Add a dish to the cart from a search-results row, then navigate the
+     * customer into the restaurant detail page so they see the qty stepper +
+     * sticky cart bar already reflecting their addition.
+     */
+    const addToCartAndOpenRestaurant = (menuItemId: number, restaurantId: number, options: number[], quantity: number) => {
+        setSubmitting(true);
+        router.post(
+            '/customer/cart',
+            { menu_item_id: menuItemId, quantity, options },
+            {
+                preserveScroll: false,
+                preserveState: false,
+                onSuccess: () => {
+                    setOpenDish(null);
+                    router.visit(restaurantHref(restaurantId, results.keyword));
+                },
+                onError: (errors) => {
+                    const first = Object.values(errors)[0];
+                    toast.error(typeof first === 'string' ? first : 'Could not add this item to your cart.');
+                },
+                onFinish: () => setSubmitting(false),
+            },
+        );
+    };
+
+    const handleDishAdd = (dish: DishItem, restaurantId: number) => {
+        if (dish.modifier_groups.length > 0) {
+            setOpenDish({ dish, restaurantId });
+            return;
+        }
+        addToCartAndOpenRestaurant(dish.id, restaurantId, [], 1);
+    };
 
     return (
         <div className="flex min-h-screen flex-col bg-background">
@@ -112,105 +196,63 @@ export default function CustomerSearch({ results }: Props) {
             <CustomerHeader />
 
             <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-                <form
-                    onSubmit={submit}
-                    className="flex h-14 items-center gap-1.5 rounded-md border border-zinc-200 bg-background px-3 transition focus-within:border-primary"
-                >
-                    {hasQuery ? (
-                        <Link
-                            href="/customer/search"
-                            aria-label="Back"
-                            className="flex size-8 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-zinc-100"
-                        >
-                            <ChevronLeft className="size-5" />
-                        </Link>
-                    ) : null}
-                    <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search dishes & restaurants"
-                        className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
-                    />
-                    <button
-                        type="submit"
-                        aria-label="Search"
-                        className="flex size-9 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:text-primary"
-                    >
-                        <SearchIcon className="size-5" />
-                    </button>
-                </form>
+                {hasQuery ? (
+                    <h1 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
+                        Results for <span className="text-primary">“{results.keyword}”</span>
+                    </h1>
+                ) : null}
 
                 {!hasQuery ? (
-                    <RecentSearches recent={results.recent} onPick={runKeyword} onClear={clearHistory} />
+                    <p className="text-muted-foreground mt-2 text-sm">Use the search icon in the header to find dishes & restaurants.</p>
+                ) : noResults ? (
+                    <div className="text-muted-foreground mt-10 rounded-xl border border-dashed bg-[#F6F8FA] p-10 text-center text-sm">
+                        No matches for <strong className="font-semibold">“{results.keyword}”</strong>
+                        {!results.using_fallback ? ` within ${results.radius_miles} mi.` : '.'}
+                    </div>
                 ) : (
                     <>
                         <Tabs tab={tab} setTab={setTab} />
 
                         {tab === 'restaurants' ? (
-                            <RestaurantsList restaurants={results.restaurants} keyword={results.keyword} />
+                            <>
+                                <RestaurantsList restaurants={restaurants} keyword={results.keyword} />
+                                {restaurants.length > 0 ? (
+                                    <div ref={sentinelRef} className="flex items-center justify-center py-8">
+                                        {loadingMore ? (
+                                            <span className="text-muted-foreground text-xs">Loading more…</span>
+                                        ) : hasMoreRestaurants ? (
+                                            <button
+                                                type="button"
+                                                onClick={loadMoreRestaurants}
+                                                className="hover:border-primary rounded-md border border-zinc-300 px-4 py-1.5 text-xs font-semibold"
+                                            >
+                                                Load more
+                                            </button>
+                                        ) : restaurantsMeta.total > restaurantsMeta.per_page ? (
+                                            <span className="text-muted-foreground text-xs">You've reached the end.</span>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </>
                         ) : (
-                            <DishesList groups={results.dishes_by_restaurant} keyword={results.keyword} />
+                            <DishesList groups={results.dishes_by_restaurant} keyword={results.keyword} onAdd={handleDishAdd} />
                         )}
-
-                        {noResults ? (
-                            <div className="mt-10 rounded-xl border border-dashed bg-[#F6F8FA] p-10 text-center text-sm text-muted-foreground">
-                                No matches for <strong className="font-semibold">“{results.keyword}”</strong>
-                                {!results.using_fallback ? ` within ${results.radius_miles} mi.` : '.'}
-                            </div>
-                        ) : null}
                     </>
                 )}
             </main>
+
+            {openDish ? (
+                <DishModifierDialog
+                    key={openDish.dish.id}
+                    dish={openDish.dish}
+                    submitting={submitting}
+                    onClose={() => setOpenDish(null)}
+                    onAdd={(optionIds, quantity) =>
+                        addToCartAndOpenRestaurant(openDish.dish.id, openDish.restaurantId, optionIds, quantity)
+                    }
+                />
+            ) : null}
         </div>
-    );
-}
-
-function RecentSearches({
-    recent,
-    onPick,
-    onClear,
-}: {
-    recent: RecentSearch[];
-    onPick: (keyword: string) => void;
-    onClear: () => void;
-}) {
-    return (
-        <section className="mt-8">
-            <div className="mb-4 flex items-end justify-between">
-                <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Recent Searches</h2>
-                {recent.length > 0 ? (
-                    <button
-                        type="button"
-                        onClick={onClear}
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-rose-600 hover:underline"
-                    >
-                        <Trash2 className="size-4" /> Clear
-                    </button>
-                ) : null}
-            </div>
-
-            {recent.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Your recent searches will show up here.</p>
-            ) : (
-                <ul className="space-y-3">
-                    {recent.map((row) => (
-                        <li key={row.id}>
-                            <button
-                                type="button"
-                                onClick={() => onPick(row.keyword)}
-                                className="group flex w-full items-center gap-3 text-left"
-                            >
-                                <span className="flex size-6 items-center justify-center rounded-full border border-zinc-300 text-zinc-500 group-hover:border-primary group-hover:text-primary">
-                                    <SearchIcon className="size-3.5" />
-                                </span>
-                                <span className="text-base text-foreground group-hover:text-primary">{row.keyword}</span>
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </section>
     );
 }
 
@@ -222,7 +264,7 @@ function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
                     Restaurants
                 </TabButton>
                 <TabButton active={tab === 'dishes'} onClick={() => setTab('dishes')}>
-                    Dishes
+                    Items
                 </TabButton>
             </div>
         </div>
@@ -328,7 +370,15 @@ function RestaurantsList({ restaurants, keyword }: { restaurants: SearchRestaura
     );
 }
 
-function DishesList({ groups, keyword }: { groups: DishGroup[]; keyword: string }) {
+function DishesList({
+    groups,
+    keyword,
+    onAdd,
+}: {
+    groups: DishGroup[];
+    keyword: string;
+    onAdd: (dish: DishItem, restaurantId: number) => void;
+}) {
     if (groups.length === 0) {
         return (
             <div className="mt-6 rounded-xl border border-dashed bg-[#F6F8FA] p-10 text-center text-sm text-muted-foreground">
@@ -358,9 +408,8 @@ function DishesList({ groups, keyword }: { groups: DishGroup[]; keyword: string 
                             <DishCard
                                 key={dish.id}
                                 dish={dish}
-                                restaurantId={group.restaurant.id}
                                 rating={group.restaurant.rating}
-                                keyword={keyword}
+                                onAdd={() => onAdd(dish, group.restaurant.id)}
                             />
                         ))}
                     </div>
@@ -372,14 +421,12 @@ function DishesList({ groups, keyword }: { groups: DishGroup[]; keyword: string 
 
 function DishCard({
     dish,
-    restaurantId,
     rating,
-    keyword,
+    onAdd,
 }: {
     dish: DishItem;
-    restaurantId: number;
     rating: number | null;
-    keyword: string;
+    onAdd: () => void;
 }) {
     return (
         <article className="rounded-xl border border-zinc-200 bg-white p-3">
@@ -396,10 +443,7 @@ function DishCard({
                     </div>
                     <button
                         type="button"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            router.visit(restaurantHref(restaurantId, keyword));
-                        }}
+                        onClick={onAdd}
                         className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500 bg-white px-5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-600 shadow-sm transition hover:bg-emerald-500 hover:text-white"
                     >
                         Add

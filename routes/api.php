@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\AuthController as ApiAuthController;
 use App\Http\Controllers\Api\Customer\CheckoutController;
 use App\Http\Controllers\Api\Customer\CustomerCartController;
 use App\Http\Controllers\Api\Customer\CustomerDashboardController;
+use App\Http\Controllers\Api\Customer\CustomerFavoriteController;
 use App\Http\Controllers\Api\Customer\CustomerProfileController;
 use App\Http\Controllers\Api\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Api\Customer\CustomerSearchController;
@@ -31,7 +32,15 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     Route::get('search', [CustomerSearchController::class, 'index']);
     Route::delete('search/history', [CustomerSearchController::class, 'clear']);
 
+    Route::get('restaurants', [CustomerRestaurantController::class, 'index']);
     Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])->whereNumber('id');
+
+    Route::controller(CustomerFavoriteController::class)->prefix('favorites')->group(function () {
+        Route::get('restaurants', 'restaurants');
+        Route::get('menu-items', 'menuItems');
+        Route::post('restaurants/{restaurantId}', 'toggleRestaurant')->whereNumber('restaurantId');
+        Route::post('menu-items/{menuItemId}', 'toggleMenuItem')->whereNumber('menuItemId');
+    });
 
     Route::controller(CustomerCartController::class)->prefix('cart')->group(function () {
         Route::get('/', 'index');
@@ -48,6 +57,7 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
 
     Route::controller(CustomerProfileController::class)->prefix('profile')->group(function () {
         Route::get('/', 'show');
+        Route::get('orders', 'orders');
         Route::put('/', 'update');
         Route::post('delete/initiate', 'initiateDeletion');
         Route::delete('/', 'deleteAccount');

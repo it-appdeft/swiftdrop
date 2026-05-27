@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -47,5 +48,18 @@ class CustomerProfile extends Model
     public function searchHistory(): HasMany
     {
         return $this->hasMany(CustomerSearchHistory::class);
+    }
+
+    /** Saved-favourites pivots, used to surface is_favorited flags on the customer surfaces. */
+    public function favoriteRestaurants(): BelongsToMany
+    {
+        return $this->belongsToMany(Restaurant::class, 'customer_favorite_restaurants')
+            ->withTimestamps();
+    }
+
+    public function favoriteMenuItems(): BelongsToMany
+    {
+        return $this->belongsToMany(MenuItem::class, 'customer_favorite_menu_items')
+            ->withTimestamps();
     }
 }

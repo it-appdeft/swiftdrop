@@ -26,7 +26,7 @@ import {
     Trash2,
     Users as UsersIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AddressDialog } from '../components/address-dialog';
 import { CustomerHeader } from '../components/customer-header';
 
@@ -77,6 +77,13 @@ interface ServerDeletionReason {
     sort_order: number;
 }
 
+interface OrdersMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+}
+
 interface SharedProps {
     auth: {
         user: { id: number; name: string; email: string | null; mobile?: string | null } | null;
@@ -84,6 +91,7 @@ interface SharedProps {
     customer?: ServerCustomer | null;
     deletionReasons?: ServerDeletionReason[];
     orders?: PastOrder[];
+    orders_meta?: OrdersMeta;
     flash?: {
         status?: string;
         otp?: { target: string; expires_in: number; test_code: string | null } | null;
@@ -1214,14 +1222,62 @@ function OrderCard({ order }: { order: PastOrder }) {
     );
 }
 
-function OrderHistorySection({ orders }: { orders: PastOrder[] }) {
+function OrderHistorySection({
+    initialOrders,
+    initialMeta,
+}: {
+    initialOrders: PastOrder[];
+    initialMeta: OrdersMeta;
+}) {
     const [search, setSearch] = useState('');
+    const [orders, setOrders] = useState<PastOrder[]>(initialOrders);
+    const [meta, setMeta] = useState<OrdersMeta>(initialMeta);
+    const [loading, setLoading] = useState(false);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
 
     const filtered = orders.filter((o) => {
         const q = search.trim().toLowerCase();
         if (!q) return true;
         return o.restaurant.toLowerCase().includes(q) || o.items.some((i) => i.name.toLowerCase().includes(q));
     });
+
+    const hasMore = meta.current_page < meta.last_page;
+
+    const loadMore = useCallback(async () => {
+        if (loading || !hasMore) return;
+        setLoading(true);
+        try {
+            const res = await fetch(`/customer/profile/orders?page=${meta.current_page + 1}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error();
+            const json = (await res.json()) as { orders: PastOrder[]; meta: OrdersMeta };
+            setOrders((prev) => {
+                const seen = new Set(prev.map((o) => o.id));
+                return [...prev, ...json.orders.filter((o) => !seen.has(o.id))];
+            });
+            setMeta(json.meta);
+        } catch {
+            toast.error('Could not load more orders.');
+        } finally {
+            setLoading(false);
+        }
+    }, [hasMore, loading, meta.current_page]);
+
+    // IntersectionObserver triggers loadMore as the sentinel enters viewport.
+    useEffect(() => {
+        if (!sentinelRef.current || !hasMore) return;
+        const el = sentinelRef.current;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((e) => e.isIntersecting)) loadMore();
+            },
+            { rootMargin: '300px 0px' },
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [hasMore, loadMore]);
 
     return (
         <>
@@ -1245,6 +1301,23 @@ function OrderHistorySection({ orders }: { orders: PastOrder[] }) {
                     filtered.map((o) => <OrderCard key={o.id} order={o} />)
                 )}
             </div>
+            {orders.length > 0 ? (
+                <div ref={sentinelRef} className="flex items-center justify-center py-6">
+                    {loading ? (
+                        <span className="text-muted-foreground text-xs">Loading more…</span>
+                    ) : hasMore ? (
+                        <button
+                            type="button"
+                            onClick={loadMore}
+                            className="hover:border-primary rounded-md border border-zinc-300 px-4 py-1.5 text-xs font-semibold"
+                        >
+                            Load more
+                        </button>
+                    ) : (
+                        <span className="text-muted-foreground text-xs">You've reached the end.</span>
+                    )}
+                </div>
+            ) : null}
         </>
     );
 }
@@ -2298,8 +2371,14 @@ function ProfileHeader({ name, email, photo, onEdit }: { name: string; email: st
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CustomerProfile() {
-    const { auth, customer, deletionReasons, orders: serverOrders } = usePage<SharedProps>().props;
+    const { auth, customer, deletionReasons, orders: serverOrders, orders_meta } = usePage<SharedProps>().props;
     const orders = serverOrders ?? [];
+    const ordersMeta: OrdersMeta = orders_meta ?? {
+        current_page: 1,
+        last_page: 1,
+        per_page: orders.length || 10,
+        total: orders.length,
+    };
     const user = auth?.user ?? null;
     // Prefer real server data; fall back to auth shared props.
     const fullName = customer ? `${customer.first_name} ${customer.last_name}`.trim() : (user?.name ?? '');
@@ -2324,14 +2403,14 @@ export default function CustomerProfile() {
         }
         switch (section) {
             case 'orders':
-                return <OrderHistorySection orders={orders} />;
+                return <OrderHistorySection initialOrders={orders} initialMeta={ordersMeta} />;
             case 'addresses':
                 return <AddressesSection addresses={addresses} />;
             case 'favorites':
-                return <OrderHistorySection orders={orders} />;
+                return <OrderHistorySection initialOrders={orders} initialMeta={ordersMeta} />;
             // return <FavoritesSection />;
             case 'payments':
-                return <OrderHistorySection orders={orders} />;
+                return <OrderHistorySection initialOrders={orders} initialMeta={ordersMeta} />;
             // return <PaymentsSection onAddNew={() => setAddingCard(true)} />;
             case 'settings':
                 return <SettingsSection onDeleteAccount={() => setDeleteOpen(true)} />;
@@ -2340,7 +2419,7 @@ export default function CustomerProfile() {
             case 'terms':
                 return <TermsSection />;
             case 'help':
-                return <OrderHistorySection orders={orders} />;
+                return <OrderHistorySection initialOrders={orders} initialMeta={ordersMeta} />;
             // return <HelpSection />;
         }
     };
