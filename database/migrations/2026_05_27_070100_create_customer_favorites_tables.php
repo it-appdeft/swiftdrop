@@ -17,7 +17,10 @@ return new class extends Migration
                 $table->foreignId('restaurant_id')->constrained()->cascadeOnDelete();
                 $table->timestamps();
 
-                $table->unique(['customer_profile_id', 'restaurant_id']);
+                // Explicit short name — the auto-generated identifier
+                // (customer_favorite_restaurants_customer_profile_id_restaurant_id_unique)
+                // is 70 chars and exceeds MySQL's 64-char limit.
+                $table->unique(['customer_profile_id', 'restaurant_id'], 'cfr_profile_restaurant_unique');
             });
         }
 
@@ -28,7 +31,7 @@ return new class extends Migration
                 $table->foreignId('menu_item_id')->constrained()->cascadeOnDelete();
                 $table->timestamps();
 
-                $table->unique(['customer_profile_id', 'menu_item_id']);
+                $table->unique(['customer_profile_id', 'menu_item_id'], 'cfmi_profile_item_unique');
             });
         }
     }
