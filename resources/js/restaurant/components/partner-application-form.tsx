@@ -24,10 +24,6 @@ const RESTAURANT_TYPE_OPTIONS = [
     'QSR',
 ];
 
-const DIET_OPTIONS: { value: 'veg' | 'non_veg'; label: string }[] = [
-    { value: 'veg', label: 'Veg' },
-    { value: 'non_veg', label: 'Non-veg' },
-];
 
 const COUNTRY_CODE_OPTIONS: { value: string; label: string }[] = [
     { value: '+44', label: '🇬🇧 +44' },
@@ -72,7 +68,6 @@ interface DayHours {
 
 interface CategoryRow {
     name: string;
-    diet: 'veg' | 'non_veg';
 }
 
 export interface FormState {
@@ -140,7 +135,7 @@ export const DEFAULT_STATE: FormState = {
     bankName: '',
     accountNumber: '',
     ifsc: '',
-    categories: [{ name: '', diet: 'veg' }],
+    categories: [{ name: '' }],
     termsAccepted: false,
 };
 
@@ -869,12 +864,12 @@ export function CategoriesStep({
 
     const addRow = () => {
         if (data.categories.length >= 50) return;
-        update({ categories: [...data.categories, { name: '', diet: 'veg' }] });
+        update({ categories: [...data.categories, { name: '' }] });
     };
 
     const removeRow = (idx: number) => {
         const next = data.categories.filter((_, i) => i !== idx);
-        update({ categories: next.length ? next : [{ name: '', diet: 'veg' }] });
+        update({ categories: next.length ? next : [{ name: '' }] });
     };
 
     return (
@@ -893,7 +888,7 @@ export function CategoriesStep({
                     return (
                         <div
                             key={idx}
-                            className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-background p-3 sm:grid-cols-[1fr_160px_auto] sm:items-end"
+                            className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-background p-3 sm:grid-cols-[1fr_auto] sm:items-end"
                         >
                             <div className="space-y-1.5">
                                 {idx === 0 && <FieldLabel>Category name</FieldLabel>}
@@ -913,41 +908,14 @@ export function CategoriesStep({
                                     <p className="text-xs text-rose-600">{nameError}</p>
                                 )}
                             </div>
-                            {/* Diet + delete share a row on mobile (flex wrapper);
-                                on `sm:` the wrapper collapses via `sm:contents` so
-                                both become direct grid children of the parent's
-                                `[1fr_160px_auto]` track layout. */}
-                            <div className="flex items-end gap-3 sm:contents">
-                                <div className="min-w-0 flex-1 space-y-1.5">
-                                    {idx === 0 && <FieldLabel>Diet</FieldLabel>}
-                                    <div className="relative">
-                                        <select
-                                            value={row.diet}
-                                            onChange={(e) =>
-                                                setRow(idx, {
-                                                    diet: e.target.value as CategoryRow['diet'],
-                                                })
-                                            }
-                                            className="h-11 w-full appearance-none rounded-md border border-input bg-background pl-3 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                        >
-                                            {DIET_OPTIONS.map((opt) => (
-                                                <option key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => removeRow(idx)}
-                                    aria-label="Remove category"
-                                    className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:border-rose-500 hover:text-rose-500"
-                                >
-                                    <Trash2 className="size-4" />
-                                </button>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => removeRow(idx)}
+                                aria-label="Remove category"
+                                className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:border-rose-500 hover:text-rose-500"
+                            >
+                                <Trash2 className="size-4" />
+                            </button>
                         </div>
                     );
                 })}

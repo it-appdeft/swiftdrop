@@ -358,7 +358,7 @@ export default function PartnerApply({
 
     const merged: FormState = { ...DEFAULT_STATE, ...initialData };
     if (!merged.categories || merged.categories.length === 0) {
-        merged.categories = [{ name: '', diet: 'veg' }];
+        merged.categories = [{ name: '' }];
     }
 
     const [step, setStep] = useState<StepKey>(clamp(initialStep));
