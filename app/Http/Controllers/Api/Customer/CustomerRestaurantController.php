@@ -40,12 +40,7 @@ class CustomerRestaurantController extends Controller
         return $this->success(
             data: [
                 'restaurants' => DashboardRestaurantResource::collection($paginator->getCollection())->resolve($request),
-                'meta' => [
-                    'current_page' => $paginator->currentPage(),
-                    'last_page' => $paginator->lastPage(),
-                    'per_page' => $paginator->perPage(),
-                    'total' => $paginator->total(),
-                ],
+                'meta' => \App\Support\PaginationMeta::make($paginator),
             ],
             message: 'Restaurants retrieved.',
         );
@@ -60,6 +55,7 @@ class CustomerRestaurantController extends Controller
             $request->keyword(),
             menuPage: $menuPage,
             menuPerPage: CustomerRestaurantService::MENU_PER_PAGE,
+            filters: $request->menuFilters(),
         );
 
         return $this->success(

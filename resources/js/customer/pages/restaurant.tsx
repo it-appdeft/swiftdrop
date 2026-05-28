@@ -89,16 +89,33 @@ interface Cart {
     subtotal: number;
 }
 
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
 interface MenuMeta {
     current_page: number;
     last_page: number;
     per_page: number;
     total: number;
+    from?: number | null;
+    to?: number | null;
+    next_page_url?: string | null;
+    prev_page_url?: string | null;
+    links?: PaginationLink[];
+}
+
+interface MenuFilters {
+    diet: Diet | null;
+    min_rating: number | null;
 }
 
 interface RestaurantPayload {
     restaurant: RestaurantHeader;
     keyword: string;
+    filters: MenuFilters;
     menu: Dish[];
     menu_meta: MenuMeta;
     recommended: Dish[];
@@ -113,15 +130,9 @@ type Diet = 'all' | 'veg' | 'non_veg';
 
 const DESCRIPTION_TRUNCATE = 120;
 
-/** Client-side diet + minimum-rating filter applied to both menu lists. */
-function filterDishes(dishes: Dish[], diet: Diet, minRating: boolean): Dish[] {
-    return dishes.filter((d) => {
-        if (diet === 'veg' && !d.is_veg) return false;
-        if (diet === 'non_veg' && d.is_veg) return false;
-        if (minRating && d.rating !== null && d.rating < 4.0) return false;
-        return true;
-    });
-}
+/** "Ratings 4.0+" chip sends this threshold; the server gates on the
+ *  restaurant's rating (menu_items carry no own rating). */
+const MIN_RATING = 4.0;
 
 const CSRF = (): string =>
     (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
@@ -129,9 +140,12 @@ const CSRF = (): string =>
 export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     const r = data.restaurant;
 
+    // Diet + rating filters are now server-side params (echoed back in
+    // `data.filters`) so the API and web share one code path.
+    const diet: Diet = data.filters.diet ?? 'all';
+    const minRating = data.filters.min_rating !== null;
+
     const [query, setQuery] = useState('');
-    const [diet, setDiet] = useState<Diet>('all');
-    const [minRating, setMinRating] = useState(true); // "Ratings 4.0+" chip starts active (matches design)
     const [openDish, setOpenDish] = useState<ModifierDish | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
@@ -165,6 +179,8 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         try {
             const params = new URLSearchParams({ page: String(menuMeta.current_page + 1) });
             if (data.keyword) params.set('search', data.keyword);
+            if (data.filters.diet) params.set('diet', data.filters.diet);
+            if (data.filters.min_rating !== null) params.set('min_rating', String(data.filters.min_rating));
             const res = await fetch(`/customer/restaurants/${r.id}?${params.toString()}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
@@ -181,7 +197,25 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         } finally {
             setLoadingMore(false);
         }
-    }, [data.keyword, hasMoreMenu, loadingMore, menuMeta.current_page, r.id]);
+    }, [data.keyword, data.filters, hasMoreMenu, loadingMore, menuMeta.current_page, r.id]);
+
+    /**
+     * Apply the Veg/Non-Veg + Ratings 4.0+ filters server-side — re-runs the
+     * detail query from page 1, carrying the keyword + the new filter set.
+     */
+    const applyMenuFilters = (next: { diet?: Diet; minRating?: boolean }) => {
+        const nextDiet = next.diet ?? diet;
+        const nextMin = next.minRating ?? minRating;
+        router.get(
+            `/customer/restaurants/${r.id}`,
+            {
+                ...(data.keyword ? { search: data.keyword } : {}),
+                ...(nextDiet !== 'all' ? { diet: nextDiet } : {}),
+                ...(nextMin ? { min_rating: MIN_RATING } : {}),
+            },
+            { preserveScroll: true, preserveState: false },
+        );
+    };
 
     useEffect(() => {
         if (!sentinelRef.current || !hasMoreMenu) return;
@@ -205,8 +239,10 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         router.get(`/customer/restaurants/${r.id}`, {}, { preserveScroll: true, preserveState: false });
     };
 
-    const menu = useMemo(() => filterDishes(menuItems, diet, minRating), [menuItems, diet, minRating]);
-    const recommended = useMemo(() => filterDishes(data.recommended, diet, minRating), [data.recommended, diet, minRating]);
+    // Menu + recommended arrive already filtered (server-side). The visible
+    // menu is the locally-accumulated infinite-scroll list.
+    const menu = menuItems;
+    const recommended = data.recommended;
 
     // Dishes the customer already searched-matched should not also appear in the
     // "Other items" list below — de-duplicate by id.
@@ -478,19 +514,24 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                     </button>
                 </form>
 
-                {/* Filters */}
+                {/* Filters (server-side via api params) */}
                 <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
-                    <DietRadio label="Veg" active={diet === 'veg'} color="emerald" onClick={() => setDiet(diet === 'veg' ? 'all' : 'veg')} />
+                    <DietRadio
+                        label="Veg"
+                        active={diet === 'veg'}
+                        color="emerald"
+                        onClick={() => applyMenuFilters({ diet: diet === 'veg' ? 'all' : 'veg' })}
+                    />
                     <DietRadio
                         label="Non-Veg"
                         active={diet === 'non_veg'}
                         color="rose"
-                        onClick={() => setDiet(diet === 'non_veg' ? 'all' : 'non_veg')}
+                        onClick={() => applyMenuFilters({ diet: diet === 'non_veg' ? 'all' : 'non_veg' })}
                     />
                     {minRating ? (
                         <button
                             type="button"
-                            onClick={() => setMinRating(false)}
+                            onClick={() => applyMenuFilters({ minRating: false })}
                             className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white"
                         >
                             Ratings 4.0+ <span aria-hidden>×</span>
@@ -498,7 +539,7 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                     ) : (
                         <button
                             type="button"
-                            onClick={() => setMinRating(true)}
+                            onClick={() => applyMenuFilters({ minRating: true })}
                             className="text-foreground rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:border-emerald-500"
                         >
                             Ratings 4.0+

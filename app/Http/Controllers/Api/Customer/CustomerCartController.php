@@ -7,9 +7,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\Cart\AddCartItemRequest;
 use App\Http\Requests\Customer\Cart\UpdateCartItemRequest;
 use App\Http\Resources\Customer\CustomerCartResource;
+use App\Support\PaginationMeta;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 /**
  * JSON cart endpoints for mobile / external clients. The web counterpart
@@ -37,15 +39,19 @@ class CustomerCartController extends Controller
 
         $page = max(1, (int) $request->query('page', 1));
         $perPage = max(1, min(50, (int) $request->query('per_page', self::CART_ITEMS_PER_PAGE)));
-        $total = count($payload['items']);
+        $allItems = $payload['items'];
+        $pageItems = array_slice($allItems, ($page - 1) * $perPage, $perPage);
 
-        $payload['items'] = array_slice($payload['items'], ($page - 1) * $perPage, $perPage);
-        $payload['items_meta'] = [
-            'current_page' => $page,
-            'last_page' => max(1, (int) ceil($total / $perPage)),
-            'per_page' => $perPage,
-            'total' => $total,
-        ];
+        $paginator = new LengthAwarePaginator(
+            items: $pageItems,
+            total: count($allItems),
+            perPage: $perPage,
+            currentPage: $page,
+            options: ['path' => url('/api/customer/cart')],
+        );
+
+        $payload['items'] = $pageItems;
+        $payload['items_meta'] = PaginationMeta::make($paginator);
 
         return $this->success(
             data: $payload,

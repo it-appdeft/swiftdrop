@@ -11,6 +11,7 @@ use App\Models\MenuItem;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Services\Platform\PlatformConfigService;
+use App\Support\PaginationMeta;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as LengthAwarePaginatorImpl;
@@ -31,10 +32,14 @@ class CustomerSearchService implements CustomerSearchServiceInterface
     ) {
     }
 
-    public function search(User $user, string $keyword, int $page = 1, int $perPage = self::RESTAURANTS_PER_PAGE): CustomerSearchResults
+    public function search(User $user, string $keyword, int $page = 1, int $perPage = self::RESTAURANTS_PER_PAGE, array $filters = []): CustomerSearchResults
     {
         $profile = $user->customerProfile;
         $keyword = trim($keyword);
+        $filters = [
+            'offers' => (bool) ($filters['offers'] ?? false),
+            'highest_rated' => (bool) ($filters['highest_rated'] ?? false),
+        ];
 
         $address = $this->selectedAddressFor($profile);
         $radius = max(0.1, $this->config->float(
@@ -53,10 +58,8 @@ class CustomerSearchService implements CustomerSearchServiceInterface
                 address: $address,
                 radiusMiles: $radius,
                 usingFallback: ! $address || $address->lat === null || $address->lng === null,
-                restaurantsCurrentPage: $empty->currentPage(),
-                restaurantsLastPage: $empty->lastPage(),
-                restaurantsPerPage: $empty->perPage(),
-                restaurantsTotal: $empty->total(),
+                restaurantsMeta: PaginationMeta::make($empty),
+                filters: $filters,
             );
         }
 
@@ -68,8 +71,16 @@ class CustomerSearchService implements CustomerSearchServiceInterface
 
         $hasGeo = $address && $address->lat !== null && $address->lng !== null;
         [$restaurantsPaginator, $dishesByRestaurant] = $hasGeo
-            ? $this->searchWithinRadius($keyword, $address, $radius, $page, $perPage)
-            : $this->searchUnbounded($keyword, $page, $perPage);
+            ? $this->searchWithinRadius($keyword, $address, $radius, $page, $perPage, $filters)
+            : $this->searchUnbounded($keyword, $page, $perPage, $filters);
+
+        // Keep the keyword + active filters on the pagination links so paging
+        // within a filtered search round-trips correctly.
+        $restaurantsPaginator->appends(array_filter([
+            'search' => $keyword,
+            'offers' => $filters['offers'] ? 1 : null,
+            'highest_rated' => $filters['highest_rated'] ? 1 : null,
+        ]));
 
         return new CustomerSearchResults(
             keyword: $keyword,
@@ -79,10 +90,8 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             address: $address,
             radiusMiles: $radius,
             usingFallback: ! $hasGeo,
-            restaurantsCurrentPage: $restaurantsPaginator->currentPage(),
-            restaurantsLastPage: $restaurantsPaginator->lastPage(),
-            restaurantsPerPage: $restaurantsPaginator->perPage(),
-            restaurantsTotal: $restaurantsPaginator->total(),
+            restaurantsMeta: PaginationMeta::make($restaurantsPaginator),
+            filters: $filters,
         );
     }
 
@@ -147,9 +156,10 @@ class CustomerSearchService implements CustomerSearchServiceInterface
     }
 
     /**
+     * @param  array{offers: bool, highest_rated: bool}  $filters
      * @return array{0: LengthAwarePaginator, 1: Collection}
      */
-    protected function searchWithinRadius(string $keyword, CustomerAddress $address, float $radius, int $page, int $perPage): array
+    protected function searchWithinRadius(string $keyword, CustomerAddress $address, float $radius, int $page, int $perPage, array $filters): array
     {
         $lat = (float) $address->lat;
         $lng = (float) $address->lng;
@@ -158,7 +168,8 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         $paginator = Restaurant::query()
             ->active()
             ->approved()
-            ->where(fn ($q) => $this->applyRestaurantNameOrFoodItemMatch($q, $keyword))
+            // Keyword + Offers + Highest rated in one scope.
+            ->customerSearch(['keyword' => $keyword, ...$filters])
             ->withinRadius($lat, $lng, $radius)
             ->orderBy('distance_miles')
             ->paginate(perPage: $perPage, page: $page);
@@ -179,20 +190,22 @@ class CustomerSearchService implements CustomerSearchServiceInterface
                     ->whereRaw("{$distanceExpr} <= ?", [$radius]);
             },
             distanceExpr: $distanceExpr,
+            filters: $filters,
         );
 
         return [$paginator, $dishesByRestaurant];
     }
 
     /**
+     * @param  array{offers: bool, highest_rated: bool}  $filters
      * @return array{0: LengthAwarePaginator, 1: Collection}
      */
-    protected function searchUnbounded(string $keyword, int $page, int $perPage): array
+    protected function searchUnbounded(string $keyword, int $page, int $perPage, array $filters): array
     {
         $paginator = Restaurant::query()
             ->active()
             ->approved()
-            ->where(fn ($q) => $this->applyRestaurantNameOrFoodItemMatch($q, $keyword))
+            ->customerSearch(['keyword' => $keyword, ...$filters])
             ->paginate(perPage: $perPage, page: $page);
 
         $paginator->setCollection($paginator->getCollection()
@@ -203,31 +216,10 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             $keyword,
             geoFilter: null,
             distanceExpr: null,
+            filters: $filters,
         );
 
         return [$paginator, $dishesByRestaurant];
-    }
-
-    /**
-     * Restaurant matches when its own name matches the keyword, OR it has
-     * at least one available menu item linked to a food_item whose name
-     * (or the menu item's own name) matches the keyword.
-     */
-    protected function applyRestaurantNameOrFoodItemMatch(Builder $query, string $keyword): void
-    {
-        $query
-            ->where('restaurants.name', 'like', "%{$keyword}%")
-            ->orWhereExists(function ($sub) use ($keyword) {
-                $sub->select(DB::raw(1))
-                    ->from('menu_items')
-                    ->leftJoin('food_items', 'food_items.id', '=', 'menu_items.food_item_id')
-                    ->whereColumn('menu_items.restaurant_id', 'restaurants.id')
-                    ->where('menu_items.is_available', true)
-                    ->where(function ($w) use ($keyword) {
-                        $w->where('food_items.name', 'like', "%{$keyword}%")
-                            ->orWhere('menu_items.name', 'like', "%{$keyword}%");
-                    });
-            });
     }
 
     /**
@@ -235,9 +227,10 @@ class CustomerSearchService implements CustomerSearchServiceInterface
      * matching menu item, each with its matching dishes nested inside.
      *
      * @param  ?callable(Builder): void  $geoFilter
+     * @param  array{offers: bool, highest_rated: bool}  $filters
      * @return Collection<int, array{restaurant: Restaurant, distance_miles: ?float, dishes: Collection<int, MenuItem>}>
      */
-    protected function dishesGroupedByRestaurant(string $keyword, ?callable $geoFilter, ?string $distanceExpr): Collection
+    protected function dishesGroupedByRestaurant(string $keyword, ?callable $geoFilter, ?string $distanceExpr, array $filters = []): Collection
     {
         $menuQuery = MenuItem::query()
             ->with(['foodItem', 'modifierGroups.options'])
@@ -250,6 +243,16 @@ class CustomerSearchService implements CustomerSearchServiceInterface
                 $q->where('food_items.name', 'like', "%{$keyword}%")
                     ->orWhere('menu_items.name', 'like', "%{$keyword}%");
             });
+
+        // Same Offers / Highest rated filters as the restaurants tab, applied
+        // against the joined `restaurants` table. The offers predicate reuses
+        // the exact constraint behind Restaurant::scopeWithOffers().
+        if (! empty($filters['highest_rated'])) {
+            $menuQuery->where('restaurants.rating', '>=', Restaurant::HIGH_RATING);
+        }
+        if (! empty($filters['offers'])) {
+            $menuQuery->whereExists(fn ($sub) => Restaurant::applyOfferExists($sub));
+        }
 
         if ($geoFilter) {
             $geoFilter($menuQuery);

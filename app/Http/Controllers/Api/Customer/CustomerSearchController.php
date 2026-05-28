@@ -21,11 +21,29 @@ class CustomerSearchController extends Controller
     public function index(SearchRequest $request): JsonResponse
     {
         $page = max(1, (int) $request->query('page', 1));
-        $results = $this->search->search($request->user(), $request->keyword(), page: $page);
+        $results = $this->search->search($request->user(), $request->keyword(), page: $page, filters: $request->filters());
 
         return $this->success(
             data: new CustomerSearchResource($results),
             message: 'Search completed.',
+        );
+    }
+
+    /**
+     * Recent search keywords for the mobile app's search screen — the list a
+     * client renders before offering "Clear" ({@see clear()}).
+     */
+    public function history(SearchRequest $request): JsonResponse
+    {
+        $recent = $this->search->recentSearches($request->user())
+            ->map(fn ($row) => [
+                'id' => $row->id,
+                'keyword' => $row->keyword,
+            ])->values()->all();
+
+        return $this->success(
+            data: ['recent' => $recent],
+            message: 'Recent searches retrieved.',
         );
     }
 

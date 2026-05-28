@@ -3,7 +3,7 @@ import { CountryFlag } from '@/components/country-flag';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { primaryIsoForDial } from '@/lib/countries';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     ArrowLeft,
@@ -1164,7 +1164,7 @@ function OrderCard({ order }: { order: PastOrder }) {
     const badge = ORDER_STATUS[order.status] ?? { label: order.status, className: 'text-muted-foreground' };
 
     return (
-        <article className="bg-muted/40 rounded-2xl p-5">
+        <article className="border-border bg-background rounded-2xl border p-5">
             <header className="flex items-start gap-4">
                 {order.image ? (
                     <img src={order.image} alt="" className="size-14 shrink-0 rounded-xl object-cover" loading="lazy" />
@@ -1696,12 +1696,135 @@ function AddressesSection({ addresses }: { addresses: ServerAddress[] }) {
 
 // ─── Section: Favorites ────────────────────────────────────────────────────────
 
+interface FavMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+}
+
+interface FavRestaurant {
+    id: number;
+    name: string;
+    cuisines: string | null;
+    city: string | null;
+    logo_url: string | null;
+    cover_url: string | null;
+    rating: number | null;
+    total_reviews: number;
+}
+
+interface FavItem {
+    id: number;
+    restaurant_id: number;
+    restaurant_name: string | null;
+    name: string;
+    price: number;
+    is_veg: boolean;
+    image_url: string | null;
+    rating: number | null;
+}
+
+const favCsrf = (): string =>
+    (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+
+/**
+ * Generic paginated favourites loader — fetches `/customer/favorites/{type}`
+ * (JSON, 10/page), accumulates pages for infinite scroll, and removes a row
+ * when it's unfavourited. Returns everything the two tab views need.
+ */
+function useFavorites<T extends { id: number }>(endpoint: string, active: boolean) {
+    const [items, setItems] = useState<T[]>([]);
+    const [meta, setMeta] = useState<FavMeta>({ current_page: 0, last_page: 1, per_page: 10, total: 0 });
+    const [loading, setLoading] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+    const loadPage = useCallback(
+        async (page: number) => {
+            setLoading(true);
+            try {
+                const res = await fetch(`${endpoint}?page=${page}`, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error();
+                const json = (await res.json()) as { data: T[]; meta: FavMeta };
+                setItems((prev) => {
+                    const seen = new Set(prev.map((r) => r.id));
+                    return page === 1 ? json.data : [...prev, ...json.data.filter((r) => !seen.has(r.id))];
+                });
+                setMeta(json.meta);
+                setLoaded(true);
+            } catch {
+                toast.error('Could not load favourites.');
+            } finally {
+                setLoading(false);
+            }
+        },
+        [endpoint],
+    );
+
+    // Lazy first load when the tab becomes active.
+    useEffect(() => {
+        if (active && !loaded && !loading) loadPage(1);
+    }, [active, loaded, loading, loadPage]);
+
+    const hasMore = meta.current_page > 0 && meta.current_page < meta.last_page;
+
+    useEffect(() => {
+        if (!active || !sentinelRef.current || !hasMore) return;
+        const el = sentinelRef.current;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((e) => e.isIntersecting) && !loading) loadPage(meta.current_page + 1);
+            },
+            { rootMargin: '300px 0px' },
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [active, hasMore, loading, meta.current_page, loadPage]);
+
+    const remove = (id: number) => setItems((prev) => prev.filter((r) => r.id !== id));
+
+    return { items, loading, loaded, hasMore, sentinelRef, loadPage, meta, remove };
+}
+
 function FavoritesSection() {
     const [tab, setTab] = useState<'restaurants' | 'items'>('restaurants');
 
+    const restaurants = useFavorites<FavRestaurant>('/customer/favorites/restaurants', tab === 'restaurants');
+    const items = useFavorites<FavItem>('/customer/favorites/menu-items', tab === 'items');
+
+    const unfavorite = async (type: 'restaurants' | 'menu-items', id: number, onDone: () => void) => {
+        try {
+            const res = await fetch(`/customer/favorites/${type}/${id}`, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': favCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error();
+            onDone();
+            toast.success('Removed from favourites');
+        } catch {
+            toast.error('Could not update favourite.');
+        }
+    };
+
+    // Group the loaded items by restaurant for the Items tab (matches design).
+    const itemGroups = (() => {
+        const map = new Map<number, { name: string; items: FavItem[] }>();
+        for (const it of items.items) {
+            const g = map.get(it.restaurant_id) ?? { name: it.restaurant_name ?? 'Restaurant', items: [] };
+            g.items.push(it);
+            map.set(it.restaurant_id, g);
+        }
+        return [...map.entries()].map(([id, g]) => ({ id, ...g }));
+    })();
+
     return (
         <>
-            <h2 className="text-lg font-bold tracking-tight">Favorites</h2>
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Favorites</h2>
 
             <div className="border-border mt-3 border-b">
                 <div className="flex gap-6 text-sm font-medium">
@@ -1722,91 +1845,158 @@ function FavoritesSection() {
             </div>
 
             {tab === 'restaurants' ? (
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {FAVORITE_RESTAURANTS.map((r) => (
-                        <div key={r.id} className="border-border bg-background overflow-hidden rounded-2xl border shadow-sm">
-                            <div className="relative aspect-[4/3] overflow-hidden">
-                                <img src={r.image} alt={r.name} className="h-full w-full object-cover" loading="lazy" />
-                                <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow">
-                                    {r.discount}
-                                </span>
-                                <span className="absolute top-3 right-3 inline-flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-semibold text-amber-600 shadow">
-                                    <Star className="size-3 fill-current" /> {r.rating}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between p-3">
-                                <div>
-                                    <p className="text-sm font-semibold">{r.name}</p>
-                                    <p className="text-muted-foreground text-[11px]">
-                                        {r.eta} · {r.distance}
-                                    </p>
-                                </div>
-                                <Heart className="size-5 fill-rose-500 text-rose-500" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="mt-4 space-y-4">
-                    {FAVORITE_ITEM_GROUPS.map((g) => (
-                        <div key={g.restaurant} className="border-border bg-background rounded-2xl border">
-                            <header className="flex items-center justify-between p-3">
-                                <div>
-                                    <p className="text-sm font-semibold">{g.restaurant}</p>
-                                    <p className="text-muted-foreground text-[11px]">
-                                        {g.eta} · {g.distance}
-                                    </p>
-                                </div>
-                                <button type="button" className="text-muted-foreground hover:text-primary">
-                                    ›
-                                </button>
-                            </header>
-                            <div className="grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-2">
-                                {g.items.map((item) => (
-                                    <div key={item.id} className="border-border flex gap-3 rounded-lg border p-2">
-                                        <div className="relative size-20 shrink-0">
-                                            <img src={item.image} alt={item.name} className="size-full rounded-md object-cover" loading="lazy" />
-                                            <button
-                                                type="button"
-                                                className="border-primary bg-background text-primary absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
-                                            >
-                                                ADD
-                                            </button>
-                                        </div>
-                                        <div className="flex min-w-0 flex-1 flex-col justify-between">
-                                            <div>
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <span
-                                                        className={
-                                                            'size-3 shrink-0 rounded-sm border-2 ' +
-                                                            (item.veg ? 'border-emerald-500' : 'border-rose-500')
-                                                        }
-                                                    >
-                                                        <span
-                                                            className={
-                                                                'block size-full rounded-full ' + (item.veg ? 'bg-emerald-500' : 'bg-rose-500')
-                                                            }
-                                                        />
-                                                    </span>
-                                                    <Heart className="size-4 fill-rose-500 text-rose-500" />
-                                                </div>
-                                                <p className="text-xs leading-tight font-semibold">{item.name}</p>
+                <>
+                    {restaurants.loaded && restaurants.items.length === 0 ? (
+                        <p className="bg-muted/40 text-muted-foreground mt-4 rounded-lg py-10 text-center text-sm">
+                            No favourite restaurants yet.
+                        </p>
+                    ) : (
+                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            {restaurants.items.map((r) => (
+                                <Link
+                                    key={r.id}
+                                    href={`/customer/restaurants/${r.id}`}
+                                    className="border-border bg-background group block overflow-hidden rounded-2xl border shadow-sm"
+                                >
+                                    <div className="relative aspect-[4/3] overflow-hidden bg-zinc-200">
+                                        {r.cover_url || r.logo_url ? (
+                                            <img
+                                                src={(r.cover_url ?? r.logo_url)!}
+                                                alt={r.name}
+                                                className="h-full w-full object-cover transition group-hover:scale-105"
+                                                loading="lazy"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
+                                                {r.name.charAt(0)}
                                             </div>
-                                            <div className="flex items-center justify-between text-[11px]">
-                                                <span className="font-semibold">{item.price}</span>
-                                                <span className="inline-flex items-center gap-0.5 text-amber-600">
-                                                    <Star className="size-3 fill-current" /> {item.rating}
-                                                </span>
-                                            </div>
-                                        </div>
+                                        )}
+                                        {r.rating !== null ? (
+                                            <span className="absolute top-3 right-3 inline-flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 text-[11px] font-semibold text-amber-600 shadow">
+                                                <Star className="size-3 fill-current" /> {r.rating.toFixed(1)}
+                                            </span>
+                                        ) : null}
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="flex items-center justify-between p-3">
+                                        <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold">{r.name}</p>
+                                            <p className="text-muted-foreground text-[11px]">
+                                                20-30 min{r.city ? ` · ${r.city}` : ''}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            aria-label="Remove from favourites"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                unfavorite('restaurants', r.id, () => restaurants.remove(r.id));
+                                            }}
+                                            className="shrink-0"
+                                        >
+                                            <Heart className="size-5 fill-rose-500 text-rose-500" />
+                                        </button>
+                                    </div>
+                                </Link>
+                            ))}
                         </div>
-                    ))}
-                </div>
+                    )}
+                    <FavLoadMore loading={restaurants.loading} hasMore={restaurants.hasMore} sentinelRef={restaurants.sentinelRef} />
+                </>
+            ) : (
+                <>
+                    {items.loaded && items.items.length === 0 ? (
+                        <p className="bg-muted/40 text-muted-foreground mt-4 rounded-lg py-10 text-center text-sm">No favourite items yet.</p>
+                    ) : (
+                        <div className="mt-4 space-y-4">
+                            {itemGroups.map((g) => (
+                                <div key={g.id} className="border-border bg-background rounded-2xl border">
+                                    <Link
+                                        href={`/customer/restaurants/${g.id}`}
+                                        className="flex items-center justify-between p-3 hover:text-primary"
+                                    >
+                                        <p className="text-sm font-semibold">{g.name}</p>
+                                        <span className="text-muted-foreground">›</span>
+                                    </Link>
+                                    <div className="grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-2">
+                                        {g.items.map((item) => (
+                                            <div key={item.id} className="border-border flex gap-3 rounded-lg border p-2">
+                                                <div className="relative size-20 shrink-0">
+                                                    {item.image_url ? (
+                                                        <img src={item.image_url} alt={item.name} className="size-full rounded-md object-cover" loading="lazy" />
+                                                    ) : (
+                                                        <div className="bg-muted/40 size-full rounded-md" />
+                                                    )}
+                                                    <Link
+                                                        href={`/customer/restaurants/${item.restaurant_id}`}
+                                                        className="border-primary bg-background text-primary absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
+                                                    >
+                                                        ADD
+                                                    </Link>
+                                                </div>
+                                                <div className="flex min-w-0 flex-1 flex-col justify-between">
+                                                    <div>
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <span
+                                                                className={
+                                                                    'size-3 shrink-0 rounded-sm border-2 ' +
+                                                                    (item.is_veg ? 'border-emerald-500' : 'border-rose-500')
+                                                                }
+                                                            >
+                                                                <span
+                                                                    className={
+                                                                        'block size-full rounded-full ' +
+                                                                        (item.is_veg ? 'bg-emerald-500' : 'bg-rose-500')
+                                                                    }
+                                                                />
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                aria-label="Remove from favourites"
+                                                                onClick={() => unfavorite('menu-items', item.id, () => items.remove(item.id))}
+                                                            >
+                                                                <Heart className="size-4 fill-rose-500 text-rose-500" />
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-xs leading-tight font-semibold">{item.name}</p>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-[11px]">
+                                                        <span className="font-semibold">£{item.price.toFixed(2)}</span>
+                                                        {item.rating !== null ? (
+                                                            <span className="inline-flex items-center gap-0.5 text-amber-600">
+                                                                <Star className="size-3 fill-current" /> {item.rating.toFixed(1)}
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <FavLoadMore loading={items.loading} hasMore={items.hasMore} sentinelRef={items.sentinelRef} />
+                </>
             )}
         </>
+    );
+}
+
+function FavLoadMore({
+    loading,
+    hasMore,
+    sentinelRef,
+}: {
+    loading: boolean;
+    hasMore: boolean;
+    sentinelRef: React.RefObject<HTMLDivElement | null>;
+}) {
+    if (!hasMore && !loading) return null;
+    return (
+        <div ref={sentinelRef} className="flex items-center justify-center py-6">
+            {loading ? <span className="text-muted-foreground text-xs">Loading more…</span> : null}
+        </div>
     );
 }
 
@@ -2407,8 +2597,7 @@ export default function CustomerProfile() {
             case 'addresses':
                 return <AddressesSection addresses={addresses} />;
             case 'favorites':
-                return <OrderHistorySection initialOrders={orders} initialMeta={ordersMeta} />;
-            // return <FavoritesSection />;
+                return <FavoritesSection />;
             case 'payments':
                 return <OrderHistorySection initialOrders={orders} initialMeta={ordersMeta} />;
             // return <PaymentsSection onAddNew={() => setAddingCard(true)} />;
@@ -2425,7 +2614,7 @@ export default function CustomerProfile() {
     };
 
     return (
-        <div className="flex min-h-screen flex-col bg-[#F6F8FA]">
+        <div className="bg-background flex min-h-screen flex-col">
             <Head title="Profile" />
 
             <CustomerHeader />
@@ -2435,7 +2624,7 @@ export default function CustomerProfile() {
                     <ProfileHeader name={fullName || 'Customer'} email={email} photo={photo} onEdit={() => setEditOpen(true)} />
 
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_1fr]">
-                        <aside className="bg-background rounded-2xl p-3 shadow-sm lg:sticky lg:top-20 lg:self-start">
+                        <aside className="rounded-2xl bg-[#F6F8FA] p-3 lg:sticky lg:top-20 lg:self-start">
                             <ul className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:gap-1.5 lg:overflow-visible">
                                 {SIDEBAR_ITEMS.map((item) => {
                                     const Icon = item.icon;
@@ -2450,7 +2639,7 @@ export default function CustomerProfile() {
                                                 }}
                                                 className={
                                                     'flex w-full items-center gap-3 rounded-lg px-4 py-3 text-base font-medium whitespace-nowrap transition ' +
-                                                    (active ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted')
+                                                    (active ? 'bg-background text-primary shadow-sm' : 'text-foreground hover:bg-background/60')
                                                 }
                                             >
                                                 <Icon className="size-5" />
@@ -2472,7 +2661,7 @@ export default function CustomerProfile() {
                             </ul>
                         </aside>
 
-                        <section className="bg-background rounded-2xl p-5 shadow-sm sm:p-8">{renderSection()}</section>
+                        <section className="rounded-2xl bg-[#F6F8FA] p-5 sm:p-8">{renderSection()}</section>
                     </div>
                 </div>
             </main>

@@ -11,6 +11,7 @@ use App\Http\Requests\Customer\Profile\UpdateProfileRequest;
 use App\Http\Resources\Customer\AddressResource;
 use App\Http\Resources\Customer\CustomerProfileResource;
 use App\Models\Order;
+use App\Support\PaginationMeta;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -72,12 +73,7 @@ class CustomerProfileController extends Controller
         return $this->success(
             data: [
                 'orders' => $rows,
-                'meta' => [
-                    'current_page' => $paginator->currentPage(),
-                    'last_page' => $paginator->lastPage(),
-                    'per_page' => $paginator->perPage(),
-                    'total' => $paginator->total(),
-                ],
+                'meta' => PaginationMeta::make($paginator),
             ],
             message: 'Orders retrieved.',
         );
@@ -91,6 +87,33 @@ class CustomerProfileController extends Controller
         return $this->success(
             data: new CustomerProfileResource($updatedUser->customerProfile),
             message: 'Profile updated.',
+        );
+    }
+
+    /**
+     * Paginated saved addresses (selected → default → newest first), 10/page.
+     */
+    public function addresses(Request $request): JsonResponse
+    {
+        $user = auth('sanctum')->user();
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = max(1, min(50, (int) $request->query('per_page', 10)));
+        $profile = $user->customerProfile;
+
+        $paginator = $profile
+            ? $profile->addresses()
+                ->orderByDesc('is_selected')
+                ->orderByDesc('is_default')
+                ->orderByDesc('id')
+                ->paginate(perPage: $perPage, page: $page)
+            : new \Illuminate\Pagination\LengthAwarePaginator(items: [], total: 0, perPage: $perPage, currentPage: $page);
+
+        return $this->success(
+            data: [
+                'addresses' => AddressResource::collection($paginator->getCollection())->resolve($request),
+                'meta' => PaginationMeta::make($paginator),
+            ],
+            message: 'Addresses retrieved.',
         );
     }
 

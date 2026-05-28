@@ -16,19 +16,9 @@ class CustomerDashboardResource extends JsonResource
 
         return [
             'food_items' => FoodItemResource::collection($data->foodItems)->resolve($request),
-            'food_items_meta' => [
-                'current_page' => $data->foodItemsCurrentPage,
-                'last_page' => $data->foodItemsLastPage,
-                'per_page' => $data->foodItemsPerPage,
-                'total' => $data->foodItemsTotal,
-            ],
+            'food_items_meta' => $data->foodItemsMeta,
             'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
-            'restaurants_meta' => [
-                'current_page' => $data->restaurantsCurrentPage,
-                'last_page' => $data->restaurantsLastPage,
-                'per_page' => $data->restaurantsPerPage,
-                'total' => $data->restaurantsTotal,
-            ],
+            'restaurants_meta' => $data->restaurantsMeta,
             'address' => $data->address ? [
                 'id' => $data->address->id,
                 'label' => $data->address->label,

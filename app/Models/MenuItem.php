@@ -79,6 +79,33 @@ class MenuItem extends Model
         return $query->where('is_available', true);
     }
 
+    /**
+     * Customer-facing restaurant-detail filters in one call: diet (veg /
+     * non_veg) and the "Ratings 4.0+" chip. menu_items carry no own rating,
+     * so the rating filter gates on the parent restaurant's rating (the value
+     * surfaced per dish on the detail page).
+     *
+     * @param  array{diet?: ?string, min_rating?: float|int|bool|null}  $filters
+     */
+    public function scopeCustomerFilter(Builder $query, array $filters): Builder
+    {
+        $diet = $filters['diet'] ?? null;
+        $minRating = $filters['min_rating'] ?? null;
+
+        return $query
+            ->when(
+                in_array($diet, ['veg', 'non_veg'], true),
+                fn (Builder $q) => $q->where('is_veg', $diet === 'veg'),
+            )
+            ->when(
+                $minRating !== null && (float) $minRating > 0,
+                fn (Builder $q) => $q->whereHas(
+                    'restaurant',
+                    fn (Builder $r) => $r->where('restaurants.rating', '>=', (float) $minRating),
+                ),
+            );
+    }
+
     public function scopeForRestaurant(Builder $query, int $restaurantId): Builder
     {
         return $query->where('restaurant_id', $restaurantId);

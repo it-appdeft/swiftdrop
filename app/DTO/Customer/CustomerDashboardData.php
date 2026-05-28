@@ -16,6 +16,8 @@ class CustomerDashboardData
     /**
      * @param  Collection<int, FoodItem>  $foodItems
      * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float, is_favorited: bool}>  $restaurants
+     * @param  array<string, mixed>  $restaurantsMeta  Pagination meta (incl. links) for the restaurants list.
+     * @param  array<string, mixed>  $foodItemsMeta    Pagination meta (incl. links) for the food-items strip.
      */
     public function __construct(
         public readonly Collection $foodItems,
@@ -23,14 +25,8 @@ class CustomerDashboardData
         public readonly ?CustomerAddress $address,
         public readonly float $radiusMiles,
         public readonly bool $usingFallback,
-        public readonly int $restaurantsTotal = 0,
-        public readonly int $restaurantsPerPage = 10,
-        public readonly int $restaurantsLastPage = 1,
-        public readonly int $restaurantsCurrentPage = 1,
-        public readonly int $foodItemsTotal = 0,
-        public readonly int $foodItemsPerPage = 10,
-        public readonly int $foodItemsLastPage = 1,
-        public readonly int $foodItemsCurrentPage = 1,
+        public readonly array $restaurantsMeta = [],
+        public readonly array $foodItemsMeta = [],
         public readonly ?FoodItem $selectedFoodItem = null,
     ) {
     }

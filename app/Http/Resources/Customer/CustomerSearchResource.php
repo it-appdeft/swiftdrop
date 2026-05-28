@@ -18,13 +18,12 @@ class CustomerSearchResource extends JsonResource
 
         return [
             'keyword' => $data->keyword,
-            'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
-            'restaurants_meta' => [
-                'current_page' => $data->restaurantsCurrentPage,
-                'last_page' => $data->restaurantsLastPage,
-                'per_page' => $data->restaurantsPerPage,
-                'total' => $data->restaurantsTotal,
+            'filters' => [
+                'offers' => (bool) ($data->filters['offers'] ?? false),
+                'highest_rated' => (bool) ($data->filters['highest_rated'] ?? false),
             ],
+            'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
+            'restaurants_meta' => $data->restaurantsMeta,
             'dishes_by_restaurant' => $data->dishesByRestaurant->map(function (array $row) {
                 /** @var Restaurant $restaurant */
                 $restaurant = $row['restaurant'];
