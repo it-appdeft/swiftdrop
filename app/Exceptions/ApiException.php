@@ -34,7 +34,12 @@ class ApiException extends RuntimeException
 
     public function render(Request $request): JsonResponse|RedirectResponse
     {
-        if ($request->expectsJson()) {
+        // API routes (and any request without a session to redirect back to)
+        // always get the JSON envelope. A stateless client that omits the
+        // Accept: application/json header would otherwise fall through to
+        // back(), which needs a session and 302-redirects instead of
+        // returning the error (e.g. PUT /api/customer/addresses/{bad-id}).
+        if ($request->expectsJson() || $request->is('api/*') || ! $request->hasSession()) {
             return response()->json([
                 'success' => false,
                 'message' => $this->getMessage(),

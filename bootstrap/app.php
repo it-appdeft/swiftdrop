@@ -40,7 +40,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // extend App\Exceptions\ApiException render themselves and bypass
         // this callback; framework-level exceptions fall through here.
         $exceptions->render(function (Throwable $e, Request $request) {
-            if (! $request->expectsJson()) {
+            // API routes always get the JSON envelope, even when the client
+            // forgot the Accept: application/json header — otherwise framework
+            // exceptions (model-not-found, validation, …) fall through to the
+            // web handler and 302-redirect a stateless client.
+            if (! $request->expectsJson() && ! $request->is('api/*')) {
                 return null;
             }
 
@@ -71,7 +75,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
                 $e instanceof NotFoundHttpException => response()->json([
                     'success' => false,
-                    'message' => $e->getMessage() ?: 'Resource not found.',
+                    // Route-model binding surfaces "No query results for model
+                    // [App\Models\X] 5" — hide that internal detail.
+                    'message' => ($msg = $e->getMessage()) && ! str_contains($msg, 'No query results for model')
+                        ? $msg
+                        : 'Resource not found.',
                     'errors' => (object) [],
                 ], 404),
 
