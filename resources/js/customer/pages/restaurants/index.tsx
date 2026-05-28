@@ -5,11 +5,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CustomerHeader } from '../../components/customer-header';
 import { RestaurantCard, type DashboardRestaurant } from '../dashboard';
 
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
 interface PageMeta {
     current_page: number;
     last_page: number;
     per_page: number;
     total: number;
+    from?: number | null;
+    to?: number | null;
+    next_page_url?: string | null;
+    prev_page_url?: string | null;
+    links?: PaginationLink[];
 }
 
 interface Props {

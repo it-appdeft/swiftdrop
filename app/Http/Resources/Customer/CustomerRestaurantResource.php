@@ -43,15 +43,16 @@ class CustomerRestaurantResource extends JsonResource
         return [
             'restaurant' => $header,
             'keyword' => $data->keyword,
+            // Active menu filters echoed back so the frontend can restore the
+            // Veg/Non-Veg radio + "Ratings 4.0+" chip after a server reload.
+            'filters' => [
+                'diet' => $data->filters['diet'] ?? null,
+                'min_rating' => $data->filters['min_rating'] ?? null,
+            ],
             'menu' => $data->menuItems
                 ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id])))
                 ->values()->all(),
-            'menu_meta' => [
-                'current_page' => $data->menuCurrentPage,
-                'last_page' => $data->menuLastPage,
-                'per_page' => $data->menuPerPage,
-                'total' => $data->menuTotal,
-            ],
+            'menu_meta' => $data->menuMeta,
             'recommended' => $data->recommended
                 ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id])))
                 ->values()->all(),

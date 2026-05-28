@@ -12,6 +12,10 @@ class CustomerSearchResults
      * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float, dishes: Collection<int, \App\Models\MenuItem>}>  $dishesByRestaurant
      * @param  Collection<int, \App\Models\CustomerSearchHistory>  $recent
      */
+    /**
+     * @param  array<string, mixed>  $restaurantsMeta  Pagination meta (incl. links) for the restaurants tab.
+     * @param  array{offers: bool, highest_rated: bool}  $filters  Active post-keyword result filters.
+     */
     public function __construct(
         public readonly string $keyword,
         public readonly Collection $restaurants,
@@ -20,10 +24,8 @@ class CustomerSearchResults
         public readonly ?CustomerAddress $address,
         public readonly float $radiusMiles,
         public readonly bool $usingFallback,
-        public readonly int $restaurantsCurrentPage = 1,
-        public readonly int $restaurantsLastPage = 1,
-        public readonly int $restaurantsPerPage = 10,
-        public readonly int $restaurantsTotal = 0,
+        public readonly array $restaurantsMeta = [],
+        public readonly array $filters = ['offers' => false, 'highest_rated' => false],
     ) {
     }
 }

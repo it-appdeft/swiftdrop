@@ -47,7 +47,9 @@ class CustomerProfile extends Model
 
     public function searchHistory(): HasMany
     {
-        return $this->hasMany(CustomerSearchHistory::class);
+        return $this->hasMany(CustomerSearchHistory::class)
+            ->latest()
+            ->limit(15);
     }
 
     /** Saved-favourites pivots, used to surface is_favorited flags on the customer surfaces. */

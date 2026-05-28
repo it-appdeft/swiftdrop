@@ -139,7 +139,7 @@ class CustomerFavoriteService implements CustomerFavoriteServiceInterface
         }
 
         return $profile->favoriteMenuItems()
-            ->with('foodItem')
+            ->with(['foodItem', 'restaurant:id,name,rating,total_reviews'])
             ->orderByDesc('customer_favorite_menu_items.created_at')
             ->paginate(perPage: $perPage, page: $page);
     }

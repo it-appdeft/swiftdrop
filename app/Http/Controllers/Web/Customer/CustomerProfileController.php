@@ -12,8 +12,10 @@ use App\Http\Requests\Customer\Profile\AddAddressRequest;
 use App\Http\Requests\Customer\Profile\DeleteAccountRequest;
 use App\Http\Requests\Customer\Profile\UpdateAddressRequest;
 use App\Http\Requests\Customer\Profile\UpdateProfileRequest;
+use App\Http\Resources\Customer\AddressResource;
 use App\Models\DeletionReason;
 use App\Models\Order;
+use App\Support\PaginationMeta;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -168,15 +170,10 @@ class CustomerProfileController extends Controller
             ->all();
     }
 
-    /** @return array<string, int> */
+    /** @return array<string, mixed> */
     protected function meta(LengthAwarePaginator $paginator): array
     {
-        return [
-            'current_page' => $paginator->currentPage(),
-            'last_page' => $paginator->lastPage(),
-            'per_page' => $paginator->perPage(),
-            'total' => $paginator->total(),
-        ];
+        return PaginationMeta::make($paginator);
     }
 
     public function update(UpdateProfileRequest $request): RedirectResponse
@@ -187,6 +184,43 @@ class CustomerProfileController extends Controller
     }
 
     // ── Addresses ──────────────────────────────────────────────────────────
+
+    /** Default page size for the saved-addresses list. */
+    protected const ADDRESSES_PER_PAGE = 10;
+
+    /**
+     * Paginated saved addresses (JSON, selected → default → newest first).
+     * Backs the profile "Saved Address" list / mobile address picker.
+     */
+    public function addresses(Request $request): JsonResponse
+    {
+        $paginator = $this->paginatedAddresses(Auth::user(), max(1, (int) $request->query('page', 1)));
+
+        return response()->json([
+            'data' => AddressResource::collection($paginator->getCollection())->resolve($request),
+            'meta' => PaginationMeta::make($paginator),
+        ]);
+    }
+
+    protected function paginatedAddresses(mixed $user, int $page): LengthAwarePaginator
+    {
+        $profile = $user?->customerProfile;
+        if (! $profile) {
+            return new \Illuminate\Pagination\LengthAwarePaginator(
+                items: [],
+                total: 0,
+                perPage: self::ADDRESSES_PER_PAGE,
+                currentPage: $page,
+                options: ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath()],
+            );
+        }
+
+        return $profile->addresses()
+            ->orderByDesc('is_selected')
+            ->orderByDesc('is_default')
+            ->orderByDesc('id')
+            ->paginate(perPage: self::ADDRESSES_PER_PAGE, page: $page);
+    }
 
     public function addAddress(AddAddressRequest $request): RedirectResponse
     {

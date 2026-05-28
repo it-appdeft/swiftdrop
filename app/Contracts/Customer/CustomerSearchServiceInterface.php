@@ -13,11 +13,14 @@ interface CustomerSearchServiceInterface
      * are paginated (10/page by default) so the results page supports infinite
      * scroll; dishes_by_restaurant remains a capped grouped list.
      *
+     * `$filters` carries the post-keyword result chips:
+     * `['offers' => bool, 'highest_rated' => bool]`.
+     *
      * An empty / whitespace keyword skips the search and returns only the
      * recent-searches list so the same call serves both the empty state and
      * the results state.
      */
-    public function search(User $user, string $keyword, int $page = 1, int $perPage = 10): CustomerSearchResults;
+    public function search(User $user, string $keyword, int $page = 1, int $perPage = 10, array $filters = []): CustomerSearchResults;
 
     /**
      * Wipe the customer's search history.

@@ -10,6 +10,7 @@ use App\Models\FoodItem;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Services\Platform\PlatformConfigService;
+use App\Support\PaginationMeta;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -38,12 +39,14 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
         $usingFallback = ! ($address && $address->lat !== null && $address->lng !== null);
 
         // Filtered list — what the customer actually sees (may be a subset
-        // when a food-item filter is active).
+        // when a food-item filter is active). pageName drives the ?query key
+        // baked into the pagination links so they round-trip correctly.
         $restaurantsPaginator = $this->paginateRestaurants(
             $user,
             page: $restaurantsPage,
             perPage: self::RESTAURANTS_PER_PAGE,
             foodItemId: $foodItemId,
+            pageName: 'restaurants_page',
         );
         /** @var Collection<int, array{restaurant: Restaurant, distance_miles: ?float, is_favorited: bool}> $restaurants */
         $restaurants = collect($restaurantsPaginator->items());
@@ -52,7 +55,24 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
         // so the customer can switch dishes. We compute the strip from the
         // FULL set of reachable restaurants (not just the filtered page).
         $reachableIds = $this->reachableRestaurantIds($user);
-        $foodItemsPaginator = $this->paginateFoodItemsForRestaurants($reachableIds, $foodItemsPage, self::FOOD_ITEMS_PER_PAGE);
+        $foodItemsPaginator = $this->paginateFoodItemsForRestaurants(
+            $reachableIds,
+            $foodItemsPage,
+            self::FOOD_ITEMS_PER_PAGE,
+            pageName: 'food_items_page',
+        );
+
+        // The food-item filter must survive across the restaurants links, and
+        // the active food-item page must survive across the restaurants links
+        // (and vice versa) — append the cross-list query params.
+        $restaurantsPaginator->appends(array_filter([
+            'food_item_id' => $foodItemId,
+            'food_items_page' => $foodItemsPage > 1 ? $foodItemsPage : null,
+        ]));
+        $foodItemsPaginator->appends(array_filter([
+            'food_item_id' => $foodItemId,
+            'restaurants_page' => $restaurantsPage > 1 ? $restaurantsPage : null,
+        ]));
 
         // Resolve the selected food item so the resource can echo its name +
         // image back to the frontend (used for the "showing restaurants
@@ -65,14 +85,8 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
             address: $address,
             radiusMiles: $radius,
             usingFallback: $usingFallback,
-            restaurantsTotal: $restaurantsPaginator->total(),
-            restaurantsPerPage: $restaurantsPaginator->perPage(),
-            restaurantsLastPage: $restaurantsPaginator->lastPage(),
-            restaurantsCurrentPage: $restaurantsPaginator->currentPage(),
-            foodItemsTotal: $foodItemsPaginator->total(),
-            foodItemsPerPage: $foodItemsPaginator->perPage(),
-            foodItemsLastPage: $foodItemsPaginator->lastPage(),
-            foodItemsCurrentPage: $foodItemsPaginator->currentPage(),
+            restaurantsMeta: PaginationMeta::make($restaurantsPaginator),
+            foodItemsMeta: PaginationMeta::make($foodItemsPaginator),
             selectedFoodItem: $selectedFoodItem,
         );
     }
@@ -103,7 +117,7 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
      * Empty `$restaurantIds` short-circuits to an empty paginator so we don't
      * issue a query that can never match anything.
      */
-    protected function paginateFoodItemsForRestaurants(array $restaurantIds, int $page, int $perPage): LengthAwarePaginator
+    protected function paginateFoodItemsForRestaurants(array $restaurantIds, int $page, int $perPage, string $pageName = 'page'): LengthAwarePaginator
     {
         if ($restaurantIds === []) {
             return new \Illuminate\Pagination\LengthAwarePaginator(
@@ -111,13 +125,14 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
                 total: 0,
                 perPage: $perPage,
                 currentPage: $page,
+                options: ['pageName' => $pageName, 'path' => \Illuminate\Pagination\Paginator::resolveCurrentPath()],
             );
         }
 
         return FoodItem::query()
             ->availableForRestaurants($restaurantIds)
             ->orderBy('id')
-            ->paginate(perPage: $perPage, page: $page);
+            ->paginate(perPage: $perPage, pageName: $pageName, page: $page);
     }
 
     /**
@@ -134,6 +149,7 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
         int $page = 1,
         int $perPage = self::RESTAURANTS_PER_PAGE,
         ?int $foodItemId = null,
+        string $pageName = 'page',
     ): LengthAwarePaginator {
         $address = $this->defaultAddressFor($user);
         $radius = $this->dashboardRadius();
@@ -157,7 +173,7 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
                 ->where('is_available', true));
         }
 
-        $paginator = $query->paginate(perPage: $perPage, page: $page);
+        $paginator = $query->paginate(perPage: $perPage, pageName: $pageName, page: $page);
 
         $favoriteIds = $user ? array_flip($this->favorites->favoriteRestaurantIds($user)) : [];
 

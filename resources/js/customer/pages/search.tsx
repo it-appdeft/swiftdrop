@@ -1,6 +1,6 @@
 import { toast } from '@/hooks/use-toast';
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronRight, Clock, Heart, Minus, Plus, Star, UtensilsCrossed } from 'lucide-react';
+import { ChevronRight, Clock, Heart, Star, Tag, UtensilsCrossed } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish } from '../components/dish-modifier-dialog';
@@ -59,16 +59,33 @@ interface SearchAddress {
     postcode: string | null;
 }
 
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
 interface RestaurantsMeta {
     current_page: number;
     last_page: number;
     per_page: number;
     total: number;
+    from?: number | null;
+    to?: number | null;
+    next_page_url?: string | null;
+    prev_page_url?: string | null;
+    links?: PaginationLink[];
+}
+
+interface SearchFilters {
+    offers: boolean;
+    highest_rated: boolean;
 }
 
 interface Props {
     results: {
         keyword: string;
+        filters: SearchFilters;
         restaurants: SearchRestaurant[];
         restaurants_meta: RestaurantsMeta;
         dishes_by_restaurant: DishGroup[];
@@ -117,6 +134,8 @@ export default function CustomerSearch({ results }: Props) {
                 search: results.keyword,
                 page: String(restaurantsMeta.current_page + 1),
             });
+            if (results.filters.offers) params.set('offers', '1');
+            if (results.filters.highest_rated) params.set('highest_rated', '1');
             const res = await fetch(`/customer/search?${params.toString()}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
@@ -133,7 +152,22 @@ export default function CustomerSearch({ results }: Props) {
         } finally {
             setLoadingMore(false);
         }
-    }, [hasMoreRestaurants, loadingMore, restaurantsMeta.current_page, results.keyword]);
+    }, [hasMoreRestaurants, loadingMore, restaurantsMeta.current_page, results.keyword, results.filters]);
+
+    // Toggling a result filter re-runs the search from page 1 (full Inertia
+    // visit) carrying the keyword + the new filter set.
+    const toggleFilter = (key: keyof SearchFilters) => {
+        const next: SearchFilters = { ...results.filters, [key]: !results.filters[key] };
+        router.get(
+            '/customer/search',
+            {
+                search: results.keyword,
+                ...(next.offers ? { offers: 1 } : {}),
+                ...(next.highest_rated ? { highest_rated: 1 } : {}),
+            },
+            { preserveScroll: true, preserveState: false },
+        );
+    };
 
     // IntersectionObserver kicks off loadMore when the sentinel scrolls in.
     useEffect(() => {
@@ -213,6 +247,24 @@ export default function CustomerSearch({ results }: Props) {
                     <>
                         <Tabs tab={tab} setTab={setTab} />
 
+                        {/* Post-keyword result filters — apply to both tabs (server filters both). */}
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                            <FilterChip
+                                active={results.filters.offers}
+                                onClick={() => toggleFilter('offers')}
+                                icon={<Tag className="size-3.5" />}
+                            >
+                                Offers
+                            </FilterChip>
+                            <FilterChip
+                                active={results.filters.highest_rated}
+                                onClick={() => toggleFilter('highest_rated')}
+                                icon={<Star className="size-3.5" />}
+                            >
+                                Highest rated
+                            </FilterChip>
+                        </div>
+
                         {tab === 'restaurants' ? (
                             <>
                                 <RestaurantsList restaurants={restaurants} keyword={results.keyword} />
@@ -253,6 +305,35 @@ export default function CustomerSearch({ results }: Props) {
                 />
             ) : null}
         </div>
+    );
+}
+
+function FilterChip({
+    active,
+    onClick,
+    icon,
+    children,
+}: {
+    active: boolean;
+    onClick: () => void;
+    icon: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={active}
+            className={
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ' +
+                (active
+                    ? 'border-emerald-600 bg-emerald-600 text-white'
+                    : 'text-foreground border-zinc-300 hover:border-emerald-500')
+            }
+        >
+            {icon}
+            {children}
+        </button>
     );
 }
 

@@ -20,8 +20,10 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
     Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])
         ->whereNumber('id')->name('restaurants.show');
 
-    // Saved-favourites toggles — JSON so the heart flips without a full
-    // Inertia visit. Listing the favourites is API-only for now (mobile app).
+    // Saved favourites — JSON lists (profile Favorites tab, paginated +
+    // infinite scroll) and the heart toggles (flip without an Inertia visit).
+    Route::get('favorites/restaurants', [CustomerFavoriteController::class, 'restaurants'])->name('favorites.restaurants');
+    Route::get('favorites/menu-items', [CustomerFavoriteController::class, 'menuItems'])->name('favorites.menu-items');
     Route::post('favorites/restaurants/{restaurantId}', [CustomerFavoriteController::class, 'toggleRestaurant'])
         ->whereNumber('restaurantId')->name('favorites.restaurants.toggle');
     Route::post('favorites/menu-items/{menuItemId}', [CustomerFavoriteController::class, 'toggleMenuItem'])
@@ -57,6 +59,7 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
         Route::delete('profile', 'deleteAccount')->name('profile.delete');
 
         // Saved addresses.
+        Route::get('addresses', 'addresses')->name('addresses.index');
         Route::post('addresses', 'addAddress')->name('addresses.store');
         Route::put('addresses/{addressId}', 'updateAddress')
             ->whereNumber('addressId')->name('addresses.update');

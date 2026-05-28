@@ -48,12 +48,7 @@ class CustomerRestaurantController extends Controller
 
         $payload = [
             'restaurants' => DashboardRestaurantResource::collection($paginator->getCollection())->resolve($request),
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'last_page' => $paginator->lastPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-            ],
+            'meta' => \App\Support\PaginationMeta::make($paginator),
         ];
 
         // Infinite-scroll subsequent pages are fetched as JSON so they can be
@@ -74,6 +69,7 @@ class CustomerRestaurantController extends Controller
             $request->keyword(),
             menuPage: $menuPage,
             menuPerPage: CustomerRestaurantService::MENU_PER_PAGE,
+            filters: $request->menuFilters(),
         );
         $cart = $this->cart->getCart($request->user());
 

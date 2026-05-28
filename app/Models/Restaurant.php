@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,9 +10,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Carbon;
 
 class Restaurant extends Model
 {
+    /** Rating cutoff for the customer "Highest rated" filter. */
+    public const HIGH_RATING = 4.0;
+
     protected $fillable = [
         'user_id',
         // Step 1 — Restaurant identity (matches the partner-application UI).
@@ -104,6 +109,90 @@ class Restaurant extends Model
             ->whereNotNull('restaurants.lng')
             ->selectRaw("restaurants.*, {$distance} as distance_miles")
             ->whereRaw("{$distance} <= ?", [$radiusMiles]);
+    }
+
+    /**
+     * One-call customer search filter combining the keyword match with the
+     * post-keyword result chips (Offers / Highest rated). Lets callers do
+     * `Restaurant::query()->active()->approved()->customerSearch($filters)`
+     * instead of stitching three scopes together.
+     *
+     * @param  array{keyword?: ?string, offers?: bool, highest_rated?: bool}  $filters
+     */
+    public function scopeCustomerSearch(Builder $query, array $filters): Builder
+    {
+        return $query
+            ->when(filled($filters['keyword'] ?? null), fn (Builder $q) => $q->matchingKeyword((string) $filters['keyword']))
+            ->when(! empty($filters['offers']), fn (Builder $q) => $q->withOffers())
+            ->when(! empty($filters['highest_rated']), fn (Builder $q) => $q->highRated());
+    }
+
+    /**
+     * Keyword match: the restaurant's own name, OR it has at least one
+     * available menu item whose name (or its linked food_item name) matches.
+     */
+    public function scopeMatchingKeyword(Builder $query, string $keyword): Builder
+    {
+        $keyword = trim($keyword);
+        if ($keyword === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $w) use ($keyword) {
+            $w->where('restaurants.name', 'like', "%{$keyword}%")
+                ->orWhereExists(function (QueryBuilder $sub) use ($keyword) {
+                    $sub->selectRaw('1')
+                        ->from('menu_items')
+                        ->leftJoin('food_items', 'food_items.id', '=', 'menu_items.food_item_id')
+                        ->whereColumn('menu_items.restaurant_id', 'restaurants.id')
+                        ->where('menu_items.is_available', true)
+                        ->where(fn (QueryBuilder $x) => $x
+                            ->where('food_items.name', 'like', "%{$keyword}%")
+                            ->orWhere('menu_items.name', 'like', "%{$keyword}%"));
+                });
+        });
+    }
+
+    /**
+     * Customer "Highest rated" search filter — restaurants rated at or above
+     * {@see HIGH_RATING}. Column is qualified so the scope also works on
+     * queries that join `restaurants` (e.g. the dishes search).
+     */
+    public function scopeHighRated(Builder $query, ?float $min = null): Builder
+    {
+        return $query->where('restaurants.rating', '>=', $min ?? self::HIGH_RATING);
+    }
+
+    /**
+     * Customer "Offers" search filter — restaurants with at least one active,
+     * in-window {@see Offer} available to them: either a global ('all') offer
+     * or one targeted at this restaurant.
+     */
+    public function scopeWithOffers(Builder $query): Builder
+    {
+        return $query->whereExists(fn (QueryBuilder $sub) => self::applyOfferExists($sub));
+    }
+
+    /**
+     * Correlated "has an applicable, active, valid offer" subquery keyed on
+     * `restaurants.id`. Extracted so the dishes search (a MenuItem query that
+     * joins `restaurants`) can reuse the exact same predicate as
+     * {@see scopeWithOffers()} without duplicating the conditions.
+     */
+    public static function applyOfferExists(QueryBuilder $sub): QueryBuilder
+    {
+        $now = Carbon::now();
+
+        return $sub->selectRaw('1')
+            ->from('offers')
+            ->where('offers.is_active', true)
+            ->where(fn (QueryBuilder $q) => $q->whereNull('offers.valid_from')->orWhere('offers.valid_from', '<=', $now))
+            ->where(fn (QueryBuilder $q) => $q->whereNull('offers.valid_until')->orWhere('offers.valid_until', '>=', $now))
+            ->where(fn (QueryBuilder $q) => $q
+                ->where('offers.applicable_to', 'all')
+                ->orWhere(fn (QueryBuilder $qq) => $qq
+                    ->where('offers.applicable_to', 'restaurant')
+                    ->whereColumn('offers.applicable_id', 'restaurants.id')));
     }
 
     /**

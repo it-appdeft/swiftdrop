@@ -30,6 +30,7 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     Route::get('dashboard', [CustomerDashboardController::class, 'index']);
 
     Route::get('search', [CustomerSearchController::class, 'index']);
+    Route::get('search/history', [CustomerSearchController::class, 'history']);
     Route::delete('search/history', [CustomerSearchController::class, 'clear']);
 
     Route::get('restaurants', [CustomerRestaurantController::class, 'index']);
@@ -64,6 +65,7 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     });
 
     Route::controller(CustomerProfileController::class)->prefix('addresses')->group(function () {
+        Route::get('/', 'addresses');
         Route::post('/', 'addAddress');
         Route::put('{addressId}', 'updateAddress');
         Route::delete('{addressId}', 'deleteAddress');

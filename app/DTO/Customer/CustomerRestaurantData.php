@@ -25,10 +25,8 @@ class CustomerRestaurantData
         public readonly ?float $distanceMiles = null,
         public readonly bool $isFavorite = false,
         public readonly array $favoriteMenuItemIds = [],
-        public readonly int $menuCurrentPage = 1,
-        public readonly int $menuLastPage = 1,
-        public readonly int $menuPerPage = 10,
-        public readonly int $menuTotal = 0,
+        public readonly array $menuMeta = [],
+        public readonly array $filters = ['diet' => null, 'min_rating' => null],
     ) {
     }
 }
