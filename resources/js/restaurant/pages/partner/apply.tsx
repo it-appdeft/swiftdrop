@@ -249,7 +249,7 @@ function ReviewStep({
 
             <SummaryCard title="Legal & Bank" onEdit={() => onEditStep(3)}>
                 <SummaryRow label="GST" value={data.gst} />
-                <SummaryRow label="FSSAI" value={data.fssai} />
+                <SummaryRow label="FSA" value={data.fssai} />
                 <SummaryRow label="PAN" value={data.pan} />
                 <SummaryRow label="Bank" value={data.bankName} />
                 <SummaryRow label="Account" value={data.accountNumber} />

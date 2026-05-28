@@ -53,7 +53,7 @@ export type DocSlot =
 
 export const DOC_FIELDS: { key: DocSlot; label: string }[] = [
     { key: 'gstCert', label: 'GST certificate' },
-    { key: 'fssai', label: 'FSSAI license' },
+    { key: 'fssai', label: 'FSA license' },
     { key: 'pan', label: 'PAN card' },
     { key: 'cancelledCheque', label: 'Cancelled cheque' },
     { key: 'ownerId', label: 'Owner ID proof' },
@@ -668,7 +668,7 @@ export function LegalBankStep({
                         error={errors.gst}
                     />
                     <TextField
-                        label="FSSAI / Food license"
+                        label="FSA / Food license"
                         required
                         placeholder="12345678901234"
                         value={data.fssai}
