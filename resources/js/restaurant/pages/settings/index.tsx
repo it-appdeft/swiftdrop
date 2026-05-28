@@ -275,7 +275,7 @@ function RestaurantTab({
 }) {
     const seeded: FormState = { ...DEFAULT_STATE, ...(application ?? {}) };
     if (!seeded.categories || seeded.categories.length === 0) {
-        seeded.categories = [{ name: '', diet: 'veg' }];
+        seeded.categories = [{ name: '' }];
     }
 
     const [data, setData] = useState<FormState>(seeded);
