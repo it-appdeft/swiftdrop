@@ -248,7 +248,7 @@ function ReviewStep({
             </SummaryCard>
 
             <SummaryCard title="Legal & Bank" onEdit={() => onEditStep(3)}>
-                <SummaryRow label="GST" value={data.gst} />
+                <SummaryRow label="VAT" value={data.gst} />
                 <SummaryRow label="FSA" value={data.fssai} />
                 <SummaryRow label="PAN" value={data.pan} />
                 <SummaryRow label="Bank" value={data.bankName} />

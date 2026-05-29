@@ -52,7 +52,7 @@ export type DocSlot =
     | 'restaurantPhoto';
 
 export const DOC_FIELDS: { key: DocSlot; label: string }[] = [
-    { key: 'gstCert', label: 'GST certificate' },
+    { key: 'gstCert', label: 'VAT certificate' },
     { key: 'fssai', label: 'FSA license' },
     { key: 'pan', label: 'PAN card' },
     { key: 'cancelledCheque', label: 'Cancelled cheque' },
@@ -337,7 +337,7 @@ export function AccountRestaurantStep({
                 <TextField
                     label="Owner full name"
                     required
-                    placeholder="Rohit Mehta"
+                    placeholder="Enter owner full name"
                     value={data.ownerName}
                     onChange={(v) => update({ ownerName: v })}
                     error={errors.ownerName}
@@ -408,14 +408,14 @@ export function AccountRestaurantStep({
                 <TextField
                     label="Restaurant name"
                     required
-                    placeholder="Spice Route"
+                    placeholder="Enter restaurant name"
                     value={data.restaurantName}
                     onChange={(v) => update({ restaurantName: v })}
                     error={errors.restaurantName}
                 />
                 <TextField
                     label="Legal business name"
-                    placeholder="Spice Route Hospitality Pvt Ltd"
+                    placeholder="Enter legal business name"
                     value={data.legalName}
                     onChange={(v) => update({ legalName: v })}
                     error={errors.legalName}
@@ -566,7 +566,7 @@ export function LocationHoursStep({
                 <TextField
                     label="City"
                     required
-                    placeholder="Bengaluru"
+                    placeholder="Enter city"
                     value={data.city}
                     onChange={(v) => update({ city: v })}
                     error={errors.city}
@@ -574,7 +574,7 @@ export function LocationHoursStep({
                 <TextField
                     label="PIN code"
                     required
-                    placeholder="560038"
+                    placeholder="Enter PIN code"
                     value={data.pinCode}
                     onChange={(v) => update({ pinCode: v })}
                     error={errors.pinCode}
@@ -662,7 +662,7 @@ export function LegalBankStep({
                     <TextField
                         label="VAT number"
                         required
-                        placeholder="29ABCDE1234F1Z5"
+                        placeholder="Enter VAT number"
                         value={data.gst}
                         onChange={(v) => update({ gst: v })}
                         error={errors.gst}
@@ -670,7 +670,7 @@ export function LegalBankStep({
                     <TextField
                         label="FSA / Food license"
                         required
-                        placeholder="12345678901234"
+                        placeholder="Enter license number"
                         value={data.fssai}
                         onChange={(v) => update({ fssai: v })}
                         error={errors.fssai}
@@ -678,7 +678,7 @@ export function LegalBankStep({
                     <TextField
                         label="PAN number"
                         required
-                        placeholder="ABCDE1234F"
+                        placeholder="Enter PAN number"
                         value={data.pan}
                         onChange={(v) => update({ pan: v })}
                         error={errors.pan}
@@ -695,21 +695,21 @@ export function LegalBankStep({
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <TextField
                         label="Account holder name"
-                        placeholder="Spice Route Hospitality Pvt Ltd"
+                        placeholder="Enter account holder name"
                         value={data.bankAccountHolder}
                         onChange={(v) => update({ bankAccountHolder: v })}
                         error={errors.bankAccountHolder}
                     />
                     <TextField
                         label="Bank name"
-                        placeholder="HDFC Bank"
+                        placeholder="Enter bank name"
                         value={data.bankName}
                         onChange={(v) => update({ bankName: v })}
                         error={errors.bankName}
                     />
                     <TextField
                         label="Account number"
-                        placeholder="e.g. 1234567890"
+                        placeholder="Enter account number"
                         value={data.accountNumber}
                         // Strip non-digits on every change (covers typing AND paste).
                         onChange={(v) => update({ accountNumber: v.replace(/\D/g, '') })}
@@ -719,7 +719,7 @@ export function LegalBankStep({
                     />
                     <TextField
                         label="IFSC / SWIFT code"
-                        placeholder="HDFC0001234"
+                        placeholder="Enter IFSC / SWIFT code"
                         value={data.ifsc}
                         onChange={(v) => update({ ifsc: v })}
                         error={errors.ifsc}
@@ -896,7 +896,7 @@ export function CategoriesStep({
                                     type="text"
                                     value={row.name}
                                     onChange={(e) => setRow(idx, { name: e.target.value })}
-                                    placeholder="Starters"
+                                    placeholder="Enter category name"
                                     className={
                                         'h-11 w-full rounded-md border bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 ' +
                                         (nameError
