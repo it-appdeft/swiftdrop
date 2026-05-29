@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { FoodType, Paginated } from '@/types/admin';
-import { formatRelative } from '@/utils/format';
+import { decodePaginationLabel, formatRelative } from '@/utils/format';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Admin', href: '/admin/food-types' },
