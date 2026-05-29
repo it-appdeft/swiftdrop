@@ -79,7 +79,7 @@ class CustomerRestaurantResource extends JsonResource
             // Drives the "Add" → customise popup. Empty array → the dish adds
             // to the cart directly with no modal.
             'modifier_groups' => $item->relationLoaded('modifierGroups')
-                ? $item->modifierGroups->map(fn ($group) => $this->modifierGroup($group))->values()->all()
+                ? $item->modifierGroups->map(fn ($group) => $this->modifierGroup($group, $item))->values()->all()
                 : [],
         ];
     }
@@ -155,20 +155,36 @@ class CustomerRestaurantResource extends JsonResource
      *
      * @return array<string, mixed>
      */
-    protected function modifierGroup(\App\Models\ModifierGroup $group): array
+    protected function modifierGroup(\App\Models\ModifierGroup $group, MenuItem $item): array
     {
+        // Per-dish prices for price-driver options: option id → price. A
+        // price-driver group only shows the options this dish offers (those
+        // with a per-dish price row), priced from that row.
+        $itemPrices = $item->relationLoaded('modifierOptions')
+            ? $item->modifierOptions->mapWithKeys(fn ($o) => [(int) $o->id => (float) $o->pivot->price])
+            : collect();
+
+        $options = $group->options;
+        if ($group->is_price_driver) {
+            $options = $options->filter(fn ($o) => $itemPrices->has((int) $o->id));
+        }
+
         return [
             'id' => $group->id,
             'name' => $group->name,
             'description' => $group->description,
             'selection_type' => $group->selection_type, // 'single' | 'multiple'
+            'is_price_driver' => (bool) $group->is_price_driver,
             'is_required' => (bool) $group->is_required,
             'min_selections' => (int) $group->min_selections,
             'max_selections' => $group->max_selections !== null ? (int) $group->max_selections : null,
-            'options' => $group->options->map(fn ($option) => [
+            'options' => $options->map(fn ($option) => [
                 'id' => $option->id,
                 'name' => $option->name,
-                'price_delta' => (float) $option->price_delta,
+                'price_delta' => $group->is_price_driver
+                    ? (float) ($itemPrices[(int) $option->id] ?? 0)
+                    : (float) $option->price_delta,
+                'is_default' => (bool) $option->is_default,
             ])->values()->all(),
         ];
     }

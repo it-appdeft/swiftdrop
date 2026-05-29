@@ -28,7 +28,7 @@ class CustomerCartService implements CustomerCartServiceInterface
         // Only live, switched-on dishes can be added.
         $menuItem = MenuItem::query()
             ->available()
-            ->with('modifierGroups.options')
+            ->with(['modifierGroups.options', 'modifierOptions'])
             ->findOrFail($menuItemId);
 
         $quantity = max(1, $quantity);
@@ -37,7 +37,7 @@ class CustomerCartService implements CustomerCartServiceInterface
         // AddCartItemRequest already enforced selection rules; here we just
         // build the priced snapshot and ignore anything not on this dish.
         $selected = $this->resolveSelections($menuItem, $optionIds);
-        $unitPrice = round((float) $menuItem->price + $selected->sum('price_delta'), 2);
+        $unitPrice = $this->computeUnitPrice($menuItem, $optionIds);
         $signature = $this->signature($optionIds);
 
         return DB::transaction(function () use ($user, $menuItem, $quantity, $selected, $unitPrice, $signature) {
@@ -160,6 +160,7 @@ class CustomerCartService implements CustomerCartServiceInterface
     private function resolveSelections(MenuItem $menuItem, array $optionIds): Collection
     {
         $ids = array_map('intval', $optionIds);
+        $itemOptionPrices = $this->itemOptionPrices($menuItem);
 
         return $menuItem->modifierGroups
             ->flatMap(fn ($group) => $group->options
@@ -169,9 +170,59 @@ class CustomerCartService implements CustomerCartServiceInterface
                     'modifier_option_id' => $opt->id,
                     'group_name' => $group->name,
                     'option_name' => $opt->name,
-                    'price_delta' => (float) $opt->price_delta,
+                    // Price-driver options snapshot their per-dish price; surcharge
+                    // options snapshot their group delta.
+                    'price_delta' => $group->is_price_driver
+                        ? ($itemOptionPrices[$opt->id] ?? (float) $opt->price_delta)
+                        : (float) $opt->price_delta,
                 ]))
             ->values();
+    }
+
+    /**
+     * Unit price for a dish + selected options.
+     *
+     * A price-driver group (e.g. Pizza size) sets the ABSOLUTE base price —
+     * the picked size's price replaces the dish's base price rather than
+     * adding to it. Every other (surcharge) group adds its options' deltas
+     * on top. Keyed off the is_price_driver flag, never the group name.
+     */
+    private function computeUnitPrice(MenuItem $menuItem, array $optionIds): float
+    {
+        $ids = array_map('intval', $optionIds);
+        $base = (float) $menuItem->price;
+        $surcharge = 0.0;
+        $itemOptionPrices = $this->itemOptionPrices($menuItem);
+
+        foreach ($menuItem->modifierGroups as $group) {
+            $picked = $group->options->whereIn('id', $ids);
+            if ($picked->isEmpty()) {
+                continue;
+            }
+
+            if ($group->is_price_driver) {
+                // Pick-one group, so the first picked option is the size. Its
+                // price is the per-dish price (falls back to the group delta).
+                $opt = $picked->first();
+                $base = $itemOptionPrices[$opt->id] ?? (float) $opt->price_delta;
+            } else {
+                $surcharge += (float) $picked->sum('price_delta');
+            }
+        }
+
+        return round($base + $surcharge, 2);
+    }
+
+    /** Per-dish price for each price-driver option: option id → price. */
+    private function itemOptionPrices(MenuItem $menuItem): array
+    {
+        if (! $menuItem->relationLoaded('modifierOptions')) {
+            return [];
+        }
+
+        return $menuItem->modifierOptions
+            ->mapWithKeys(fn (ModifierOption $o) => [(int) $o->id => (float) $o->pivot->price])
+            ->all();
     }
 
     /** Order-independent fingerprint of a selection set, for line merging. */

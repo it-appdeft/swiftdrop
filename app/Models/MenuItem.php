@@ -150,4 +150,17 @@ class MenuItem extends Model
             ->orderBy('menu_item_modifier_group.sort_order')
             ->withTimestamps();
     }
+
+    /**
+     * Per-dish prices for price-driver (size) options. The pivot's `price`
+     * is this dish's absolute price for that option; the presence of a row
+     * also means the dish offers that option. See the menu_item_modifier_option
+     * table.
+     */
+    public function modifierOptions(): BelongsToMany
+    {
+        return $this->belongsToMany(ModifierOption::class, 'menu_item_modifier_option')
+            ->withPivot('price')
+            ->withTimestamps();
+    }
 }

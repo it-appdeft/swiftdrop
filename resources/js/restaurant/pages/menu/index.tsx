@@ -34,12 +34,20 @@ interface Category {
     count?: number;
 }
 
+/** Admin-managed food-type catalog (Biryani, Pizza, …) a dish can be tagged with. */
+interface FoodType {
+    id: string;
+    name: string;
+}
+
 interface MenuItem {
     id: string;
     name: string;
     // Null = dish belongs to no category (server allows it after a
     // category gets deleted via ON DELETE SET NULL on the FK).
     categoryId: string | null;
+    /** Admin-managed food type tag (menu_items.food_type_id). Null = untagged. */
+    foodTypeId: string | null;
     price: number;
     diet: Diet;
     sold: number;
@@ -51,6 +59,8 @@ interface MenuItem {
     modifierGroupIds?: string[];
     /** Per-group option subset offered for this item: group id → option ids. */
     modifierOptionIds?: Record<string, string[]>;
+    /** Per-dish prices for price-driver (size) options: option id → price. */
+    modifierOptionPrices?: Record<string, number>;
 }
 
 const FOOD_IMG = {
@@ -453,6 +463,7 @@ function AddItemDialog({
     open,
     onClose,
     categories,
+    foodTypes,
     modifierGroups,
     editing,
     onSubmit,
@@ -461,6 +472,7 @@ function AddItemDialog({
     open: boolean;
     onClose: () => void;
     categories: Category[];
+    foodTypes: FoodType[];
     modifierGroups: ModifierGroup[];
     /** When set, the dialog opens in edit mode pre-filled from this item. */
     editing?: MenuItem | null;
@@ -476,6 +488,7 @@ function AddItemDialog({
     const isEdit = !!editing;
     const [name, setName] = useState('');
     const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '');
+    const [foodTypeId, setFoodTypeId] = useState('');
     const [price, setPrice] = useState('');
     const [diet, setDiet] = useState<Diet>('veg');
     const [prepMin, setPrepMin] = useState('20');
@@ -489,6 +502,8 @@ function AddItemDialog({
     // Per-group option subset: group id → option ids this item offers.
     // Defaults to "all options" the moment a group is checked.
     const [optionsByGroup, setOptionsByGroup] = useState<Record<string, string[]>>({});
+    // Per-dish price for each price-driver (size) option: option id → price string.
+    const [optionPrices, setOptionPrices] = useState<Record<string, string>>({});
 
     // Pre-fill (edit) or clear (add) the form whenever the dialog opens.
     useEffect(() => {
@@ -497,6 +512,7 @@ function AddItemDialog({
             const groupIds = editing.modifierGroupIds ?? [];
             setName(editing.name);
             setCategoryId(editing.categoryId ?? categories[0]?.id ?? '');
+            setFoodTypeId(editing.foodTypeId ?? '');
             setPrice(String(editing.price));
             setDiet(editing.diet);
             setPrepMin(editing.prepMin != null ? String(editing.prepMin) : '');
@@ -507,20 +523,33 @@ function AddItemDialog({
             setModifierGroupIds(groupIds);
             // Per-option subsets aren't persisted server-side yet, so default
             // each attached group to "all options offered".
+            // Merge per group: use the saved offered subset where present
+            // (price-driver groups), otherwise default to all options.
+            const savedSubset = editing.modifierOptionIds ?? {};
             setOptionsByGroup(
-                editing.modifierOptionIds ??
-                    Object.fromEntries(
-                        groupIds.map((gid) => [
-                            gid,
+                Object.fromEntries(
+                    groupIds.map((gid) => [
+                        gid,
+                        savedSubset[gid] ??
                             (modifierGroups.find((g) => g.id === gid)?.options ?? []).map(
                                 (o) => o.id,
                             ),
-                        ]),
-                    ),
+                    ]),
+                ),
+            );
+            // Per-dish size prices (option id → price), stringified for inputs.
+            setOptionPrices(
+                Object.fromEntries(
+                    Object.entries(editing.modifierOptionPrices ?? {}).map(([id, p]) => [
+                        id,
+                        String(p),
+                    ]),
+                ),
             );
         } else {
             setName('');
             setCategoryId(categories[0]?.id ?? '');
+            setFoodTypeId('');
             setPrice('');
             setDiet('veg');
             setPrepMin('20');
@@ -530,6 +559,7 @@ function AddItemDialog({
             setPhotoFile(null);
             setModifierGroupIds([]);
             setOptionsByGroup({});
+            setOptionPrices({});
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, editing]);
@@ -544,27 +574,37 @@ function AddItemDialog({
                 });
                 return prev.filter((x) => x !== group.id);
             }
-            // Newly checked → a "pick one" group offers a single option
-            // (radio) so default to the first; "pick multiple" offers all.
+
+            // Only one price-driver group can power an item's price, so
+            // attaching one drops any other price-driver group already on.
+            if (group.isPriceDriver) {
+                const otherDrivers = modifierGroups
+                    .filter((g) => g.isPriceDriver && g.id !== group.id)
+                    .map((g) => g.id);
+                setOptionsByGroup((o) => {
+                    const next = { ...o };
+                    for (const id of otherDrivers) delete next[id];
+                    next[group.id] = group.options.map((opt) => opt.id);
+                    return next;
+                });
+                return [...prev.filter((id) => !otherDrivers.includes(id)), group.id];
+            }
+
+            // Newly checked → offer all options by default; the admin then
+            // unchecks any they don't want to offer for this item.
             setOptionsByGroup((o) => ({
                 ...o,
-                [group.id]:
-                    group.selectionType === 'single'
-                        ? group.options.slice(0, 1).map((opt) => opt.id)
-                        : group.options.map((opt) => opt.id),
+                [group.id]: group.options.map((opt) => opt.id),
             }));
             return [...prev, group.id];
         });
     };
 
+    // Offering options for an item is always multi-select (checkbox): the
+    // admin picks which options the item offers, regardless of how the
+    // customer later picks (pick-one vs pick-multiple is enforced at order time).
     const toggleOption = (group: ModifierGroup, optionId: string) => {
         setOptionsByGroup((prev) => {
-            // Pick-one groups behave like a radio: selecting an option
-            // replaces the previous choice. Pick-multiple toggles like a
-            // checkbox.
-            if (group.selectionType === 'single') {
-                return { ...prev, [group.id]: [optionId] };
-            }
             const current = prev[group.id] ?? [];
             const next = current.includes(optionId)
                 ? current.filter((x) => x !== optionId)
@@ -573,9 +613,36 @@ function AddItemDialog({
         });
     };
 
+    // A price-driver group (e.g. Pizza size) attached to this item sets its
+    // base price. At most one can be attached (toggleGroup enforces this).
+    const priceDriverGroup = useMemo(
+        () => modifierGroups.find((g) => g.isPriceDriver && modifierGroupIds.includes(g.id)) ?? null,
+        [modifierGroups, modifierGroupIds],
+    );
+
+    // The locked price = the per-dish price of the default offered option (or
+    // the first offered option if the default isn't offered). Server derives
+    // the same value, keeping them in sync.
+    const lockedPrice = useMemo(() => {
+        if (!priceDriverGroup) return null;
+        const offered = optionsByGroup[priceDriverGroup.id] ?? [];
+        if (offered.length === 0) return 0;
+        const defaultOpt = priceDriverGroup.options.find(
+            (o) => o.isDefault && offered.includes(o.id),
+        );
+        const chosenId = defaultOpt?.id ?? offered[0];
+        return Number(optionPrices[chosenId] ?? '') || 0;
+    }, [priceDriverGroup, optionsByGroup, optionPrices]);
+
+    // Drive the Price field from the size selection while a price-driver is on.
+    useEffect(() => {
+        if (lockedPrice !== null) setPrice(String(lockedPrice));
+    }, [lockedPrice]);
+
     const reset = () => {
         setName('');
         setCategoryId(categories[0]?.id ?? '');
+        setFoodTypeId('');
         setPrice('');
         setDiet('veg');
         setPrepMin('20');
@@ -585,6 +652,7 @@ function AddItemDialog({
         setPhotoFile(null);
         setModifierGroupIds([]);
         setOptionsByGroup({});
+        setOptionPrices({});
     };
 
     const handleClose = () => {
@@ -594,10 +662,24 @@ function AddItemDialog({
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim() || !price || saving) return;
+        if (!name.trim() || saving) return;
+        // Price is required only when no price-driver group is attached —
+        // otherwise the server derives it from the group's default option.
+        if (!priceDriverGroup && !price) return;
+
+        // Per-dish prices for the offered options of price-driver groups.
+        const priceMap: Record<string, number> = {};
+        for (const g of modifierGroups) {
+            if (!g.isPriceDriver || !modifierGroupIds.includes(g.id)) continue;
+            for (const oid of optionsByGroup[g.id] ?? []) {
+                priceMap[oid] = Number(optionPrices[oid] ?? '') || 0;
+            }
+        }
+
         onSubmit({
             name: name.trim(),
             categoryId,
+            foodTypeId: foodTypeId || null,
             price: Number(price),
             diet,
             available,
@@ -607,6 +689,7 @@ function AddItemDialog({
             imageFile: photoFile,
             modifierGroupIds,
             modifierOptionIds: optionsByGroup,
+            modifierOptionPrices: priceMap,
         });
         // Parent closes the dialog once the request succeeds; if it fails the
         // modal stays open so the partner can retry without re-entering data.
@@ -695,7 +778,7 @@ function AddItemDialog({
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className={priceDriverGroup ? 'space-y-1.5' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}>
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium">Category</label>
                             <div className="relative">
@@ -713,22 +796,50 @@ function AddItemDialog({
                                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             </div>
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium">
-                                Price (£)
-                                <span className="ml-0.5 text-rose-500">*</span>
-                            </label>
-                            <input
-                                type="number"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                                placeholder="220"
-                                required
-                                aria-required="true"
-                                min="0"
-                                step="0.01"
-                                className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            />
+                        {/* Price is hidden when a "Sets item price" group is attached —
+                            the price comes from that group's options instead. */}
+                        {priceDriverGroup ? (
+                            <p className="text-xs text-muted-foreground">
+                                Price comes from the “{priceDriverGroup.name}” group — set each
+                                size's price there.
+                            </p>
+                        ) : (
+                            <div className="space-y-1.5">
+                                <label className="text-sm font-medium">
+                                    Price (£)
+                                    <span className="ml-0.5 text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                    placeholder="220"
+                                    required
+                                    aria-required="true"
+                                    min="0"
+                                    step="0.01"
+                                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Food type</label>
+                        <div className="relative">
+                            <select
+                                value={foodTypeId}
+                                onChange={(e) => setFoodTypeId(e.target.value)}
+                                className="h-11 w-full appearance-none rounded-md border border-input bg-background pl-3 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            >
+                                <option value="">No food type</option>
+                                {foodTypes.map((ft) => (
+                                    <option key={ft.id} value={ft.id}>
+                                        {ft.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         </div>
                     </div>
 
@@ -827,9 +938,9 @@ function AddItemDialog({
                                                         <span className="text-sm font-semibold">
                                                             {g.name}
                                                         </span>
-                                                        {g.required && (
-                                                            <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-rose-700">
-                                                                Required
+                                                        {g.isPriceDriver && (
+                                                            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary">
+                                                                Sets price
                                                             </span>
                                                         )}
                                                     </span>
@@ -853,47 +964,102 @@ function AddItemDialog({
                                                         {g.options.map((opt) => {
                                                             const checked =
                                                                 chosenOptions.includes(opt.id);
-                                                            const isSingle =
-                                                                g.selectionType === 'single';
+                                                            // Offering options is always multi-select:
+                                                            // the admin chooses which options the item
+                                                            // offers; the customer's pick-one vs
+                                                            // pick-any is enforced at order time.
+                                                            const indicator = (
+                                                                <span
+                                                                    aria-hidden
+                                                                    className={
+                                                                        'flex size-4 shrink-0 items-center justify-center rounded border ' +
+                                                                        (checked
+                                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                                            : 'border-input bg-background')
+                                                                    }
+                                                                >
+                                                                    {checked && (
+                                                                        <Check className="size-2.5" />
+                                                                    )}
+                                                                </span>
+                                                            );
+                                                            const label = (
+                                                                <span className="flex flex-1 items-center gap-1.5">
+                                                                    {opt.name}
+                                                                    {g.isPriceDriver &&
+                                                                        opt.isDefault && (
+                                                                            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary">
+                                                                                Default
+                                                                            </span>
+                                                                        )}
+                                                                </span>
+                                                            );
+
+                                                            // Price-driver group: a £ price input per
+                                                            // offered option (split from the toggle so
+                                                            // the input isn't nested in a button).
+                                                            if (g.isPriceDriver) {
+                                                                return (
+                                                                    <div
+                                                                        key={opt.id}
+                                                                        className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm"
+                                                                    >
+                                                                        <button
+                                                                            type="button"
+                                                                            role="checkbox"
+                                                                            aria-checked={checked}
+                                                                            onClick={() =>
+                                                                                toggleOption(g, opt.id)
+                                                                            }
+                                                                            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left hover:opacity-80"
+                                                                        >
+                                                                            {indicator}
+                                                                            {label}
+                                                                        </button>
+                                                                        {checked ? (
+                                                                            <div className="relative w-24 shrink-0">
+                                                                                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                                                                    £
+                                                                                </span>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="0"
+                                                                                    step="0.01"
+                                                                                    value={
+                                                                                        optionPrices[opt.id] ?? ''
+                                                                                    }
+                                                                                    onChange={(e) =>
+                                                                                        setOptionPrices((p) => ({
+                                                                                            ...p,
+                                                                                            [opt.id]: e.target.value,
+                                                                                        }))
+                                                                                    }
+                                                                                    placeholder="0.00"
+                                                                                    className="h-8 w-full rounded-md border border-input bg-background pl-6 pr-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                                                                />
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className="shrink-0 text-[11px] text-muted-foreground">
+                                                                                Not offered
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            }
+
                                                             return (
                                                                 <button
                                                                     key={opt.id}
                                                                     type="button"
-                                                                    role={
-                                                                        isSingle
-                                                                            ? 'radio'
-                                                                            : 'checkbox'
-                                                                    }
+                                                                    role="checkbox"
                                                                     aria-checked={checked}
                                                                     onClick={() =>
                                                                         toggleOption(g, opt.id)
                                                                     }
                                                                     className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
                                                                 >
-                                                                    <span
-                                                                        aria-hidden
-                                                                        className={
-                                                                            'flex size-4 shrink-0 items-center justify-center border ' +
-                                                                            (isSingle
-                                                                                ? 'rounded-full '
-                                                                                : 'rounded ') +
-                                                                            (checked
-                                                                                ? isSingle
-                                                                                    ? 'border-primary bg-background'
-                                                                                    : 'border-primary bg-primary text-primary-foreground'
-                                                                                : 'border-input bg-background')
-                                                                        }
-                                                                    >
-                                                                        {checked &&
-                                                                            (isSingle ? (
-                                                                                <span className="size-2 rounded-full bg-primary" />
-                                                                            ) : (
-                                                                                <Check className="size-2.5" />
-                                                                            ))}
-                                                                    </span>
-                                                                    <span className="flex-1">
-                                                                        {opt.name}
-                                                                    </span>
+                                                                    {indicator}
+                                                                    {label}
                                                                     <span className="text-xs text-muted-foreground">
                                                                         {opt.priceDelta === 0
                                                                             ? 'Included'
@@ -1360,6 +1526,8 @@ interface ServerFilters {
 interface MenuPageProps {
     /** Server-rendered category list (per-restaurant) with unfiltered counts. */
     categories: Category[];
+    /** Admin-managed food-type catalog for the item form's Food type dropdown. */
+    foodTypes?: FoodType[];
     /** Server-filtered dish catalogue with modifier-group attachments. */
     items: MenuItem[];
     /** Server-rendered modifier-group catalogue (Size, Toppings, Dip…). */
@@ -1381,6 +1549,7 @@ interface MenuPageProps {
 
 export default function Menu({
     categories = [],
+    foodTypes = [],
     items: serverItems = [],
     modifierGroups = [],
     itemsTotal = 0,
@@ -1534,11 +1703,13 @@ export default function Menu({
             {
                 name: `${source.name} (copy)`,
                 category_id: source.categoryId,
+                food_type_id: source.foodTypeId,
                 price: source.price,
                 is_available: source.available,
                 is_veg: source.diet === 'veg',
                 description: source.description ?? null,
                 modifier_group_ids: source.modifierGroupIds ?? [],
+                modifier_option_prices: source.modifierOptionPrices ?? {},
             },
             { preserveScroll: true, preserveState: false },
         );
@@ -1597,12 +1768,14 @@ export default function Menu({
         const payload: Record<string, unknown> = {
             name: data.name,
             category_id: data.categoryId || null,
+            food_type_id: data.foodTypeId || null,
             price: data.price,
             is_available: data.available,
             is_veg: data.diet === 'veg',
             description: data.description ?? null,
             prep_time: data.prepMin ?? null,
             modifier_group_ids: data.modifierGroupIds ?? [],
+            modifier_option_prices: data.modifierOptionPrices ?? {},
         };
 
         // When a file is present Inertia auto-switches to multipart FormData;
@@ -1861,6 +2034,7 @@ export default function Menu({
                 open={addOpen}
                 onClose={closeDialog}
                 categories={categories}
+                foodTypes={foodTypes}
                 modifierGroups={modifierGroups}
                 editing={editingItem}
                 onSubmit={submitItem}
