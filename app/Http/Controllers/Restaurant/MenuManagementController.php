@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Restaurant;
 
 use App\Http\Controllers\Controller;
+use App\Models\FoodType;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\ModifierGroup;
@@ -52,6 +53,7 @@ class MenuManagementController extends Controller
                 ->filter($filters)
                 ->with([
                     'modifierGroups' => fn ($q) => $q->orderBy('menu_item_modifier_group.sort_order'),
+                    'modifierOptions',
                     'uploads' => fn ($q) => $q->where('collection', 'image'),
                 ])
                 ->orderBy('sort_order')
@@ -62,6 +64,7 @@ class MenuManagementController extends Controller
 
         return Inertia::render('restaurant/menu', [
             'categories'     => $restaurant ? $this->serializeCategories($restaurant) : [],
+            'foodTypes'      => $this->serializeFoodTypes(),
             'items'          => $paginator ? $this->serializeItems($paginator->getCollection()) : [],
             'modifierGroups' => $restaurant ? $this->serializeModifierGroups($restaurant) : [],
             'itemsTotal'     => $restaurant ? $restaurant->menuItems()->count() : 0,
@@ -105,6 +108,7 @@ class MenuManagementController extends Controller
         DB::transaction(function () use ($restaurant, $data, $request) {
             $item = $restaurant->menuItems()->create([
                 'category_id'  => $data['category_id'] ?? null,
+                'food_type_id' => $data['food_type_id'] ?? null,
                 'name'         => $data['name'],
                 'description'  => $data['description'] ?? null,
                 'price'        => $data['price'],
@@ -114,6 +118,7 @@ class MenuManagementController extends Controller
             ]);
 
             $this->syncModifierGroups($item, $data['modifier_group_ids'] ?? []);
+            $this->syncModifierOptionPrices($item, $data['modifier_option_prices'] ?? []);
 
             if ($request->hasFile('image')) {
                 $item->replaceUpload($request->file('image'), 'image');
@@ -133,6 +138,7 @@ class MenuManagementController extends Controller
         DB::transaction(function () use ($item, $data, $request) {
             $item->forceFill([
                 'category_id'  => $data['category_id'] ?? null,
+                'food_type_id' => $data['food_type_id'] ?? null,
                 'name'         => $data['name'],
                 'description'  => $data['description'] ?? null,
                 'price'        => $data['price'],
@@ -141,6 +147,7 @@ class MenuManagementController extends Controller
             ])->save();
 
             $this->syncModifierGroups($item, $data['modifier_group_ids'] ?? []);
+            $this->syncModifierOptionPrices($item, $data['modifier_option_prices'] ?? []);
 
             if ($request->hasFile('image')) {
                 $item->replaceUpload($request->file('image'), 'image');
@@ -231,6 +238,7 @@ class MenuManagementController extends Controller
             'description'     => ['nullable', 'string', 'max:500'],
             'price'           => ['required', 'numeric', 'min:0', 'max:99999.99'],
             'category_id'     => ['nullable', 'integer', Rule::in($categoryIds)],
+            'food_type_id'    => ['nullable', 'integer', Rule::exists('food_types', 'id')],
             'is_available'    => ['sometimes', 'boolean'],
             'is_veg'          => ['sometimes', 'boolean'],
             'prep_time'       => ['nullable', 'integer', 'min:0', 'max:240'],
@@ -238,10 +246,54 @@ class MenuManagementController extends Controller
 
             'modifier_group_ids'   => ['sometimes', 'array'],
             'modifier_group_ids.*' => ['integer', Rule::in($modifierGroupIds)],
+
+            // Per-dish prices for price-driver (size) options: option id → price.
+            'modifier_option_prices'   => ['sometimes', 'array'],
+            'modifier_option_prices.*' => ['numeric', 'min:0', 'max:99999.99'],
         ]);
 
         $validated['is_available'] = (bool) ($validated['is_available'] ?? true);
         $validated['is_veg']       = (bool) ($validated['is_veg'] ?? false);
+
+        $optionPrices = (array) ($validated['modifier_option_prices'] ?? []);
+        $validated['modifier_option_prices'] = [];
+
+        // Variant pricing: if a price-driver group (e.g. Pizza size) is
+        // attached, the item's price is set per-dish by that group's options —
+        // the default offered option's price becomes the item price. The
+        // behaviour keys off the is_price_driver flag, never the group name.
+        $selectedGroupIds = $validated['modifier_group_ids'] ?? [];
+        if ($restaurant && ! empty($selectedGroupIds)) {
+            $drivers = $restaurant->modifierGroups()
+                ->whereIn('id', $selectedGroupIds)
+                ->where('is_price_driver', true)
+                ->with(['options' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
+                ->get();
+
+            abort_if($drivers->count() > 1, 422, 'An item can have only one price-driver group.');
+
+            if ($driver = $drivers->first()) {
+                // Keep only prices for this driver's options (the offered set).
+                $offered = [];
+                foreach ($driver->options as $option) {
+                    if (array_key_exists((string) $option->id, $optionPrices)) {
+                        $offered[(int) $option->id] = (float) $optionPrices[(string) $option->id];
+                    }
+                }
+
+                abort_if(empty($offered), 422, 'Set a price for at least one size option.');
+
+                // Item price = default option's price if offered, else the
+                // first offered option's price (driver-option order).
+                $default = $driver->options->firstWhere('is_default', true);
+                $priceFrom = ($default && isset($offered[$default->id]))
+                    ? $offered[$default->id]
+                    : reset($offered);
+
+                $validated['price'] = (float) $priceFrom;
+                $validated['modifier_option_prices'] = $offered;
+            }
+        }
 
         return $validated;
     }
@@ -261,6 +313,23 @@ class MenuManagementController extends Controller
         $item->modifierGroups()->sync($payload);
     }
 
+    /**
+     * Sync per-dish prices for price-driver (size) options. Each entry is
+     * option id → price; the presence of a row marks the option as offered
+     * for this dish. Already filtered to valid driver options in validateItem.
+     *
+     * @param  array<int, float>  $optionPrices
+     */
+    protected function syncModifierOptionPrices(MenuItem $item, array $optionPrices): void
+    {
+        $payload = [];
+        foreach ($optionPrices as $optionId => $price) {
+            $payload[(int) $optionId] = ['price' => (float) $price];
+        }
+
+        $item->modifierOptions()->sync($payload);
+    }
+
     protected function nextItemSortOrder(Restaurant $restaurant): int
     {
         return (int) ($restaurant->menuItems()->max('sort_order') ?? 0) + 1;
@@ -277,6 +346,19 @@ class MenuManagementController extends Controller
     }
 
     /* -------------------- Serializers (Inertia → React) -------------------- */
+
+    /** Admin-managed food-type catalog for the item form's Food type dropdown. */
+    protected function serializeFoodTypes(): array
+    {
+        return FoodType::query()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (FoodType $t) => [
+                'id'   => (string) $t->id,
+                'name' => (string) $t->name,
+            ])
+            ->all();
+    }
 
     protected function serializeCategories(Restaurant $restaurant): array
     {
@@ -308,6 +390,7 @@ class MenuManagementController extends Controller
             'id'                 => (string) $item->id,
             'name'               => (string) $item->name,
             'categoryId'         => $item->category_id !== null ? (string) $item->category_id : null,
+            'foodTypeId'         => $item->food_type_id !== null ? (string) $item->food_type_id : null,
             'price'              => (float) $item->price,
             'diet'               => $item->is_veg ? 'veg' : 'non_veg',
             'available'          => (bool) $item->is_available,
@@ -319,6 +402,15 @@ class MenuManagementController extends Controller
             'modifierGroupIds'   => $item->modifierGroups
                 ->pluck('id')
                 ->map(fn ($id) => (string) $id)
+                ->all(),
+            // Per-dish size pricing: offered option ids grouped by their
+            // group, plus the option id → price map (price-driver groups only).
+            'modifierOptionIds'   => $item->modifierOptions
+                ->groupBy(fn ($o) => (string) $o->modifier_group_id)
+                ->map(fn ($opts) => $opts->pluck('id')->map(fn ($id) => (string) $id)->all())
+                ->all(),
+            'modifierOptionPrices' => $item->modifierOptions
+                ->mapWithKeys(fn ($o) => [(string) $o->id => (float) $o->pivot->price])
                 ->all(),
         ])->all();
     }
@@ -336,6 +428,7 @@ class MenuManagementController extends Controller
             'name'           => (string) $g->name,
             'description'    => (string) ($g->description ?? ''),
             'selectionType'  => $g->selection_type,
+            'isPriceDriver'  => (bool) $g->is_price_driver,
             'required'       => (bool) $g->is_required,
             'minSelections'  => (int) $g->min_selections,
             'maxSelections'  => $g->max_selections === null ? null : (int) $g->max_selections,
@@ -343,6 +436,7 @@ class MenuManagementController extends Controller
                 'id'         => (string) $o->id,
                 'name'       => (string) $o->name,
                 'priceDelta' => (float) $o->price_delta,
+                'isDefault'  => (bool) $o->is_default,
             ])->values()->all(),
         ])->values()->all();
     }

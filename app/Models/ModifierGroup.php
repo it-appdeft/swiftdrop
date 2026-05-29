@@ -29,6 +29,7 @@ class ModifierGroup extends Model
         'name',
         'description',
         'selection_type',
+        'is_price_driver',
         'is_required',
         'min_selections',
         'max_selections',
@@ -38,6 +39,7 @@ class ModifierGroup extends Model
     protected function casts(): array
     {
         return [
+            'is_price_driver' => 'boolean',
             'is_required'    => 'boolean',
             'min_selections' => 'integer',
             'max_selections' => 'integer',

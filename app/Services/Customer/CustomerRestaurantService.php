@@ -50,7 +50,7 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
             ->forRestaurant($restaurant->id)
             ->available()
             ->customerFilter($filters)
-            ->with(['foodType', 'modifierGroups.options'])
+            ->with(['foodType', 'modifierGroups.options', 'modifierOptions'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->paginate(perPage: $menuPerPage, page: $menuPage);
@@ -67,7 +67,7 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
                 ->available()
                 ->matchingKeyword($keyword)
                 ->customerFilter($filters)
-                ->with(['foodType', 'modifierGroups.options'])
+                ->with(['foodType', 'modifierGroups.options', 'modifierOptions'])
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get();

@@ -63,13 +63,14 @@ class ModifierController extends Controller
 
         DB::transaction(function () use ($restaurant, $data) {
             $group = $restaurant->modifierGroups()->create([
-                'name'           => $data['name'],
-                'description'    => $data['description'] ?? null,
-                'selection_type' => $data['selection_type'],
-                'is_required'    => $data['is_required'],
-                'min_selections' => $data['min_selections'],
-                'max_selections' => $data['max_selections'] ?? null,
-                'sort_order'     => $this->nextSortOrder($restaurant),
+                'name'            => $data['name'],
+                'description'     => $data['description'] ?? null,
+                'selection_type'  => $data['selection_type'],
+                'is_price_driver' => $data['is_price_driver'],
+                'is_required'     => $data['is_required'],
+                'min_selections'  => $data['min_selections'],
+                'max_selections'  => $data['max_selections'] ?? null,
+                'sort_order'      => $this->nextSortOrder($restaurant),
             ]);
 
             $this->syncOptions($group, $data['options'] ?? []);
@@ -95,12 +96,13 @@ class ModifierController extends Controller
 
         DB::transaction(function () use ($modifier, $data) {
             $modifier->forceFill([
-                'name'           => $data['name'],
-                'description'    => $data['description'] ?? null,
-                'selection_type' => $data['selection_type'],
-                'is_required'    => $data['is_required'],
-                'min_selections' => $data['min_selections'],
-                'max_selections' => $data['max_selections'] ?? null,
+                'name'            => $data['name'],
+                'description'     => $data['description'] ?? null,
+                'selection_type'  => $data['selection_type'],
+                'is_price_driver' => $data['is_price_driver'],
+                'is_required'     => $data['is_required'],
+                'min_selections'  => $data['min_selections'],
+                'max_selections'  => $data['max_selections'] ?? null,
             ])->save();
 
             $this->syncOptions($modifier, $data['options'] ?? []);
@@ -137,7 +139,7 @@ class ModifierController extends Controller
             'name'              => ['required', 'string', 'max:120'],
             'description'       => ['nullable', 'string', 'max:255'],
             'selection_type'    => ['required', Rule::in(ModifierGroup::SELECTION_TYPES)],
-            'is_required'       => ['sometimes', 'boolean'],
+            'is_price_driver'   => ['sometimes', 'boolean'],
             'min_selections'    => ['sometimes', 'integer', 'min:0', 'max:50'],
             'max_selections'    => ['nullable', 'integer', 'min:1', 'max:50'],
 
@@ -145,37 +147,72 @@ class ModifierController extends Controller
             'options.*.id'            => ['nullable', 'integer'],
             'options.*.name'          => ['required', 'string', 'max:120'],
             'options.*.price_delta'   => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
+            'options.*.is_default'    => ['sometimes', 'boolean'],
         ]);
 
-        $validated['is_required']    = (bool) ($validated['is_required'] ?? false);
-        $validated['min_selections'] = (int)  ($validated['min_selections'] ?? ($validated['is_required'] ? 1 : 0));
+        $validated['is_price_driver'] = (bool) ($validated['is_price_driver'] ?? false);
 
-        // Pick-one groups always behave as min=max=1 regardless of what
-        // the client sent, so the constraint can't drift on the server.
+        if ($validated['is_price_driver']) {
+            // A price-driver group is the item's size/variant selector: the
+            // customer must pick exactly one, and that pick sets the price.
+            // Required is implicit here even though the UI toggle is gone.
+            $validated['selection_type'] = ModifierGroup::SELECTION_SINGLE;
+            $validated['is_required']    = true;
+            $validated['min_selections'] = 1;
+            $validated['max_selections'] = 1;
+            $this->normalizeDefaultOption($validated);
+
+            return $validated;
+        }
+
+        // Non-driver groups: the Required toggle was removed from the UI, so
+        // these are always optional. `is_default` is meaningless here.
+        $validated['is_required']    = false;
+        $validated['min_selections'] = 0;
+        $validated['options']        = array_map(function (array $opt) {
+            $opt['is_default'] = false;
+            return $opt;
+        }, $validated['options'] ?? []);
+
         if ($validated['selection_type'] === ModifierGroup::SELECTION_SINGLE) {
-            $validated['min_selections'] = $validated['is_required'] ? 1 : 0;
             $validated['max_selections'] = 1;
         } else {
-            // Pick-multiple: you can't require or allow more picks than the
-            // number of options that exist. Clamp both bounds to the option
-            // count so a stale "max 8 with 4 options" can't be persisted.
-            $optionCount = count($validated['options'] ?? []);
-            if ($optionCount > 0) {
-                $validated['min_selections'] = min($validated['min_selections'], $optionCount);
-                if (! empty($validated['max_selections'])) {
-                    $validated['max_selections'] = min($validated['max_selections'], $optionCount);
-                }
+            // Pick-multiple: can't allow more picks than options that exist.
+            $optionCount = count($validated['options']);
+            if ($optionCount > 0 && ! empty($validated['max_selections'])) {
+                $validated['max_selections'] = min($validated['max_selections'], $optionCount);
             }
         }
 
-        if (
-            isset($validated['max_selections'])
-            && $validated['max_selections'] < $validated['min_selections']
-        ) {
-            abort(422, 'Max selections must be greater than or equal to min selections.');
-        }
-
         return $validated;
+    }
+
+    /**
+     * Force exactly one default option on a price-driver group. The default
+     * option's price prefills the item's base Price field. If the client
+     * flags none, the first option wins; if it flags several, the first
+     * flagged one wins.
+     */
+    protected function normalizeDefaultOption(array &$validated): void
+    {
+        $options = array_values($validated['options'] ?? []);
+        abort_if(empty($options), 422, 'A price-driver group needs at least one option.');
+
+        $defaultIndex = null;
+        foreach ($options as $i => $opt) {
+            if (! empty($opt['is_default'])) {
+                $defaultIndex = $i;
+                break;
+            }
+        }
+        $defaultIndex ??= 0;
+
+        foreach ($options as $i => &$opt) {
+            $opt['is_default'] = ($i === $defaultIndex);
+        }
+        unset($opt);
+
+        $validated['options'] = $options;
     }
 
     /**
@@ -192,6 +229,7 @@ class ModifierController extends Controller
             $payload = [
                 'name'        => $row['name'],
                 'price_delta' => (float) ($row['price_delta'] ?? 0),
+                'is_default'  => (bool) ($row['is_default'] ?? false),
                 'sort_order'  => $index,
             ];
 
@@ -241,6 +279,7 @@ class ModifierController extends Controller
             'name'           => (string) $g->name,
             'description'    => (string) ($g->description ?? ''),
             'selectionType'  => $g->selection_type,
+            'isPriceDriver'  => (bool) $g->is_price_driver,
             'required'       => (bool) $g->is_required,
             'minSelections'  => (int) $g->min_selections,
             'maxSelections'  => $g->max_selections === null ? null : (int) $g->max_selections,
@@ -248,6 +287,7 @@ class ModifierController extends Controller
                 'id'         => (string) $o->id,
                 'name'       => (string) $o->name,
                 'priceDelta' => (float) $o->price_delta,
+                'isDefault'  => (bool) $o->is_default,
             ])->values()->all(),
         ])->values()->all();
     }

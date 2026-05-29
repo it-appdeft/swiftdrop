@@ -136,9 +136,9 @@ function GroupSidebar({
                                     >
                                         <span className="flex w-full items-center justify-between gap-2">
                                             <span className="truncate">{g.name}</span>
-                                            {g.required && (
-                                                <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-rose-700">
-                                                    Required
+                                            {g.isPriceDriver && (
+                                                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-primary">
+                                                    Price
                                                 </span>
                                             )}
                                         </span>
@@ -162,16 +162,39 @@ function GroupSidebar({
 
 function OptionRow({
     option,
+    isPriceDriver,
     onChange,
+    onMakeDefault,
     onDelete,
 }: {
     option: ModifierOption;
+    isPriceDriver: boolean;
     onChange: (patch: Partial<ModifierOption>) => void;
+    onMakeDefault: () => void;
     onDelete: () => void;
 }) {
     return (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-background p-2">
-            <GripVertical className="size-4 shrink-0 text-muted-foreground" />
+            {isPriceDriver ? (
+                // Radio: the default option prefills the item's base price.
+                <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!!option.isDefault}
+                    onClick={onMakeDefault}
+                    title="Set as default — prefills the item's Price"
+                    className={
+                        'flex size-5 shrink-0 items-center justify-center rounded-full border transition ' +
+                        (option.isDefault
+                            ? 'border-primary'
+                            : 'border-input hover:border-primary')
+                    }
+                >
+                    {option.isDefault && <span className="size-2.5 rounded-full bg-primary" />}
+                </button>
+            ) : (
+                <GripVertical className="size-4 shrink-0 text-muted-foreground" />
+            )}
             <input
                 type="text"
                 value={option.name}
@@ -179,20 +202,24 @@ function OptionRow({
                 placeholder="Option name"
                 className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
-            <div className="relative shrink-0">
-                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                    +£
-                </span>
-                <input
-                    type="number"
-                    step="0.50"
-                    value={option.priceDelta}
-                    onChange={(e) =>
-                        onChange({ priceDelta: Number(e.target.value) || 0 })
-                    }
-                    className="h-9 w-24 rounded-md border border-input bg-background pl-7 pr-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-            </div>
+            {/* Price-driver options are priced per dish in the menu form, so no
+                price input here — only the name + default selection. */}
+            {!isPriceDriver && (
+                <div className="relative shrink-0">
+                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        +£
+                    </span>
+                    <input
+                        type="number"
+                        step="0.50"
+                        value={option.priceDelta}
+                        onChange={(e) =>
+                            onChange({ priceDelta: Number(e.target.value) || 0 })
+                        }
+                        className="h-9 w-24 rounded-md border border-input bg-background pl-7 pr-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                </div>
+            )}
             <button
                 type="button"
                 onClick={onDelete}
@@ -203,6 +230,14 @@ function OptionRow({
             </button>
         </div>
     );
+}
+
+/** Guarantee exactly one default option on a price-driver group. */
+function withOneDefault(options: ModifierOption[]): ModifierOption[] {
+    if (options.length === 0) return options;
+    const defaultIdx = options.findIndex((o) => o.isDefault);
+    const keep = defaultIdx === -1 ? 0 : defaultIdx;
+    return options.map((o, i) => ({ ...o, isDefault: i === keep }));
 }
 
 // ─── Group editor (right panel) ───────────────────────────────────────────
@@ -258,7 +293,10 @@ function GroupEditor({
     };
 
     const removeOption = (id: string) => {
-        const options = group.options.filter((o) => o.id !== id);
+        let options = group.options.filter((o) => o.id !== id);
+        // On a price-driver group, removing the default reassigns it to the
+        // first remaining option so an item always has a price source.
+        if (group.isPriceDriver) options = withOneDefault(options);
         const count = options.length;
         // Selecting more than the available options is impossible, so keep
         // min/max within the new option count when a row is removed.
@@ -272,13 +310,46 @@ function GroupEditor({
     };
 
     const addOption = () => {
+        const isFirst = group.options.length === 0;
         onChange({
             ...group,
             options: [
                 ...group.options,
-                { id: nextId('o'), name: '', priceDelta: 0 },
+                // First option on a price-driver group defaults to the price source.
+                { id: nextId('o'), name: '', priceDelta: 0, isDefault: !!group.isPriceDriver && isFirst },
             ],
         });
+    };
+
+    // Move the "prefills the item price" default to a different option.
+    const makeDefault = (id: string) => {
+        onChange({
+            ...group,
+            options: group.options.map((o) => ({ ...o, isDefault: o.id === id })),
+        });
+    };
+
+    // Flip the group between surcharge-style and price-driver (variant) mode.
+    const togglePriceDriver = (on: boolean) => {
+        if (on) {
+            onChange({
+                ...group,
+                isPriceDriver: true,
+                selectionType: 'single',
+                required: true,
+                minSelections: 1,
+                maxSelections: 1,
+                options: withOneDefault(group.options),
+            });
+        } else {
+            onChange({
+                ...group,
+                isPriceDriver: false,
+                required: false,
+                minSelections: 0,
+                options: group.options.map((o) => ({ ...o, isDefault: false })),
+            });
+        }
     };
 
     return (
@@ -353,6 +424,9 @@ function GroupEditor({
                                     <button
                                         key={t}
                                         type="button"
+                                        // A price-driver group is always pick-one — the
+                                        // customer picks exactly one size that sets the price.
+                                        disabled={group.isPriceDriver}
                                         onClick={() =>
                                             onChange({
                                                 ...group,
@@ -364,7 +438,7 @@ function GroupEditor({
                                             })
                                         }
                                         className={
-                                            'flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-semibold transition ' +
+                                            'flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ' +
                                             (isActive
                                                 ? 'border-primary bg-primary/10 text-primary'
                                                 : 'border-input bg-background text-foreground hover:border-primary')
@@ -379,30 +453,24 @@ function GroupEditor({
                     </div>
 
                     <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Required</label>
+                        <label className="text-sm font-medium">Sets item price</label>
                         <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2">
                             <span className="text-sm text-muted-foreground">
-                                Customers must pick at least one
+                                This group sets the item price (e.g. sizes)
                             </span>
                             <span
                                 role="switch"
-                                aria-checked={group.required}
-                                onClick={() =>
-                                    onChange({
-                                        ...group,
-                                        required: !group.required,
-                                        minSelections: !group.required ? 1 : 0,
-                                    })
-                                }
+                                aria-checked={!!group.isPriceDriver}
+                                onClick={() => togglePriceDriver(!group.isPriceDriver)}
                                 className={
                                     'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition ' +
-                                    (group.required ? 'bg-primary' : 'bg-muted')
+                                    (group.isPriceDriver ? 'bg-primary' : 'bg-muted')
                                 }
                             >
                                 <span
                                     className={
                                         'inline-block size-5 rounded-full bg-background shadow transition ' +
-                                        (group.required ? 'translate-x-5' : 'translate-x-0.5')
+                                        (group.isPriceDriver ? 'translate-x-5' : 'translate-x-0.5')
                                     }
                                 />
                             </span>
@@ -470,7 +538,9 @@ function GroupEditor({
                     <div className="min-w-0">
                         <h3 className="text-base font-bold tracking-tight">Options</h3>
                         <p className="text-xs text-muted-foreground">
-                            Drag to reorder. Price is the surcharge added to the base item.
+                            {group.isPriceDriver
+                                ? "Define the size names and pick a default. Prices are set per dish in the menu form when you attach this group."
+                                : 'Drag to reorder. Price is the surcharge added to the base item.'}
                         </p>
                     </div>
                     <button
@@ -493,7 +563,9 @@ function GroupEditor({
                             <OptionRow
                                 key={option.id}
                                 option={option}
+                                isPriceDriver={!!group.isPriceDriver}
                                 onChange={(patch) => setOption(option.id, patch)}
+                                onMakeDefault={() => makeDefault(option.id)}
                                 onDelete={() => removeOption(option.id)}
                             />
                         ))
@@ -579,6 +651,9 @@ export default function Modifiers({
         name: g.name,
         description: g.description ?? '',
         selection_type: g.selectionType,
+        is_price_driver: !!g.isPriceDriver,
+        // `is_required` / min / max are derived server-side from is_price_driver
+        // and selection_type; sent here only to keep the existing contract.
         is_required: g.required,
         min_selections: g.minSelections,
         // The server requires max_selections to be null (unlimited) or >= 1.
@@ -592,6 +667,7 @@ export default function Modifiers({
             id: /^\d+$/.test(o.id) ? Number(o.id) : null,
             name: o.name,
             price_delta: o.priceDelta,
+            is_default: !!o.isDefault,
         })),
     });
 
@@ -665,6 +741,7 @@ export default function Modifiers({
             name: 'New group',
             description: '',
             selectionType: 'single',
+            isPriceDriver: false,
             required: false,
             minSelections: 0,
             maxSelections: 1,
