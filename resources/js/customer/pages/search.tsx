@@ -1,7 +1,7 @@
 import { toast } from '@/hooks/use-toast';
 import { Head, Link, router } from '@inertiajs/react';
 import { ChevronRight, Clock, Heart, Star, Tag, UtensilsCrossed } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish } from '../components/dish-modifier-dialog';
 
@@ -84,10 +84,11 @@ interface SearchFilters {
 
 interface Props {
     results: {
+        type: Tab;
         keyword: string;
         filters: SearchFilters;
         restaurants: SearchRestaurant[];
-        restaurants_meta: RestaurantsMeta;
+        pagination: RestaurantsMeta;
         dishes_by_restaurant: DishGroup[];
         recent: RecentSearch[];
         address: SearchAddress | null;
@@ -96,7 +97,8 @@ interface Props {
     };
 }
 
-type Tab = 'restaurants' | 'dishes';
+// Mirrors the backend `{type}` route segment.
+type Tab = 'restaurant' | 'items';
 
 /** Restaurant detail URL, carrying the active search keyword so the detail
  *  page can populate its "Recommended" (related to your search) list. */
@@ -106,60 +108,89 @@ function restaurantHref(id: number, keyword: string): string {
 }
 
 export default function CustomerSearch({ results }: Props) {
-    const [tab, setTab] = useState<Tab>('restaurants');
+    const type = results.type;
     const [openDish, setOpenDish] = useState<{ dish: ModifierDish; restaurantId: number } | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
-    // Restaurants tab uses infinite scroll. Initial page comes from props; we
-    // append subsequent pages via JSON fetch (same /customer/search endpoint).
+    // Both tabs use infinite scroll. The active tab's first page comes from
+    // props; subsequent pages append via JSON fetch from the same
+    // /customer/search/{type} endpoint. Only the list matching the current
+    // `type` is shown, but we keep both states so the reset effect is simple.
     const [restaurants, setRestaurants] = useState<SearchRestaurant[]>(results.restaurants);
-    const [restaurantsMeta, setRestaurantsMeta] = useState<RestaurantsMeta>(results.restaurants_meta);
+    const [groups, setGroups] = useState<DishGroup[]>(results.dishes_by_restaurant);
+    const [meta, setMeta] = useState<RestaurantsMeta>(results.pagination);
     const [loadingMore, setLoadingMore] = useState(false);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-    // Whenever the keyword changes (new Inertia render), reset the local list
-    // so we don't show stale rows from the previous keyword.
+    // Reset the local lists whenever a fresh render arrives (new type, keyword
+    // or filter set) so we never show stale rows from the previous request.
     useEffect(() => {
         setRestaurants(results.restaurants);
-        setRestaurantsMeta(results.restaurants_meta);
-    }, [results.keyword, results.restaurants, results.restaurants_meta]);
+        setGroups(results.dishes_by_restaurant);
+        setMeta(results.pagination);
+    }, [results.type, results.keyword, results.restaurants, results.dishes_by_restaurant, results.pagination]);
 
-    const hasMoreRestaurants = restaurantsMeta.current_page < restaurantsMeta.last_page;
+    const hasMore = meta.current_page < meta.last_page;
 
-    const loadMoreRestaurants = useCallback(async () => {
-        if (loadingMore || !hasMoreRestaurants) return;
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
         setLoadingMore(true);
         try {
             const params = new URLSearchParams({
                 search: results.keyword,
-                page: String(restaurantsMeta.current_page + 1),
+                page: String(meta.current_page + 1),
             });
             if (results.filters.offers) params.set('offers', '1');
             if (results.filters.highest_rated) params.set('highest_rated', '1');
-            const res = await fetch(`/customer/search?${params.toString()}`, {
+            const res = await fetch(`/customer/search/${type}?${params.toString()}`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
             });
             if (!res.ok) throw new Error();
-            const json = (await res.json()) as { restaurants: SearchRestaurant[]; restaurants_meta: RestaurantsMeta };
-            setRestaurants((prev) => {
-                const seen = new Set(prev.map((r) => r.id));
-                return [...prev, ...json.restaurants.filter((r) => !seen.has(r.id))];
-            });
-            setRestaurantsMeta(json.restaurants_meta);
+            const json = (await res.json()) as {
+                restaurants: SearchRestaurant[];
+                dishes_by_restaurant: DishGroup[];
+                pagination: RestaurantsMeta;
+            };
+            if (type === 'items') {
+                setGroups((prev) => {
+                    const seen = new Set(prev.map((g) => g.restaurant.id));
+                    return [...prev, ...json.dishes_by_restaurant.filter((g) => !seen.has(g.restaurant.id))];
+                });
+            } else {
+                setRestaurants((prev) => {
+                    const seen = new Set(prev.map((r) => r.id));
+                    return [...prev, ...json.restaurants.filter((r) => !seen.has(r.id))];
+                });
+            }
+            setMeta(json.pagination);
         } catch {
-            toast.error('Could not load more restaurants.');
+            toast.error('Could not load more results.');
         } finally {
             setLoadingMore(false);
         }
-    }, [hasMoreRestaurants, loadingMore, restaurantsMeta.current_page, results.keyword, results.filters]);
+    }, [hasMore, loadingMore, meta.current_page, results.keyword, results.filters, type]);
 
-    // Toggling a result filter re-runs the search from page 1 (full Inertia
-    // visit) carrying the keyword + the new filter set.
+    // Switching tab is a fresh search against the other endpoint, carrying the
+    // keyword + active filters so the result set stays in sync.
+    const goToTab = (next: Tab) => {
+        if (next === type) return;
+        router.get(
+            `/customer/search/${next}`,
+            {
+                search: results.keyword,
+                ...(results.filters.offers ? { offers: 1 } : {}),
+                ...(results.filters.highest_rated ? { highest_rated: 1 } : {}),
+            },
+            { preserveScroll: true, preserveState: false },
+        );
+    };
+
+    // Toggling a result filter re-runs the current tab from page 1.
     const toggleFilter = (key: keyof SearchFilters) => {
         const next: SearchFilters = { ...results.filters, [key]: !results.filters[key] };
         router.get(
-            '/customer/search',
+            `/customer/search/${type}`,
             {
                 search: results.keyword,
                 ...(next.offers ? { offers: 1 } : {}),
@@ -171,24 +202,20 @@ export default function CustomerSearch({ results }: Props) {
 
     // IntersectionObserver kicks off loadMore when the sentinel scrolls in.
     useEffect(() => {
-        if (tab !== 'restaurants' || !sentinelRef.current || !hasMoreRestaurants) return;
+        if (!sentinelRef.current || !hasMore) return;
         const el = sentinelRef.current;
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries.some((e) => e.isIntersecting)) loadMoreRestaurants();
+                if (entries.some((e) => e.isIntersecting)) loadMore();
             },
             { rootMargin: '400px 0px' },
         );
         observer.observe(el);
         return () => observer.disconnect();
-    }, [tab, hasMoreRestaurants, loadMoreRestaurants]);
+    }, [hasMore, loadMore]);
 
     const hasQuery = results.keyword.trim() !== '';
-    const dishCount = useMemo(
-        () => results.dishes_by_restaurant.reduce((sum, g) => sum + g.dishes.length, 0),
-        [results.dishes_by_restaurant],
-    );
-    const noResults = hasQuery && restaurants.length === 0 && dishCount === 0;
+    const activeCount = type === 'items' ? groups.length : restaurants.length;
 
     /**
      * Add a dish to the cart from a search-results row, then navigate the
@@ -238,16 +265,11 @@ export default function CustomerSearch({ results }: Props) {
 
                 {!hasQuery ? (
                     <p className="text-muted-foreground mt-2 text-sm">Use the search icon in the header to find dishes & restaurants.</p>
-                ) : noResults ? (
-                    <div className="text-muted-foreground mt-10 rounded-xl border border-dashed bg-[#F6F8FA] p-10 text-center text-sm">
-                        No matches for <strong className="font-semibold">“{results.keyword}”</strong>
-                        {!results.using_fallback ? ` within ${results.radius_miles} mi.` : '.'}
-                    </div>
                 ) : (
                     <>
-                        <Tabs tab={tab} setTab={setTab} />
+                        <Tabs tab={type} onChange={goToTab} />
 
-                        {/* Post-keyword result filters — apply to both tabs (server filters both). */}
+                        {/* Post-keyword result filters — re-run the active tab. */}
                         <div className="mt-4 flex flex-wrap items-center gap-2">
                             <FilterChip
                                 active={results.filters.offers}
@@ -265,30 +287,29 @@ export default function CustomerSearch({ results }: Props) {
                             </FilterChip>
                         </div>
 
-                        {tab === 'restaurants' ? (
-                            <>
-                                <RestaurantsList restaurants={restaurants} keyword={results.keyword} />
-                                {restaurants.length > 0 ? (
-                                    <div ref={sentinelRef} className="flex items-center justify-center py-8">
-                                        {loadingMore ? (
-                                            <span className="text-muted-foreground text-xs">Loading more…</span>
-                                        ) : hasMoreRestaurants ? (
-                                            <button
-                                                type="button"
-                                                onClick={loadMoreRestaurants}
-                                                className="hover:border-primary rounded-md border border-zinc-300 px-4 py-1.5 text-xs font-semibold"
-                                            >
-                                                Load more
-                                            </button>
-                                        ) : restaurantsMeta.total > restaurantsMeta.per_page ? (
-                                            <span className="text-muted-foreground text-xs">You've reached the end.</span>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                            </>
+                        {type === 'restaurant' ? (
+                            <RestaurantsList restaurants={restaurants} keyword={results.keyword} />
                         ) : (
-                            <DishesList groups={results.dishes_by_restaurant} keyword={results.keyword} onAdd={handleDishAdd} />
+                            <DishesList groups={groups} keyword={results.keyword} onAdd={handleDishAdd} />
                         )}
+
+                        {activeCount > 0 ? (
+                            <div ref={sentinelRef} className="flex items-center justify-center py-8">
+                                {loadingMore ? (
+                                    <span className="text-muted-foreground text-xs">Loading more…</span>
+                                ) : hasMore ? (
+                                    <button
+                                        type="button"
+                                        onClick={loadMore}
+                                        className="hover:border-primary rounded-md border border-zinc-300 px-4 py-1.5 text-xs font-semibold"
+                                    >
+                                        Load more
+                                    </button>
+                                ) : meta.total > meta.per_page ? (
+                                    <span className="text-muted-foreground text-xs">You've reached the end.</span>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </>
                 )}
             </main>
@@ -337,14 +358,14 @@ function FilterChip({
     );
 }
 
-function Tabs({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+function Tabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
     return (
         <div className="mt-6 border-b border-zinc-200">
             <div className="flex gap-10">
-                <TabButton active={tab === 'restaurants'} onClick={() => setTab('restaurants')}>
+                <TabButton active={tab === 'restaurant'} onClick={() => onChange('restaurant')}>
                     Restaurants
                 </TabButton>
-                <TabButton active={tab === 'dishes'} onClick={() => setTab('dishes')}>
+                <TabButton active={tab === 'items'} onClick={() => onChange('items')}>
                     Items
                 </TabButton>
             </div>

@@ -27,11 +27,17 @@ Route::prefix('auth')->controller(ApiAuthController::class)->group(function () {
 });
 
 Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
-    Route::get('dashboard', [CustomerDashboardController::class, 'index']);
+    // Home screen — four granular endpoints (the app composes these instead of
+    // one combined dashboard payload): profile (selected address), food-types,
+    // top-picks and restaurants (paginated, below).
+    Route::get('food-types', [CustomerDashboardController::class, 'foodTypes']);
+    Route::get('top-picks', [CustomerDashboardController::class, 'topPicks']);
 
-    Route::get('search', [CustomerSearchController::class, 'index']);
     Route::get('search/history', [CustomerSearchController::class, 'history']);
     Route::delete('search/history', [CustomerSearchController::class, 'clear']);
+    // type: `restaurant` (restaurants list) or `items` (restaurants + nested dishes).
+    Route::get('search/{type}', [CustomerSearchController::class, 'index'])
+        ->whereIn('type', ['restaurant', 'items']);
 
     Route::get('restaurants', [CustomerRestaurantController::class, 'index']);
     Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])->whereNumber('id');

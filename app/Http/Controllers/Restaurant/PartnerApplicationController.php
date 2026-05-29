@@ -45,7 +45,7 @@ class PartnerApplicationController extends Controller
             'initialStep' => (int) ($restaurant->application_step ?? 1),
             'initialData' => $this->flattenForm($restaurant),
             'initialDocuments' => $this->documentMeta($restaurant),
-            'foodItems' => $this->foodItemOptions(),
+            'foodTypes' => $this->foodTypeOptions(),
             'googleMapsApiKey' => config('services.google_maps.key'),
         ]);
     }
@@ -113,7 +113,7 @@ class PartnerApplicationController extends Controller
                 'applicationDocuments',
                 'hours',
                 'categories',
-                'foodItems',
+                'foodTypes',
             ])
             ->first();
 

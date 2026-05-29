@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Restaurant\Concerns;
 
-use App\Models\FoodItem;
+use App\Models\FoodType;
 use App\Models\MenuCategory;
 use App\Models\Restaurant;
 use App\Models\RestaurantDocument;
@@ -26,9 +26,9 @@ trait ManagesPartnerApplication
      *
      * @return array<int, array{id: int, name: string, slug: string, image_url: ?string}>
      */
-    protected function foodItemOptions(): array
+    protected function foodTypeOptions(): array
     {
-        return FoodItem::query()
+        return FoodType::query()
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'image'])
             ->map(fn ($item) => [
@@ -61,17 +61,17 @@ trait ManagesPartnerApplication
         ], fn ($v) => $v !== null && $v !== ''))->save();
 
         // Sync the pivot only when the field is present in the payload — lets
-        // partial saves (e.g. autosave) skip the food-items step without
+        // partial saves (e.g. autosave) skip the food-types step without
         // wiping previously-selected categories.
-        if (array_key_exists('foodItemIds', $data)) {
-            $ids = collect((array) $data['foodItemIds'])
+        if (array_key_exists('foodTypeIds', $data)) {
+            $ids = collect((array) $data['foodTypeIds'])
                 ->map(fn ($id) => (int) $id)
                 ->filter(fn ($id) => $id > 0)
                 ->unique()
                 ->values()
                 ->all();
 
-            $restaurant->foodItems()->sync($ids);
+            $restaurant->foodTypes()->sync($ids);
         }
     }
 
@@ -168,10 +168,22 @@ trait ManagesPartnerApplication
     }
 
     /**
-     * Store (or replace) a single application document file and return its path.
+     * Store (or replace) a single application document file.
+     *
+     * The onboarding "Restaurant photo" maps to the banner image — a
+     * first-class restaurant asset stored through the polymorphic `uploads`
+     * table via {@see \App\Models\Concerns\HasUploads} (collection 'banner'),
+     * the same mechanism menu-item images use. The remaining slots stay as
+     * partner-application documents.
      */
     protected function storeDocument(Restaurant $restaurant, string $documentType, UploadedFile $file): void
     {
+        if ($documentType === 'restaurantPhoto') {
+            $this->storeMedia($restaurant, Restaurant::BANNER_COLLECTION, $file);
+
+            return;
+        }
+
         $column = RestaurantDocument::TYPE_TO_COLUMN[$documentType];
 
         $path = $file->store("partner-applications/{$restaurant->id}", 'public');
@@ -185,6 +197,39 @@ trait ManagesPartnerApplication
             ['restaurant_id' => $restaurant->id],
             [$column => $path],
         );
+    }
+
+    /**
+     * Store (or replace) the restaurant's logo / banner. Each collection holds
+     * a single row — re-uploading replaces the existing file rather than
+     * stacking new rows. {@see \App\Models\Restaurant} reads these back through
+     * its `logo_url` / `banner_url` accessors.
+     */
+    protected function storeMedia(Restaurant $restaurant, string $collection, UploadedFile $file): void
+    {
+        $allowed = [Restaurant::LOGO_COLLECTION, Restaurant::BANNER_COLLECTION];
+        abort_unless(in_array($collection, $allowed, true), 422, 'Unsupported media type.');
+
+        $restaurant->replaceUpload($file, $collection);
+    }
+
+    /**
+     * Logo + banner status/URL for the settings form.
+     *
+     * @return array<string, array{uploaded: bool, url: ?string}>
+     */
+    protected function mediaMeta(Restaurant $restaurant): array
+    {
+        return [
+            'logo' => [
+                'uploaded' => $restaurant->logo_url !== null,
+                'url' => $restaurant->logo_url,
+            ],
+            'banner' => [
+                'uploaded' => $restaurant->banner_url !== null,
+                'url' => $restaurant->banner_url,
+            ],
+        ];
     }
 
     protected function flattenForm(Restaurant $restaurant): array
@@ -219,7 +264,7 @@ trait ManagesPartnerApplication
             'restaurantName' => (string) ($restaurant->name ?? ''),
             'legalName' => (string) ($restaurant->legal_business_name ?? ''),
             'restaurantType' => (string) ($restaurant->restaurant_type ?? ''),
-            'foodItemIds' => $restaurant->foodItems->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+            'foodTypeIds' => $restaurant->foodTypes->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             'branches' => $restaurant->branches !== null ? (string) $restaurant->branches : '',
             'seating' => $restaurant->seating_capacity !== null ? (string) $restaurant->seating_capacity : '',
             // Step 2 — Location & Hours
@@ -248,6 +293,16 @@ trait ManagesPartnerApplication
         $out = [];
 
         foreach (RestaurantDocument::TYPE_TO_COLUMN as $key => $column) {
+            if ($key === 'restaurantPhoto') {
+                // The onboarding "Restaurant photo" is the banner image, now
+                // sourced from the uploads table. Expose its URL so the form
+                // can preview it, not just show an "Uploaded" flag.
+                $url = $restaurant->banner_url;
+                $out[$key] = $url ? ['uploaded' => true, 'url' => $url] : null;
+
+                continue;
+            }
+
             $out[$key] = $row && filled($row->{$column}) ? ['uploaded' => true] : null;
         }
 

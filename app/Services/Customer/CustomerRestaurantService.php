@@ -33,7 +33,7 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
         $restaurant = Restaurant::query()
             ->active()
             ->approved()
-            ->with('hours')
+            ->with(['hours', 'uploads'])
             ->findOrFail($restaurantId);
 
         // Normalise the customer-facing menu filters (Veg / Non-Veg + Ratings 4.0+).
@@ -50,7 +50,7 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
             ->forRestaurant($restaurant->id)
             ->available()
             ->customerFilter($filters)
-            ->with(['foodItem', 'modifierGroups.options'])
+            ->with(['foodType', 'modifierGroups.options'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->paginate(perPage: $menuPerPage, page: $menuPage);
@@ -67,7 +67,7 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
                 ->available()
                 ->matchingKeyword($keyword)
                 ->customerFilter($filters)
-                ->with(['foodItem', 'modifierGroups.options'])
+                ->with(['foodType', 'modifierGroups.options'])
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get();

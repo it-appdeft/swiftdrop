@@ -51,7 +51,7 @@ class CustomerCartController extends Controller
         );
 
         $payload['items'] = $pageItems;
-        $payload['items_meta'] = PaginationMeta::make($paginator);
+        $payload['pagination'] = PaginationMeta::make($paginator);
 
         return $this->success(
             data: $payload,

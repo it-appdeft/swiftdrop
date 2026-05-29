@@ -7,14 +7,22 @@ use App\Http\Controllers\Web\Customer\CustomerFavoriteController;
 use App\Http\Controllers\Web\Customer\CustomerProfileController;
 use App\Http\Controllers\Web\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Web\Customer\CustomerSearchController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->group(function () {
     Route::get('dashboard', [CustomerDashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('search', [CustomerSearchController::class, 'index'])->name('search');
     Route::get('search/history', [CustomerSearchController::class, 'history'])->name('search.history');
     Route::delete('search/history', [CustomerSearchController::class, 'clear'])->name('search.clear');
+    // Bare /search keeps old links/bookmarks alive by landing on the restaurants tab.
+    Route::get('search', fn (Request $request) => redirect()->route('customer.search', [
+        'type' => 'restaurant',
+        ...$request->query(),
+    ]))->name('search.redirect');
+    // type: `restaurant` (restaurants list) or `items` (restaurants + nested dishes).
+    Route::get('search/{type}', [CustomerSearchController::class, 'index'])
+        ->whereIn('type', ['restaurant', 'items'])->name('search');
 
     Route::get('restaurants', [CustomerRestaurantController::class, 'index'])->name('restaurants.index');
     Route::get('restaurants/{id}', [CustomerRestaurantController::class, 'show'])

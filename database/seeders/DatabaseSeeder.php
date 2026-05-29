@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             DriverSeeder::class,
             RestaurantSeeder::class,
-            FoodItemSeeder::class,
+            FoodTypeSeeder::class,
             MenuAndModifierSeeder::class,
         ]);
     }

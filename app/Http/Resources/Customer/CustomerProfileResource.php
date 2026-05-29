@@ -12,6 +12,13 @@ class CustomerProfileResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // Profile only surfaces the active delivery address (selected →
+        // default → newest). The full list lives at GET /customer/addresses.
+        $addresses = $this->addresses;
+        $selected = $addresses->firstWhere('is_selected', true)
+            ?? $addresses->firstWhere('is_default', true)
+            ?? $addresses->sortByDesc('id')->first();
+
         return [
             'id' => $this->id,
             'user' => new UserResource($this->user),
@@ -19,7 +26,7 @@ class CustomerProfileResource extends JsonResource
             'last_name' => $this->last_name,
             'profile_photo' => $this->profile_photo,
             'date_of_birth' => $this->date_of_birth,
-            'addresses' => AddressResource::collection($this->addresses),
+            'selected_address' => $selected ? new AddressResource($selected) : null,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

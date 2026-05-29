@@ -4,7 +4,7 @@ use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\DriverController;
-use App\Http\Controllers\Admin\FoodItemController;
+use App\Http\Controllers\Admin\FoodTypeController;
 use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\RestaurantController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -71,10 +71,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('coupons/{id}/status', [CouponController::class, 'updateStatus'])->name('coupons.status');
 
     // Food Items
-    Route::get('food-items', [FoodItemController::class, 'index'])->name('food-items.index');
-    Route::get('food-items/create', [FoodItemController::class, 'create'])->name('food-items.create');
-    Route::post('food-items', [FoodItemController::class, 'store'])->name('food-items.store');
-    Route::get('food-items/{id}/edit', [FoodItemController::class, 'edit'])->name('food-items.edit');
-    Route::post('food-items/{id}', [FoodItemController::class, 'update'])->name('food-items.update');
-    Route::delete('food-items/{id}', [FoodItemController::class, 'destroy'])->name('food-items.destroy');
+    Route::get('food-types', [FoodTypeController::class, 'index'])->name('food-types.index');
+    Route::get('food-types/create', [FoodTypeController::class, 'create'])->name('food-types.create');
+    Route::post('food-types', [FoodTypeController::class, 'store'])->name('food-types.store');
+    Route::get('food-types/{id}/edit', [FoodTypeController::class, 'edit'])->name('food-types.edit');
+    Route::post('food-types/{id}', [FoodTypeController::class, 'update'])->name('food-types.update');
+    Route::delete('food-types/{id}', [FoodTypeController::class, 'destroy'])->name('food-types.destroy');
 });

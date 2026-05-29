@@ -205,7 +205,7 @@ function HeaderSearch() {
         if (!q) return;
         setOpen(false);
         setQuery('');
-        router.get('/customer/search', { search: q }, { preserveScroll: false, preserveState: false });
+        router.get('/customer/search/restaurant', { search: q }, { preserveScroll: false, preserveState: false });
     };
 
     const clearHistory = async () => {

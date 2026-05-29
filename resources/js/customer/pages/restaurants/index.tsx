@@ -25,7 +25,7 @@ interface PageMeta {
 
 interface Props {
     restaurants: DashboardRestaurant[];
-    meta: PageMeta;
+    pagination: PageMeta;
 }
 
 const CSRF = (): string =>
@@ -36,7 +36,7 @@ const CSRF = (): string =>
  * subsequent pages are appended via JSON fetch when the bottom sentinel
  * scrolls into view (true infinite scroll, no scroll-position jumps).
  */
-export default function CustomerRestaurantsIndex({ restaurants: initial, meta: initialMeta }: Props) {
+export default function CustomerRestaurantsIndex({ restaurants: initial, pagination: initialMeta }: Props) {
     const [items, setItems] = useState<DashboardRestaurant[]>(initial);
     const [meta, setMeta] = useState<PageMeta>(initialMeta);
     const [loading, setLoading] = useState(false);
@@ -68,7 +68,7 @@ export default function CustomerRestaurantsIndex({ restaurants: initial, meta: i
                 for (const r of json.restaurants) if (r.is_favorited) next.add(r.id);
                 return next;
             });
-            setMeta(json.meta);
+            setMeta(json.pagination);
         } catch {
             toast.error('Could not load more restaurants.');
         } finally {

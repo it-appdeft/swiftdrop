@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\FoodItem;
+use App\Models\FoodType;
 use App\Models\MenuCategory;
 use App\Models\MenuItem;
 use App\Models\ModifierGroup;
@@ -38,9 +38,9 @@ class MenuAndModifierSeeder extends Seeder
             ->get()
             ->keyBy('owner_email');
 
-        // food_item slug → id, so each menu item below links to a global food
-        // type (seeded by FoodItemSeeder) instead of leaving food_item_id null.
-        $foodItems = FoodItem::pluck('id', 'slug')->all();
+        // food_type slug → id, so each menu item below links to a global food
+        // type (seeded by FoodTypeSeeder) instead of leaving food_type_id null.
+        $foodTypes = FoodType::pluck('id', 'slug')->all();
 
         foreach ($this->blueprint() as $ownerEmail => $config) {
             $restaurant = $restaurants->get($ownerEmail);
@@ -50,7 +50,7 @@ class MenuAndModifierSeeder extends Seeder
 
             $groups = $this->seedModifierGroups($restaurant, $config['modifierGroups']);
             $categories = $this->seedCategories($restaurant, $config['categories']);
-            $this->seedItems($restaurant, $config['items'], $categories, $groups, $foodItems);
+            $this->seedItems($restaurant, $config['items'], $categories, $groups, $foodTypes);
         }
     }
 
@@ -116,14 +116,14 @@ class MenuAndModifierSeeder extends Seeder
     /**
      * @param  array<string, MenuCategory>  $categories
      * @param  array<string, ModifierGroup>  $groups
-     * @param  array<string, int>  $foodItems  food_item slug → id
+     * @param  array<string, int>  $foodTypes  food_type slug → id
      */
     protected function seedItems(
         Restaurant $restaurant,
         array $items,
         array $categories,
         array $groups,
-        array $foodItems,
+        array $foodTypes,
     ): void {
         foreach (array_values($items) as $sortOrder => $i) {
             $category = $categories[$i['category']] ?? null;
@@ -133,7 +133,7 @@ class MenuAndModifierSeeder extends Seeder
                 ['restaurant_id' => $restaurant->id, 'name' => $i['name']],
                 [
                     'category_id' => $category?->id,
-                    'food_item_id' => $foodItems[$i['foodItem']] ?? null,
+                    'food_type_id' => $foodTypes[$i['foodType']] ?? null,
                     'description' => $i['description'] ?? null,
                     'price' => $i['price'],
                     'is_available' => $i['is_available'] ?? true,
@@ -244,7 +244,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Margherita Pizza Giant Slice',
                         'category' => 'Pizzas',
-                        'foodItem' => 'pizza',
+                        'foodType' => 'pizza',
                         'price' => 8.23,
                         'is_veg' => true,
                         'description' => 'Onion, Marinated paneer cubes topped with extra cheese and tandoori sauce',
@@ -253,7 +253,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Paneer Tikka',
                         'category' => 'Starters',
-                        'foodItem' => 'starter',
+                        'foodType' => 'starter',
                         'price' => 240,
                         'is_veg' => true,
                         'description' => 'Spiced cottage cheese cubes, char-grilled in the tandoor.',
@@ -262,7 +262,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Chicken Tikka',
                         'category' => 'Starters',
-                        'foodItem' => 'starter',
+                        'foodType' => 'starter',
                         'price' => 280,
                         'is_veg' => false,
                         'description' => 'Boneless chicken marinated overnight in yoghurt and spices.',
@@ -271,7 +271,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Butter Chicken',
                         'category' => 'Main course',
-                        'foodItem' => 'curry',
+                        'foodType' => 'curry',
                         'price' => 320,
                         'is_veg' => false,
                         'description' => 'Tandoori chicken in a tomato-butter cream sauce.',
@@ -280,7 +280,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Mutton Rogan Josh',
                         'category' => 'Main course',
-                        'foodItem' => 'curry',
+                        'foodType' => 'curry',
                         'price' => 380,
                         'is_veg' => false,
                         'modifierGroups' => ['Spice Level', 'Add-ons'],
@@ -288,7 +288,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Paneer Butter Masala',
                         'category' => 'Main course',
-                        'foodItem' => 'curry',
+                        'foodType' => 'curry',
                         'price' => 290,
                         'is_veg' => true,
                         'modifierGroups' => ['Spice Level', 'Add-ons'],
@@ -296,21 +296,21 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Butter Naan',
                         'category' => 'Breads',
-                        'foodItem' => 'bread',
+                        'foodType' => 'bread',
                         'price' => 40,
                         'is_veg' => true,
                     ],
                     [
                         'name' => 'Garlic Naan',
                         'category' => 'Breads',
-                        'foodItem' => 'bread',
+                        'foodType' => 'bread',
                         'price' => 50,
                         'is_veg' => true,
                     ],
                     [
                         'name' => 'Chicken Biryani',
                         'category' => 'Rice & Biryani',
-                        'foodItem' => 'biryani',
+                        'foodType' => 'biryani',
                         'price' => 260,
                         'is_veg' => false,
                         'modifierGroups' => ['Spice Level', 'Add-ons'],
@@ -318,7 +318,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Veg Biryani',
                         'category' => 'Rice & Biryani',
-                        'foodItem' => 'biryani',
+                        'foodType' => 'biryani',
                         'price' => 220,
                         'is_veg' => true,
                         'modifierGroups' => ['Spice Level', 'Add-ons'],
@@ -326,7 +326,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Gulab Jamun',
                         'category' => 'Desserts',
-                        'foodItem' => 'dessert',
+                        'foodType' => 'dessert',
                         'price' => 60,
                         'is_veg' => true,
                     ],
@@ -365,7 +365,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Classic Smash Burger',
                         'category' => 'Burgers',
-                        'foodItem' => 'burger',
+                        'foodType' => 'burger',
                         'price' => 420,
                         'is_veg' => false,
                         'description' => 'Hand-smashed beef patty, cheese, pickles, house sauce.',
@@ -374,7 +374,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Cheese Smash',
                         'category' => 'Burgers',
-                        'foodItem' => 'burger',
+                        'foodType' => 'burger',
                         'price' => 460,
                         'is_veg' => false,
                         'modifierGroups' => ['Size', 'Add-ons'],
@@ -382,7 +382,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Veg Smash',
                         'category' => 'Burgers',
-                        'foodItem' => 'burger',
+                        'foodType' => 'burger',
                         'price' => 380,
                         'is_veg' => true,
                         'modifierGroups' => ['Size', 'Add-ons'],
@@ -390,14 +390,14 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Truffle Fries',
                         'category' => 'Sides',
-                        'foodItem' => 'fries',
+                        'foodType' => 'fries',
                         'price' => 220,
                         'is_veg' => true,
                     ],
                     [
                         'name' => 'Coke 500ml',
                         'category' => 'Drinks',
-                        'foodItem' => 'drinks',
+                        'foodType' => 'drinks',
                         'price' => 60,
                         'is_veg' => true,
                     ],
@@ -455,7 +455,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Margherita Pizza Giant Slice',
                         'category' => 'Pizzas',
-                        'foodItem' => 'pizza',
+                        'foodType' => 'pizza',
                         'price' => 8.23,
                         'is_veg' => true,
                         'description' => 'Onion, Marinated paneer cubes topped with extra cheese and tandoori sauce',
@@ -464,7 +464,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Pepperoni',
                         'category' => 'Pizzas',
-                        'foodItem' => 'pizza',
+                        'foodType' => 'pizza',
                         'price' => 9.50,
                         'is_veg' => false,
                         'modifierGroups' => ['Size', 'Cheese & Dip'],
@@ -472,7 +472,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Quattro Formaggi',
                         'category' => 'Pizzas',
-                        'foodItem' => 'pizza',
+                        'foodType' => 'pizza',
                         'price' => 10.20,
                         'is_veg' => true,
                         'modifierGroups' => ['Size', 'Toppings — Veg', 'Cheese & Dip'],
@@ -480,14 +480,14 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Garlic Bread',
                         'category' => 'Sides',
-                        'foodItem' => 'bread',
+                        'foodType' => 'bread',
                         'price' => 3.50,
                         'is_veg' => true,
                     ],
                     [
                         'name' => 'Sparkling Water',
                         'category' => 'Drinks',
-                        'foodItem' => 'drinks',
+                        'foodType' => 'drinks',
                         'price' => 1.80,
                         'is_veg' => true,
                     ],
@@ -524,14 +524,14 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Spring Rolls',
                         'category' => 'Starters',
-                        'foodItem' => 'starter',
+                        'foodType' => 'starter',
                         'price' => 180,
                         'is_veg' => true,
                     ],
                     [
                         'name' => 'Pad Thai',
                         'category' => 'Mains',
-                        'foodItem' => 'noodles',
+                        'foodType' => 'noodles',
                         'price' => 320,
                         'is_veg' => false,
                         'description' => 'Stir-fried rice noodles, tamarind, peanut, lime.',
@@ -540,7 +540,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Green Curry',
                         'category' => 'Mains',
-                        'foodItem' => 'curry',
+                        'foodType' => 'curry',
                         'price' => 360,
                         'is_veg' => false,
                         'modifierGroups' => ['Spice Level', 'Protein'],
@@ -548,7 +548,7 @@ class MenuAndModifierSeeder extends Seeder
                     [
                         'name' => 'Mango Sticky Rice',
                         'category' => 'Desserts',
-                        'foodItem' => 'dessert',
+                        'foodType' => 'dessert',
                         'price' => 220,
                         'is_veg' => true,
                     ],

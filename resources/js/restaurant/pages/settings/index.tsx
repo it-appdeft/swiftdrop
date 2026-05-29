@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { BadgeCheck, ChevronDown } from 'lucide-react';
+import { BadgeCheck, ChevronDown, ImagePlus, Upload as UploadIcon } from 'lucide-react';
 import { useState } from 'react';
 import AppLayout from '../../layouts/app-layout';
 import {
@@ -10,7 +10,7 @@ import {
     LegalBankStep,
     LocationHoursStep,
     type DocSlot,
-    type FoodItemOption,
+    type FoodTypeOption,
     type FormState,
 } from '../../components/partner-application-form';
 
@@ -44,7 +44,9 @@ interface SharedProps {
     /** Flattened onboarding snapshot powering the Restaurant tab sub-sections. */
     application?: FormState | null;
     documents?: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
-    foodItems?: FoodItemOption[];
+    /** Logo + banner status/URL (stored in the uploads table). */
+    media?: Partial<Record<'logo' | 'banner', { uploaded: boolean; url: string | null }>>;
+    foodTypes?: FoodTypeOption[];
     googleMapsApiKey?: string | null;
     [key: string]: unknown;
 }
@@ -262,15 +264,20 @@ const RESTAURANT_SECTIONS: { key: SectionKey; label: string; step: number }[] = 
     { key: 'categories', label: 'Categories', step: 5 },
 ];
 
+type MediaSlot = 'logo' | 'banner';
+type MediaState = Partial<Record<MediaSlot, { uploaded: boolean; url: string | null }>>;
+
 function RestaurantTab({
     application,
     documents,
-    foodItems,
+    media,
+    foodTypes,
     googleMapsApiKey,
 }: {
     application?: FormState | null;
     documents?: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
-    foodItems: FoodItemOption[];
+    media?: MediaState;
+    foodTypes: FoodTypeOption[];
     googleMapsApiKey: string | null;
 }) {
     const seeded: FormState = { ...DEFAULT_STATE, ...(application ?? {}) };
@@ -282,6 +289,7 @@ function RestaurantTab({
     const [docs, setDocs] = useState<Partial<Record<DocSlot, { uploaded: boolean } | null>>>(
         documents ?? {},
     );
+    const [mediaState, setMediaState] = useState<MediaState>(media ?? {});
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [section, setSection] = useState<SectionKey>('identity');
@@ -327,6 +335,21 @@ function RestaurantTab({
         );
     };
 
+    const uploadMedia = (type: MediaSlot, file: File) => {
+        // Optimistic preview so the card flips to "Uploaded" immediately.
+        setMediaState((prev) => ({ ...prev, [type]: { uploaded: true, url: URL.createObjectURL(file) } }));
+        router.post(
+            route('restaurant.settings.media.upload', { type }),
+            { file },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                forceFormData: true,
+                onError: (serverErrors) => setErrors(normalizeErrors(serverErrors as Record<string, string>)),
+            },
+        );
+    };
+
     const activeStep = RESTAURANT_SECTIONS.find((s) => s.key === section)?.step ?? 1;
 
     return (
@@ -362,14 +385,40 @@ function RestaurantTab({
 
             <section className="rounded-2xl border border-border bg-background p-5 sm:p-6">
                 {section === 'identity' && (
-                    <AccountRestaurantStep
-                        data={data}
-                        update={update}
-                        errors={errors}
-                        foodItems={foodItems}
-                        documents={docs}
-                        onUploadDoc={uploadDoc}
-                    />
+                    <div className="space-y-6">
+                        <AccountRestaurantStep
+                            data={data}
+                            update={update}
+                            errors={errors}
+                            foodTypes={foodTypes}
+                            documents={docs}
+                            onUploadDoc={uploadDoc}
+                        />
+
+                        {/* Logo + banner — stored as restaurant media (uploads table). */}
+                        <div className="space-y-3">
+                            <div>
+                                <h3 className="text-sm font-semibold">Logo &amp; banner</h3>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    Your logo appears on cards; the banner is the cover image on your restaurant page.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <MediaUploadField
+                                    label="Logo"
+                                    media={mediaState.logo}
+                                    error={errors.file}
+                                    onUpload={(file) => uploadMedia('logo', file)}
+                                />
+                                <MediaUploadField
+                                    label="Banner"
+                                    media={mediaState.banner}
+                                    error={errors.file}
+                                    onUpload={(file) => uploadMedia('banner', file)}
+                                />
+                            </div>
+                        </div>
+                    </div>
                 )}
                 {section === 'location' && (
                     <LocationHoursStep
@@ -402,6 +451,73 @@ function RestaurantTab({
                     </div>
                 )}
             </section>
+        </div>
+    );
+}
+
+/** Image upload card with a live thumbnail preview — used for logo + banner. */
+function MediaUploadField({
+    label,
+    media,
+    error,
+    onUpload,
+}: {
+    label: string;
+    media?: { uploaded: boolean; url: string | null };
+    error?: string;
+    onUpload: (file: File) => void;
+}) {
+    const [localError, setLocalError] = useState<string | null>(null);
+    const url = media?.url ?? null;
+
+    const handleFile = (file: File, input: HTMLInputElement) => {
+        input.value = '';
+        if (file.size > 5 * 1024 * 1024) {
+            setLocalError('File is too large — max 5MB.');
+            return;
+        }
+        setLocalError(null);
+        onUpload(file);
+    };
+
+    const shownError = localError ?? error;
+
+    return (
+        <div>
+            <label
+                className={
+                    'flex cursor-pointer items-center gap-3 rounded-xl border bg-background p-3 transition hover:border-primary ' +
+                    (shownError ? 'border-rose-500' : 'border-border')
+                }
+            >
+                <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted text-muted-foreground">
+                    {url ? (
+                        <img src={url} alt={label} className="size-full object-cover" />
+                    ) : (
+                        <ImagePlus className="size-5" />
+                    )}
+                </span>
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">{label}</p>
+                    <p className={'mt-0.5 text-xs ' + (media?.uploaded ? 'text-emerald-600' : 'text-muted-foreground')}>
+                        {media?.uploaded ? 'Uploaded' : 'JPG, PNG or WEBP. Max 5MB.'}
+                    </p>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary">
+                    <UploadIcon className="size-3.5" />
+                    {media?.uploaded ? 'Replace' : 'Upload'}
+                </span>
+                <input
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    className="sr-only"
+                    onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleFile(f, e.target);
+                    }}
+                />
+            </label>
+            {shownError && <p className="mt-1 text-xs text-rose-600">{shownError}</p>}
         </div>
     );
 }
@@ -476,7 +592,7 @@ function SecurityTab() {
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 export default function RestaurantSettings() {
-    const { auth, profile, application, documents, foodItems, googleMapsApiKey } =
+    const { auth, profile, application, documents, media, foodTypes, googleMapsApiKey } =
         usePage<SharedProps>().props;
     const profileData: ProfileData = profile ?? {
         ownerName: '',
@@ -530,7 +646,8 @@ export default function RestaurantSettings() {
                     <RestaurantTab
                         application={application}
                         documents={documents}
-                        foodItems={foodItems ?? []}
+                        media={media}
+                        foodTypes={foodTypes ?? []}
                         googleMapsApiKey={googleMapsApiKey ?? null}
                     />
                 )}

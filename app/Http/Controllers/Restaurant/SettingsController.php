@@ -45,7 +45,9 @@ class SettingsController extends Controller
             // Full onboarding snapshot for the Restaurant tab's sub-sections.
             'application' => $restaurant ? $this->flattenForm($restaurant) : null,
             'documents' => $restaurant ? $this->documentMeta($restaurant) : [],
-            'foodItems' => $this->foodItemOptions(),
+            // Logo + banner status/URL (stored in the uploads table).
+            'media' => $restaurant ? $this->mediaMeta($restaurant) : [],
+            'foodTypes' => $this->foodTypeOptions(),
             'googleMapsApiKey' => config('services.google_maps.key'),
         ]);
     }
@@ -98,6 +100,25 @@ class SettingsController extends Controller
         return back()->with('status', 'Document updated.');
     }
 
+    /**
+     * Upload (or replace) the restaurant's logo / banner. Stored in the
+     * uploads table — re-uploading swaps the single row in that collection.
+     */
+    public function uploadMedia(Request $request, string $type): RedirectResponse
+    {
+        $restaurant = $this->restaurantForOrFail($request);
+
+        abort_unless(in_array($type, ['logo', 'banner'], true), 404);
+
+        $request->validate([
+            'file' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $this->storeMedia($restaurant, $type, $request->file('file'));
+
+        return back()->with('status', ucfirst($type).' updated.');
+    }
+
     protected function restaurantFor(?\App\Models\User $user): ?Restaurant
     {
         if (! $user) {
@@ -105,7 +126,7 @@ class SettingsController extends Controller
         }
 
         return $user->restaurant()
-            ->with(['user', 'legalAndBank', 'applicationDocuments', 'hours', 'categories', 'foodItems'])
+            ->with(['user', 'legalAndBank', 'applicationDocuments', 'hours', 'categories', 'foodTypes'])
             ->first();
     }
 

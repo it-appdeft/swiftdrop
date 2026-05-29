@@ -17,23 +17,40 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as LengthAwarePaginatorImpl;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class CustomerSearchService implements CustomerSearchServiceInterface
 {
     protected const RECENT_LIMIT = 10;
 
-    protected const RESULT_LIMIT = 30;
-
     public const RESTAURANTS_PER_PAGE = 10;
+
+    /** Max matching dishes nested under each restaurant on the Items tab. */
+    public const ITEMS_PER_RESTAURANT = 3;
+
+    /** Allowed search modes (the `{type}` route segment). */
+    public const TYPE_RESTAURANT = 'restaurant';
+
+    public const TYPE_ITEMS = 'items';
 
     public function __construct(
         protected PlatformConfigService $config,
     ) {
     }
 
-    public function search(User $user, string $keyword, int $page = 1, int $perPage = self::RESTAURANTS_PER_PAGE, array $filters = []): CustomerSearchResults
+    /**
+     * Two search modes, selected by `$type`:
+     *  - `restaurant`: restaurants matched by name OR by an offered food type
+     *    (no dishes nested).
+     *  - `items`: restaurants that have a keyword-matching dish, each with up
+     *    to {@see ITEMS_PER_RESTAURANT} matching dishes nested. Restaurant-name
+     *    matches do NOT qualify here — only dish matches.
+     *
+     * Both modes paginate restaurants identically (10/page) so the two tabs
+     * share the restaurant API's pagination contract.
+     */
+    public function search(User $user, string $type, string $keyword, int $page = 1, int $perPage = self::RESTAURANTS_PER_PAGE, array $filters = []): CustomerSearchResults
     {
+        $type = $type === self::TYPE_ITEMS ? self::TYPE_ITEMS : self::TYPE_RESTAURANT;
         $profile = $user->customerProfile;
         $keyword = trim($keyword);
         $filters = [
@@ -46,18 +63,20 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             PlatformConfigService::KEY_DASHBOARD_RADIUS_MILES,
             5.0,
         ));
+        $hasGeo = $address && $address->lat !== null && $address->lng !== null;
 
         if ($keyword === '' || ! $profile) {
             $empty = $this->emptyPaginator($page, $perPage);
 
             return new CustomerSearchResults(
+                type: $type,
                 keyword: '',
                 restaurants: collect(),
                 dishesByRestaurant: collect(),
                 recent: $profile ? $this->recentHistory($profile) : collect(),
                 address: $address,
                 radiusMiles: $radius,
-                usingFallback: ! $address || $address->lat === null || $address->lng === null,
+                usingFallback: ! $hasGeo,
                 restaurantsMeta: PaginationMeta::make($empty),
                 filters: $filters,
             );
@@ -69,28 +88,28 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             $this->recordSearch($profile, $keyword);
         }
 
-        $hasGeo = $address && $address->lat !== null && $address->lng !== null;
-        [$restaurantsPaginator, $dishesByRestaurant] = $hasGeo
-            ? $this->searchWithinRadius($keyword, $address, $radius, $page, $perPage, $filters)
-            : $this->searchUnbounded($keyword, $page, $perPage, $filters);
+        $paginator = $type === self::TYPE_ITEMS
+            ? $this->paginateItemRestaurants($keyword, $hasGeo ? $address : null, $radius, $page, $perPage, $filters)
+            : $this->paginateNameRestaurants($keyword, $hasGeo ? $address : null, $radius, $page, $perPage, $filters);
 
         // Keep the keyword + active filters on the pagination links so paging
         // within a filtered search round-trips correctly.
-        $restaurantsPaginator->appends(array_filter([
+        $paginator->appends(array_filter([
             'search' => $keyword,
             'offers' => $filters['offers'] ? 1 : null,
             'highest_rated' => $filters['highest_rated'] ? 1 : null,
         ]));
 
         return new CustomerSearchResults(
+            type: $type,
             keyword: $keyword,
-            restaurants: collect($restaurantsPaginator->items()),
-            dishesByRestaurant: $dishesByRestaurant,
+            restaurants: $type === self::TYPE_ITEMS ? collect() : collect($paginator->items()),
+            dishesByRestaurant: $type === self::TYPE_ITEMS ? collect($paginator->items()) : collect(),
             recent: $this->recentHistory($profile),
             address: $address,
             radiusMiles: $radius,
             usingFallback: ! $hasGeo,
-            restaurantsMeta: PaginationMeta::make($restaurantsPaginator),
+            restaurantsMeta: PaginationMeta::make($paginator),
             filters: $filters,
         );
     }
@@ -156,23 +175,26 @@ class CustomerSearchService implements CustomerSearchServiceInterface
     }
 
     /**
+     * Restaurants tab: paginate restaurants matched by name OR an offered food
+     * type. Geo-aware (radius + distance sort) when the customer has coords,
+     * otherwise a global rating-sorted list. No dishes are nested.
+     *
      * @param  array{offers: bool, highest_rated: bool}  $filters
-     * @return array{0: LengthAwarePaginator, 1: Collection}
+     * @return LengthAwarePaginator<int, array{restaurant: Restaurant, distance_miles: ?float}>
      */
-    protected function searchWithinRadius(string $keyword, CustomerAddress $address, float $radius, int $page, int $perPage, array $filters): array
+    protected function paginateNameRestaurants(string $keyword, ?CustomerAddress $address, float $radius, int $page, int $perPage, array $filters): LengthAwarePaginator
     {
-        $lat = (float) $address->lat;
-        $lng = (float) $address->lng;
-        $distanceExpr = Restaurant::distanceMilesExpression($lat, $lng);
-
-        $paginator = Restaurant::query()
+        $query = Restaurant::query()
             ->active()
             ->approved()
-            // Keyword + Offers + Highest rated in one scope.
-            ->customerSearch(['keyword' => $keyword, ...$filters])
-            ->withinRadius($lat, $lng, $radius)
-            ->orderBy('distance_miles')
-            ->paginate(perPage: $perPage, page: $page);
+            ->with('uploads')
+            ->matchingNameOrFoodType($keyword)
+            ->when($filters['offers'], fn (Builder $q) => $q->withOffers())
+            ->when($filters['highest_rated'], fn (Builder $q) => $q->highRated());
+
+        $this->applyLocationOrder($query, $address, $radius);
+
+        $paginator = $query->paginate(perPage: $perPage, page: $page);
 
         $paginator->setCollection($paginator->getCollection()
             ->map(fn (Restaurant $r) => [
@@ -182,122 +204,75 @@ class CustomerSearchService implements CustomerSearchServiceInterface
                     : null,
             ])->values());
 
-        $dishesByRestaurant = $this->dishesGroupedByRestaurant(
-            $keyword,
-            geoFilter: function (Builder $q) use ($distanceExpr, $radius) {
-                $q->whereNotNull('restaurants.lat')
-                    ->whereNotNull('restaurants.lng')
-                    ->whereRaw("{$distanceExpr} <= ?", [$radius]);
-            },
-            distanceExpr: $distanceExpr,
-            filters: $filters,
-        );
-
-        return [$paginator, $dishesByRestaurant];
+        return $paginator;
     }
 
     /**
+     * Items tab: paginate restaurants that have at least one available,
+     * keyword-matching dish (restaurant-name matches do NOT qualify), then
+     * nest up to {@see ITEMS_PER_RESTAURANT} matching dishes under each. Only
+     * the current page's restaurants are hydrated with dishes.
+     *
      * @param  array{offers: bool, highest_rated: bool}  $filters
-     * @return array{0: LengthAwarePaginator, 1: Collection}
+     * @return LengthAwarePaginator<int, array{restaurant: Restaurant, distance_miles: ?float, dishes: Collection<int, MenuItem>}>
      */
-    protected function searchUnbounded(string $keyword, int $page, int $perPage, array $filters): array
+    protected function paginateItemRestaurants(string $keyword, ?CustomerAddress $address, float $radius, int $page, int $perPage, array $filters): LengthAwarePaginator
     {
-        $paginator = Restaurant::query()
+        $query = Restaurant::query()
             ->active()
             ->approved()
-            ->customerSearch(['keyword' => $keyword, ...$filters])
-            ->paginate(perPage: $perPage, page: $page);
+            ->with('uploads')
+            ->whereHas('menuItems', fn (Builder $q) => $q->available()->matchingKeyword($keyword))
+            ->when($filters['offers'], fn (Builder $q) => $q->withOffers())
+            ->when($filters['highest_rated'], fn (Builder $q) => $q->highRated());
+
+        $this->applyLocationOrder($query, $address, $radius);
+
+        $paginator = $query->paginate(perPage: $perPage, page: $page);
+
+        $restaurantIds = $paginator->getCollection()->pluck('id')->all();
+
+        // Matching dishes for just this page's restaurants, capped per
+        // restaurant below so the payload stays small.
+        $dishesByRestaurant = empty($restaurantIds)
+            ? collect()
+            : MenuItem::query()
+                ->with(['foodType', 'modifierGroups.options'])
+                ->whereIn('restaurant_id', $restaurantIds)
+                ->available()
+                ->matchingKeyword($keyword)
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->groupBy('restaurant_id');
 
         $paginator->setCollection($paginator->getCollection()
-            ->map(fn (Restaurant $r) => ['restaurant' => $r, 'distance_miles' => null])
-            ->values());
+            ->map(fn (Restaurant $r) => [
+                'restaurant' => $r,
+                'distance_miles' => $r->distance_miles !== null
+                    ? round((float) $r->distance_miles, 2)
+                    : null,
+                'dishes' => collect($dishesByRestaurant->get($r->id) ?? [])
+                    ->take(self::ITEMS_PER_RESTAURANT)
+                    ->values(),
+            ])->values());
 
-        $dishesByRestaurant = $this->dishesGroupedByRestaurant(
-            $keyword,
-            geoFilter: null,
-            distanceExpr: null,
-            filters: $filters,
-        );
-
-        return [$paginator, $dishesByRestaurant];
+        return $paginator;
     }
 
     /**
-     * Build the Dishes tab payload: restaurants that have at least one
-     * matching menu item, each with its matching dishes nested inside.
-     *
-     * @param  ?callable(Builder): void  $geoFilter
-     * @param  array{offers: bool, highest_rated: bool}  $filters
-     * @return Collection<int, array{restaurant: Restaurant, distance_miles: ?float, dishes: Collection<int, MenuItem>}>
+     * Shared ordering for both tabs: radius scope + distance sort when the
+     * customer has coords (mirrors the dashboard restaurant list), else a
+     * global rating-sorted fallback so the page is never empty.
      */
-    protected function dishesGroupedByRestaurant(string $keyword, ?callable $geoFilter, ?string $distanceExpr, array $filters = []): Collection
+    protected function applyLocationOrder(Builder $query, ?CustomerAddress $address, float $radius): void
     {
-        $menuQuery = MenuItem::query()
-            ->with(['foodItem', 'modifierGroups.options'])
-            ->join('restaurants', 'restaurants.id', '=', 'menu_items.restaurant_id')
-            ->leftJoin('food_items', 'food_items.id', '=', 'menu_items.food_item_id')
-            ->where('restaurants.status', 'active')
-            ->where('restaurants.approval_status', 'approved')
-            ->where('menu_items.is_available', true)
-            ->where(function ($q) use ($keyword) {
-                $q->where('food_items.name', 'like', "%{$keyword}%")
-                    ->orWhere('menu_items.name', 'like', "%{$keyword}%");
-            });
-
-        // Same Offers / Highest rated filters as the restaurants tab, applied
-        // against the joined `restaurants` table. The offers predicate reuses
-        // the exact constraint behind Restaurant::scopeWithOffers().
-        if (! empty($filters['highest_rated'])) {
-            $menuQuery->where('restaurants.rating', '>=', Restaurant::HIGH_RATING);
+        if ($address) {
+            $query->withinRadius((float) $address->lat, (float) $address->lng, $radius)
+                ->orderByDesc('rating')
+                ->orderBy('distance_miles');
+        } else {
+            $query->orderByDesc('rating');
         }
-        if (! empty($filters['offers'])) {
-            $menuQuery->whereExists(fn ($sub) => Restaurant::applyOfferExists($sub));
-        }
-
-        if ($geoFilter) {
-            $geoFilter($menuQuery);
-        }
-
-        $select = ['menu_items.*'];
-        if ($distanceExpr) {
-            $select[] = DB::raw("{$distanceExpr} as distance_miles");
-        }
-
-        $items = $menuQuery
-            ->select($select)
-            ->orderBy('restaurants.id')
-            ->orderBy('menu_items.sort_order')
-            ->limit(self::RESULT_LIMIT * 5)
-            ->get();
-
-        if ($items->isEmpty()) {
-            return collect();
-        }
-
-        $restaurantIds = $items->pluck('restaurant_id')->unique()->all();
-        $restaurants = Restaurant::query()
-            ->whereIn('id', $restaurantIds)
-            ->get()
-            ->keyBy('id');
-
-        return $items
-            ->groupBy('restaurant_id')
-            ->map(function (Collection $dishes, int $restaurantId) use ($restaurants) {
-                $restaurant = $restaurants->get($restaurantId);
-                if (! $restaurant) {
-                    return null;
-                }
-                $distance = $dishes->first()->distance_miles ?? null;
-
-                return [
-                    'restaurant' => $restaurant,
-                    'distance_miles' => $distance !== null ? round((float) $distance, 2) : null,
-                    'dishes' => $dishes->values(),
-                ];
-            })
-            ->filter()
-            ->values()
-            ->take(self::RESULT_LIMIT);
     }
-
 }

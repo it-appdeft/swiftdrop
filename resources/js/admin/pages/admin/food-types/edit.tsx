@@ -10,27 +10,27 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import type { FoodItem } from '@/types/admin';
+import type { FoodType } from '@/types/admin';
 
 interface Props {
-    item: FoodItem;
+    item: FoodType;
 }
 
-interface FoodItemFormState {
+interface FoodTypeFormState {
     name: string;
     slug: string;
     image: File | null;
     [key: string]: string | File | null;
 }
 
-export default function FoodItemEdit({ item }: Props) {
+export default function FoodTypeEdit({ item }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Admin', href: '/admin/food-items' },
-        { title: 'Food Items', href: '/admin/food-items' },
-        { title: item.name, href: `/admin/food-items/${item.id}/edit` },
+        { title: 'Admin', href: '/admin/food-types' },
+        { title: 'Food Types', href: '/admin/food-types' },
+        { title: item.name, href: `/admin/food-types/${item.id}/edit` },
     ];
 
-    const { data, setData, post, processing, errors } = useForm<FoodItemFormState>({
+    const { data, setData, post, processing, errors } = useForm<FoodTypeFormState>({
         name: item.name,
         slug: item.slug,
         image: null,
@@ -49,7 +49,7 @@ export default function FoodItemEdit({ item }: Props) {
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(`/admin/food-items/${item.id}`, { forceFormData: true });
+        post(`/admin/food-types/${item.id}`, { forceFormData: true });
     };
 
     return (
@@ -59,7 +59,7 @@ export default function FoodItemEdit({ item }: Props) {
             <PageContainer width="narrow">
                 <div className="mb-6 flex items-center gap-3">
                     <Button variant="ghost" size="icon-sm" asChild>
-                        <Link href="/admin/food-items"><ArrowLeft /></Link>
+                        <Link href="/admin/food-types"><ArrowLeft /></Link>
                     </Button>
                     <PageHeader eyebrow="Admin" title={`Edit ${item.name}`} />
                 </div>
@@ -135,7 +135,7 @@ export default function FoodItemEdit({ item }: Props) {
 
                     <div className="mt-6 flex items-center justify-end gap-3">
                         <Button variant="outline" asChild>
-                            <Link href="/admin/food-items">Cancel</Link>
+                            <Link href="/admin/food-types">Cancel</Link>
                         </Button>
                         <Button type="submit" loading={processing}>
                             Save changes

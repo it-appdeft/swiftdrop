@@ -49,7 +49,7 @@ interface Cart {
     restaurant_id: number | null;
     restaurant: { id: number; name: string; logo_url: string | null } | null;
     items: CartLine[];
-    items_meta: ItemsMeta;
+    pagination: ItemsMeta;
     item_count: number;
     line_count: number;
     subtotal: number;
@@ -66,14 +66,14 @@ export default function CustomerCart({ cart }: Props) {
     // appended. Reset whenever the underlying Inertia render changes (after a
     // mutation, for example).
     const [items, setItems] = useState<CartLine[]>(cart.items);
-    const [meta, setMeta] = useState<ItemsMeta>(cart.items_meta);
+    const [meta, setMeta] = useState<ItemsMeta>(cart.pagination);
     const [loadingMore, setLoadingMore] = useState(false);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setItems(cart.items);
-        setMeta(cart.items_meta);
-    }, [cart.items, cart.items_meta]);
+        setMeta(cart.pagination);
+    }, [cart.items, cart.pagination]);
 
     const hasMore = meta.current_page < meta.last_page;
 
@@ -91,7 +91,7 @@ export default function CustomerCart({ cart }: Props) {
                 const seen = new Set(prev.map((l) => l.id));
                 return [...prev, ...json.items.filter((l) => !seen.has(l.id))];
             });
-            setMeta(json.items_meta);
+            setMeta(json.pagination);
         } catch {
             toast.error('Could not load more items.');
         } finally {

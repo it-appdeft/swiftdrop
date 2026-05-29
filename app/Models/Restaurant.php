@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasUploads;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,18 @@ use Illuminate\Support\Carbon;
 
 class Restaurant extends Model
 {
+    use HasUploads;
+
+    /**
+     * Logo + banner are stored as polymorphic {@see Upload} rows (collection
+     * 'logo' / 'banner') rather than columns on this table — uploading
+     * replaces the single row in that collection. Read them through the
+     * `logo_url` / `banner_url` accessors below.
+     */
+    public const LOGO_COLLECTION = 'logo';
+
+    public const BANNER_COLLECTION = 'banner';
+
     /** Rating cutoff for the customer "Highest rated" filter. */
     public const HIGH_RATING = 4.0;
 
@@ -38,8 +51,6 @@ class Restaurant extends Model
         // Operational state (lifecycle after onboarding).
         'description',
         'accepts_cooking_requests',
-        'logo_path',
-        'cover_photo_path',
         'status',
         'approval_status',
         'is_accepting_orders',
@@ -74,6 +85,32 @@ class Restaurant extends Model
         return $this->application_submitted_at !== null;
     }
 
+    // ─── Logo / banner (backed by the uploads table) ───────────────────────────
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        return $this->mediaUrl(self::LOGO_COLLECTION);
+    }
+
+    public function getBannerUrlAttribute(): ?string
+    {
+        return $this->mediaUrl(self::BANNER_COLLECTION);
+    }
+
+    /**
+     * Resolve a media collection's URL. Prefers the already-loaded `uploads`
+     * relation (so list endpoints that eager-load it stay N+1-free) and falls
+     * back to a single query for a lone model.
+     */
+    protected function mediaUrl(string $collection): ?string
+    {
+        if ($this->relationLoaded('uploads')) {
+            return $this->uploads->firstWhere('collection', $collection)?->url;
+        }
+
+        return $this->latestUpload($collection)?->url;
+    }
+
     /** Admin has approved the partner application. */
     public function isApproved(): bool
     {
@@ -92,6 +129,18 @@ class Restaurant extends Model
     public function scopeApproved(Builder $query): Builder
     {
         return $query->where('approval_status', 'approved');
+    }
+
+    /** Currently available to take orders (the partner's "Paused" toggle is off). */
+    public function scopeAcceptingOrders(Builder $query): Builder
+    {
+        return $query->where('is_accepting_orders', true);
+    }
+
+    /** Live, approved and currently accepting orders — i.e. orderable right now. */
+    public function scopeBookable(Builder $query): Builder
+    {
+        return $query->active()->approved()->acceptingOrders();
     }
 
     /**
@@ -129,7 +178,7 @@ class Restaurant extends Model
 
     /**
      * Keyword match: the restaurant's own name, OR it has at least one
-     * available menu item whose name (or its linked food_item name) matches.
+     * available menu item whose name (or its linked food_type name) matches.
      */
     public function scopeMatchingKeyword(Builder $query, string $keyword): Builder
     {
@@ -143,14 +192,54 @@ class Restaurant extends Model
                 ->orWhereExists(function (QueryBuilder $sub) use ($keyword) {
                     $sub->selectRaw('1')
                         ->from('menu_items')
-                        ->leftJoin('food_items', 'food_items.id', '=', 'menu_items.food_item_id')
+                        ->leftJoin('food_types', 'food_types.id', '=', 'menu_items.food_type_id')
                         ->whereColumn('menu_items.restaurant_id', 'restaurants.id')
                         ->where('menu_items.is_available', true)
                         ->where(fn (QueryBuilder $x) => $x
-                            ->where('food_items.name', 'like', "%{$keyword}%")
+                            ->where('food_types.name', 'like', "%{$keyword}%")
                             ->orWhere('menu_items.name', 'like', "%{$keyword}%"));
                 });
         });
+    }
+
+    /**
+     * Restaurants-tab search match: the restaurant's own name OR it offers a
+     * food type whose name matches the keyword (i.e. it has at least one
+     * available dish tagged with that food type). Unlike {@see scopeMatchingKeyword}
+     * this deliberately excludes pure dish-name matches — those belong to the
+     * Items tab.
+     */
+    public function scopeMatchingNameOrFoodType(Builder $query, string $keyword): Builder
+    {
+        $keyword = trim($keyword);
+        if ($keyword === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $w) use ($keyword) {
+            $w->where('restaurants.name', 'like', "%{$keyword}%")
+                ->orWhereExists(function (QueryBuilder $sub) use ($keyword) {
+                    $sub->selectRaw('1')
+                        ->from('menu_items')
+                        ->join('food_types', 'food_types.id', '=', 'menu_items.food_type_id')
+                        ->whereColumn('menu_items.restaurant_id', 'restaurants.id')
+                        ->where('menu_items.is_available', true)
+                        ->where('food_types.name', 'like', "%{$keyword}%");
+                });
+        });
+    }
+
+    /**
+     * Dashboard food-type filter (the `search` param carries the food type id):
+     * restaurants offering at least one available dish tagged with that food
+     * type. Shared by the web dashboard and the api top-picks + restaurants
+     * endpoints so all surfaces filter identically.
+     */
+    public function scopeOfferingFoodType(Builder $query, int $foodTypeId): Builder
+    {
+        return $query->whereHas('menuItems', fn (Builder $q) => $q
+            ->where('food_type_id', $foodTypeId)
+            ->where('is_available', true));
     }
 
     /**
@@ -311,11 +400,11 @@ class Restaurant extends Model
     /**
      * Food categories the partner picked in Step 1. Replaces the free-text
      * `cuisines` column for new applications — choices come from the
-     * admin-managed `food_items` catalog.
+     * admin-managed `food_types` catalog.
      */
-    public function foodItems(): BelongsToMany
+    public function foodTypes(): BelongsToMany
     {
-        return $this->belongsToMany(FoodItem::class, 'restaurant_food_items')
+        return $this->belongsToMany(FoodType::class, 'restaurant_food_types')
             ->withTimestamps();
     }
 

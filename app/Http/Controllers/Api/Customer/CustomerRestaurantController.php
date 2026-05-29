@@ -31,16 +31,21 @@ class CustomerRestaurantController extends Controller
     public function index(Request $request): JsonResponse
     {
         $page = max(1, (int) $request->query('page', 1));
+        $foodTypeId = $request->filled('search')
+            ? max(1, (int) $request->query('search'))
+            : null;
+
         $paginator = $this->dashboard->paginateRestaurants(
             $request->user(),
             page: $page,
             perPage: CustomerDashboardService::RESTAURANTS_PER_PAGE,
+            foodTypeId: $foodTypeId,
         );
 
         return $this->success(
             data: [
                 'restaurants' => DashboardRestaurantResource::collection($paginator->getCollection())->resolve($request),
-                'meta' => \App\Support\PaginationMeta::make($paginator),
+                'pagination' => \App\Support\PaginationMeta::make($paginator),
             ],
             message: 'Restaurants retrieved.',
         );

@@ -15,10 +15,10 @@ class CustomerDashboardResource extends JsonResource
         $data = $this->resource;
 
         return [
-            'food_items' => FoodItemResource::collection($data->foodItems)->resolve($request),
-            'food_items_meta' => $data->foodItemsMeta,
+            'food_types' => FoodTypeResource::collection($data->foodTypes)->resolve($request),
+            'top_picks' => DashboardRestaurantResource::collection($data->topPicks)->resolve($request),
             'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
-            'restaurants_meta' => $data->restaurantsMeta,
+            'pagination' => $data->restaurantsMeta,
             'address' => $data->address ? [
                 'id' => $data->address->id,
                 'label' => $data->address->label,
@@ -30,14 +30,14 @@ class CustomerDashboardResource extends JsonResource
             ] : null,
             'radius_miles' => $data->radiusMiles,
             'using_fallback' => $data->usingFallback,
-            // Active food-item filter (null when no filter). The frontend uses
+            // Active food-type filter (null when no filter). The frontend uses
             // this to highlight the chip in the strip and show a banner above
             // the restaurants section.
-            'selected_food_item' => $data->selectedFoodItem ? [
-                'id' => $data->selectedFoodItem->id,
-                'name' => $data->selectedFoodItem->name,
-                'slug' => $data->selectedFoodItem->slug,
-                'image_url' => $data->selectedFoodItem->image_url,
+            'selected_food_type' => $data->selectedFoodType ? [
+                'id' => $data->selectedFoodType->id,
+                'name' => $data->selectedFoodType->name,
+                'slug' => $data->selectedFoodType->slug,
+                'image_url' => $data->selectedFoodType->image_url,
             ] : null,
         ];
     }

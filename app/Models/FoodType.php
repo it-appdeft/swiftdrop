@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class FoodItem extends Model
+class FoodType extends Model
 {
     protected $fillable = [
         'name',
@@ -22,14 +22,14 @@ class FoodItem extends Model
         return $this->image ? '/storage/' . ltrim($this->image, '/') : null;
     }
 
-    /** Restaurants that selected this food item during partner onboarding. */
+    /** Restaurants that selected this food type during partner onboarding. */
     public function restaurants(): BelongsToMany
     {
-        return $this->belongsToMany(Restaurant::class, 'restaurant_food_items')
+        return $this->belongsToMany(Restaurant::class, 'restaurant_food_types')
             ->withTimestamps();
     }
 
-    /** Menu items tagged with this food type (menu_items.food_item_id). */
+    /** Menu items tagged with this food type (menu_items.food_type_id). */
     public function menuItems(): HasMany
     {
         return $this->hasMany(MenuItem::class);

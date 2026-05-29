@@ -9,9 +9,13 @@ use Illuminate\Support\Collection;
 interface CustomerSearchServiceInterface
 {
     /**
-     * Run a radius-aware search across restaurants and menu items. Restaurants
-     * are paginated (10/page by default) so the results page supports infinite
-     * scroll; dishes_by_restaurant remains a capped grouped list.
+     * Run a radius-aware search in one of two modes (`$type`):
+     *  - `restaurant`: restaurants matched by name OR an offered food type.
+     *  - `items`: restaurants with a keyword-matching dish, each carrying up to
+     *    3 matching dishes (restaurant-name matches do not qualify here).
+     *
+     * Both modes paginate restaurants 10/page so the two tabs share the
+     * restaurant API's pagination contract.
      *
      * `$filters` carries the post-keyword result chips:
      * `['offers' => bool, 'highest_rated' => bool]`.
@@ -20,7 +24,7 @@ interface CustomerSearchServiceInterface
      * recent-searches list so the same call serves both the empty state and
      * the results state.
      */
-    public function search(User $user, string $keyword, int $page = 1, int $perPage = 10, array $filters = []): CustomerSearchResults;
+    public function search(User $user, string $type, string $keyword, int $page = 1, int $perPage = 10, array $filters = []): CustomerSearchResults;
 
     /**
      * Wipe the customer's search history.

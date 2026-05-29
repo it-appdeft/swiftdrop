@@ -79,7 +79,7 @@ export interface FormState {
     restaurantName: string;
     legalName: string;
     restaurantType: string;
-    foodItemIds: number[];
+    foodTypeIds: number[];
     branches: string;
     seating: string;
     // Step 2
@@ -111,7 +111,7 @@ export const DEFAULT_STATE: FormState = {
     restaurantName: '',
     legalName: '',
     restaurantType: '',
-    foodItemIds: [],
+    foodTypeIds: [],
     branches: '',
     seating: '',
     fullAddress: '',
@@ -139,7 +139,7 @@ export const DEFAULT_STATE: FormState = {
     termsAccepted: false,
 };
 
-export interface FoodItemOption {
+export interface FoodTypeOption {
     id: number;
     name: string;
     slug: string;
@@ -304,24 +304,24 @@ export function AccountRestaurantStep({
     data,
     update,
     errors,
-    foodItems,
+    foodTypes,
     documents,
     onUploadDoc,
 }: {
     data: FormState;
     update: (patch: Partial<FormState>) => void;
     errors: Record<string, string>;
-    foodItems: FoodItemOption[];
+    foodTypes: FoodTypeOption[];
     documents: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
     onUploadDoc: (type: DocSlot, file: File) => void;
 }) {
     // Food categories — partner picks from the admin-managed catalog. Chip
-    // selection is stored as an array of foodItem IDs on the form state.
-    const toggleFoodItem = (id: number) => {
-        const next = data.foodItemIds.includes(id)
-            ? data.foodItemIds.filter((x) => x !== id)
-            : [...data.foodItemIds, id];
-        update({ foodItemIds: next });
+    // selection is stored as an array of foodType IDs on the form state.
+    const toggleFoodType = (id: number) => {
+        const next = data.foodTypeIds.includes(id)
+            ? data.foodTypeIds.filter((x) => x !== id)
+            : [...data.foodTypeIds, id];
+        update({ foodTypeIds: next });
     };
 
     return (
@@ -446,23 +446,23 @@ export function AccountRestaurantStep({
             </div>
 
             <div className="space-y-2">
-                <FieldLabel>Food items</FieldLabel>
+                <FieldLabel>Food types</FieldLabel>
                 <p className="text-xs text-muted-foreground">
                     Pick the categories you serve. Catalog is managed by SwiftDrop admins.
                 </p>
-                {foodItems.length === 0 ? (
+                {foodTypes.length === 0 ? (
                     <p className="rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-xs text-muted-foreground">
                         No food items available yet — please check back soon.
                     </p>
                 ) : (
                     <div className="flex flex-wrap gap-2 pt-1">
-                        {foodItems.map((item) => {
-                            const isSelected = data.foodItemIds.includes(item.id);
+                        {foodTypes.map((item) => {
+                            const isSelected = data.foodTypeIds.includes(item.id);
                             return (
                                 <button
                                     key={item.id}
                                     type="button"
-                                    onClick={() => toggleFoodItem(item.id)}
+                                    onClick={() => toggleFoodType(item.id)}
                                     className={
                                         'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ' +
                                         (isSelected
@@ -492,8 +492,8 @@ export function AccountRestaurantStep({
                         })}
                     </div>
                 )}
-                {errors.foodItemIds && (
-                    <p className="text-xs text-rose-600">{errors.foodItemIds}</p>
+                {errors.foodTypeIds && (
+                    <p className="text-xs text-rose-600">{errors.foodTypeIds}</p>
                 )}
             </div>
 

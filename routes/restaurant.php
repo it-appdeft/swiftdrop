@@ -64,5 +64,7 @@ Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
             // legal / categories, plus document re-uploads).
             Route::post('section', 'updateSection')->name('settings.section.update');
             Route::post('documents/{type}', 'uploadDocument')->name('settings.documents.upload');
+            // Logo + banner (stored in the uploads table, collection logo/banner).
+            Route::post('media/{type}', 'uploadMedia')->name('settings.media.upload');
         });
     });

@@ -12,20 +12,20 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Admin', href: '/admin/food-items' },
-    { title: 'Food Items', href: '/admin/food-items' },
-    { title: 'New item', href: '/admin/food-items/create' },
+    { title: 'Admin', href: '/admin/food-types' },
+    { title: 'Food Types', href: '/admin/food-types' },
+    { title: 'New item', href: '/admin/food-types/create' },
 ];
 
-interface FoodItemFormState {
+interface FoodTypeFormState {
     name: string;
     slug: string;
     image: File | null;
     [key: string]: string | File | null;
 }
 
-export default function FoodItemCreate() {
-    const { data, setData, post, processing, errors } = useForm<FoodItemFormState>({
+export default function FoodTypeCreate() {
+    const { data, setData, post, processing, errors } = useForm<FoodTypeFormState>({
         name: '',
         slug: '',
         image: null,
@@ -40,17 +40,17 @@ export default function FoodItemCreate() {
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        post('/admin/food-items', { forceFormData: true });
+        post('/admin/food-types', { forceFormData: true });
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="New Food Item" />
+            <Head title="New Food Type" />
 
             <PageContainer width="narrow">
                 <div className="mb-6 flex items-center gap-3">
                     <Button variant="ghost" size="icon-sm" asChild>
-                        <Link href="/admin/food-items"><ArrowLeft /></Link>
+                        <Link href="/admin/food-types"><ArrowLeft /></Link>
                     </Button>
                     <PageHeader eyebrow="Admin" title="New food item" />
                 </div>
@@ -125,7 +125,7 @@ export default function FoodItemCreate() {
 
                     <div className="mt-6 flex items-center justify-end gap-3">
                         <Button variant="outline" asChild>
-                            <Link href="/admin/food-items">Cancel</Link>
+                            <Link href="/admin/food-types">Cancel</Link>
                         </Button>
                         <Button type="submit" loading={processing}>
                             Create item

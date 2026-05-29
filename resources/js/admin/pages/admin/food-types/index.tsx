@@ -26,27 +26,27 @@ import {
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import type { FoodItem, Paginated } from '@/types/admin';
+import type { FoodType, Paginated } from '@/types/admin';
 import { formatRelative } from '@/utils/format';
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Admin', href: '/admin/food-items' },
-    { title: 'Food Items', href: '/admin/food-items' },
+    { title: 'Admin', href: '/admin/food-types' },
+    { title: 'Food Types', href: '/admin/food-types' },
 ];
 
 interface Props {
-    items: Paginated<FoodItem>;
+    items: Paginated<FoodType>;
     filters: { search?: string };
 }
 
-export default function FoodItemsIndex({ items, filters }: Props) {
+export default function FoodTypesIndex({ items, filters }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
-    const [confirm, setConfirm] = useState<FoodItem | null>(null);
+    const [confirm, setConfirm] = useState<FoodType | null>(null);
     const [deleting, setDeleting] = useState(false);
 
     const applyFilters = useCallback(
         (overrides: Record<string, string>) => {
-            router.get('/admin/food-items', { search, ...overrides }, { preserveState: true, replace: true });
+            router.get('/admin/food-types', { search, ...overrides }, { preserveState: true, replace: true });
         },
         [search],
     );
@@ -54,7 +54,7 @@ export default function FoodItemsIndex({ items, filters }: Props) {
     const handleDelete = () => {
         if (!confirm) return;
         setDeleting(true);
-        router.delete(`/admin/food-items/${confirm.id}`, {
+        router.delete(`/admin/food-types/${confirm.id}`, {
             preserveScroll: true,
             onFinish: () => {
                 setDeleting(false);
@@ -63,7 +63,7 @@ export default function FoodItemsIndex({ items, filters }: Props) {
         });
     };
 
-    const columns: DataTableColumn<FoodItem>[] = [
+    const columns: DataTableColumn<FoodType>[] = [
         {
             id: 'image',
             header: 'Image',
@@ -111,7 +111,7 @@ export default function FoodItemsIndex({ items, filters }: Props) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                            <Link href={`/admin/food-items/${row.id}/edit`}>Edit</Link>
+                            <Link href={`/admin/food-types/${row.id}/edit`}>Edit</Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -131,16 +131,16 @@ export default function FoodItemsIndex({ items, filters }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Food Items" />
+            <Head title="Food Types" />
 
             <PageContainer>
                 <PageHeader
                     eyebrow="Admin"
-                    title="Food Items"
+                    title="Food Types"
                     description="Manage the food categories shown to customers."
                     actions={
                         <Button size="sm" leftIcon={<Plus />} asChild>
-                            <Link href="/admin/food-items/create">Add item</Link>
+                            <Link href="/admin/food-types/create">Add item</Link>
                         </Button>
                     }
                 />
@@ -164,7 +164,7 @@ export default function FoodItemsIndex({ items, filters }: Props) {
                         </div>
                     </div>
 
-                    <DataTable<FoodItem>
+                    <DataTable<FoodType>
                         data={items.data}
                         columns={columns}
                         rowKey={(row) => row.id}
@@ -175,7 +175,7 @@ export default function FoodItemsIndex({ items, filters }: Props) {
                                 description="Add your first food item to get started."
                                 action={
                                     <Button leftIcon={<Plus />} asChild>
-                                        <Link href="/admin/food-items/create">Add item</Link>
+                                        <Link href="/admin/food-types/create">Add item</Link>
                                     </Button>
                                 }
                             />

@@ -52,7 +52,7 @@ class CustomerRestaurantResource extends JsonResource
             'menu' => $data->menuItems
                 ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id])))
                 ->values()->all(),
-            'menu_meta' => $data->menuMeta,
+            'pagination' => $data->menuMeta,
             'recommended' => $data->recommended
                 ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id])))
                 ->values()->all(),
@@ -175,9 +175,9 @@ class CustomerRestaurantResource extends JsonResource
 
     protected function dishImageUrl(MenuItem $item): ?string
     {
-        $foodItem = $item->foodItem;
-        if ($foodItem && $foodItem->image) {
-            return '/storage/'.ltrim($foodItem->image, '/');
+        $foodType = $item->foodType;
+        if ($foodType && $foodType->image) {
+            return '/storage/'.ltrim($foodType->image, '/');
         }
 
         return null;

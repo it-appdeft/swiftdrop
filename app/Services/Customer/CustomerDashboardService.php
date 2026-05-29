@@ -6,7 +6,7 @@ use App\Contracts\Customer\CustomerDashboardServiceInterface;
 use App\Contracts\Customer\CustomerFavoriteServiceInterface;
 use App\DTO\Customer\CustomerDashboardData;
 use App\Models\CustomerAddress;
-use App\Models\FoodItem;
+use App\Models\FoodType;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Services\Platform\PlatformConfigService;
@@ -19,8 +19,11 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
     /** Default page size for the customer-facing restaurants list (home + index). */
     public const RESTAURANTS_PER_PAGE = 10;
 
-    /** Default page size for the food-items "Explore" strip. */
-    public const FOOD_ITEMS_PER_PAGE = 10;
+    /** Explore strip size — first N food items, shown regardless of location. */
+    public const FOOD_ITEMS_LIMIT = 20;
+
+    /** Top-picks slider size. */
+    public const TOP_PICKS_LIMIT = 5;
 
     public function __construct(
         protected PlatformConfigService $config,
@@ -31,108 +34,92 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
     public function build(
         ?User $user,
         int $restaurantsPage = 1,
-        int $foodItemsPage = 1,
-        ?int $foodItemId = null,
+        ?int $foodTypeId = null,
     ): CustomerDashboardData {
         $radius = $this->dashboardRadius();
-        $address = $this->defaultAddressFor($user);
+        $address = $this->selectedAddress($user);
         $usingFallback = ! ($address && $address->lat !== null && $address->lng !== null);
 
-        // Filtered list — what the customer actually sees (may be a subset
-        // when a food-item filter is active). pageName drives the ?query key
-        // baked into the pagination links so they round-trip correctly.
+        // Restaurants — paginated; the only paginated section on the page. The
+        // active food-type filter (if any) narrows it.
         $restaurantsPaginator = $this->paginateRestaurants(
             $user,
             page: $restaurantsPage,
             perPage: self::RESTAURANTS_PER_PAGE,
-            foodItemId: $foodItemId,
-            pageName: 'restaurants_page',
+            foodTypeId: $foodTypeId,
         );
         /** @var Collection<int, array{restaurant: Restaurant, distance_miles: ?float, is_favorited: bool}> $restaurants */
         $restaurants = collect($restaurantsPaginator->items());
 
-        // food_items strip stays unfiltered by the active food-item selection,
-        // so the customer can switch dishes. We compute the strip from the
-        // FULL set of reachable restaurants (not just the filtered page).
-        $reachableIds = $this->reachableRestaurantIds($user);
-        $foodItemsPaginator = $this->paginateFoodItemsForRestaurants(
-            $reachableIds,
-            $foodItemsPage,
-            self::FOOD_ITEMS_PER_PAGE,
-            pageName: 'food_items_page',
-        );
+        $restaurantsPaginator->appends(array_filter(['search' => $foodTypeId]));
 
-        // The food-item filter must survive across the restaurants links, and
-        // the active food-item page must survive across the restaurants links
-        // (and vice versa) — append the cross-list query params.
-        $restaurantsPaginator->appends(array_filter([
-            'food_item_id' => $foodItemId,
-            'food_items_page' => $foodItemsPage > 1 ? $foodItemsPage : null,
-        ]));
-        $foodItemsPaginator->appends(array_filter([
-            'food_item_id' => $foodItemId,
-            'restaurants_page' => $restaurantsPage > 1 ? $restaurantsPage : null,
-        ]));
-
-        // Resolve the selected food item so the resource can echo its name +
-        // image back to the frontend (used for the "showing restaurants
-        // offering X" banner without an extra fetch).
-        $selectedFoodItem = $foodItemId !== null ? FoodItem::query()->find($foodItemId) : null;
+        $selectedFoodType = $foodTypeId !== null ? FoodType::query()->find($foodTypeId) : null;
 
         return new CustomerDashboardData(
-            foodItems: $foodItemsPaginator->getCollection(),
+            foodTypes: $this->foodTypes(),
+            topPicks: $this->topPicks($user, foodTypeId: $foodTypeId),
             restaurants: $restaurants,
             address: $address,
             radiusMiles: $radius,
             usingFallback: $usingFallback,
             restaurantsMeta: PaginationMeta::make($restaurantsPaginator),
-            foodItemsMeta: PaginationMeta::make($foodItemsPaginator),
-            selectedFoodItem: $selectedFoodItem,
+            selectedFoodType: $selectedFoodType,
         );
     }
 
-    /**
-     * IDs of every active/approved restaurant the customer can see — geo-bound
-     * if they have a saved address with coords, otherwise the global active
-     * list. Used to compute the food_items strip independently of any active
-     * food-item filter.
-     *
-     * @return array<int, int>
-     */
-    protected function reachableRestaurantIds(?User $user): array
+    /** The customer's active delivery address (selected → default → newest). */
+    public function selectedAddress(?User $user): ?CustomerAddress
     {
-        $address = $this->defaultAddressFor($user);
-        $radius = $this->dashboardRadius();
-
-        $query = Restaurant::query()->active()->approved();
-        if ($address && $address->lat !== null && $address->lng !== null) {
-            $query->withinRadius((float) $address->lat, (float) $address->lng, $radius);
-        }
-
-        return $query->pluck('restaurants.id')->all();
+        return $this->defaultAddressFor($user);
     }
 
     /**
-     * Paginated food items the dashboard's currently-visible restaurants offer.
-     * Empty `$restaurantIds` short-circuits to an empty paginator so we don't
-     * issue a query that can never match anything.
+     * First N food items shown in the Explore strip — no location check, so
+     * the catalogue is always populated.
+     *
+     * @return Collection<int, FoodType>
      */
-    protected function paginateFoodItemsForRestaurants(array $restaurantIds, int $page, int $perPage, string $pageName = 'page'): LengthAwarePaginator
+    public function foodTypes(int $limit = self::FOOD_ITEMS_LIMIT): Collection
     {
-        if ($restaurantIds === []) {
-            return new \Illuminate\Pagination\LengthAwarePaginator(
-                items: [],
-                total: 0,
-                perPage: $perPage,
-                currentPage: $page,
-                options: ['pageName' => $pageName, 'path' => \Illuminate\Pagination\Paginator::resolveCurrentPath()],
-            );
+        return FoodType::query()->orderBy('id')->limit($limit)->get();
+    }
+
+    /**
+     * Top picks: restaurants that are bookable (live + approved + accepting
+     * orders), near the customer's selected address and highly rated, ordered
+     * by rating. Falls back to the global highest-rated list when the customer
+     * has no geocoded address.
+     *
+     * @return Collection<int, array{restaurant: Restaurant, distance_miles: ?float, is_favorited: bool}>
+     */
+    public function topPicks(?User $user, int $limit = self::TOP_PICKS_LIMIT, ?int $foodTypeId = null): Collection
+    {
+        $address = $this->selectedAddress($user);
+        $radius = $this->dashboardRadius();
+        $favoriteIds = $user ? array_flip($this->favorites->favoriteRestaurantIds($user)) : [];
+
+        $query = Restaurant::query()
+            ->bookable()
+            ->with('uploads')
+            ->highRated()
+            ->orderByDesc('rating');
+
+        if ($foodTypeId !== null) {
+            $query->offeringFoodType($foodTypeId);
         }
 
-        return FoodItem::query()
-            ->availableForRestaurants($restaurantIds)
-            ->orderBy('id')
-            ->paginate(perPage: $perPage, pageName: $pageName, page: $page);
+        if ($address && $address->lat !== null && $address->lng !== null) {
+            $query->withinRadius((float) $address->lat, (float) $address->lng, $radius)
+                ->orderBy('distance_miles');
+        }
+
+        return $query->limit($limit)->get()
+            ->map(fn (Restaurant $r) => [
+                'restaurant' => $r,
+                'distance_miles' => $r->distance_miles !== null ? round((float) $r->distance_miles, 2) : null,
+                'is_favorited' => isset($favoriteIds[$r->id]),
+            ])
+            ->values();
     }
 
     /**
@@ -148,7 +135,7 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
         ?User $user,
         int $page = 1,
         int $perPage = self::RESTAURANTS_PER_PAGE,
-        ?int $foodItemId = null,
+        ?int $foodTypeId = null,
         string $pageName = 'page',
     ): LengthAwarePaginator {
         $address = $this->defaultAddressFor($user);
@@ -156,7 +143,9 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
 
         $hasGeo = $address && $address->lat !== null && $address->lng !== null;
 
-        $query = Restaurant::query()->active()->approved();
+        // Eager-load uploads so the logo_url / banner_url accessors resolve
+        // without an N+1 across the list.
+        $query = Restaurant::query()->active()->approved()->with('uploads');
         if ($hasGeo) {
             $query->withinRadius((float) $address->lat, (float) $address->lng, $radius)
                 ->orderByDesc('rating')
@@ -165,12 +154,8 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
             $query->orderByDesc('created_at');
         }
 
-        // Optional dashboard filter: keep only restaurants that have at least
-        // one available menu item tagged with the chosen food_item_id.
-        if ($foodItemId !== null) {
-            $query->whereHas('menuItems', fn ($q) => $q
-                ->where('food_item_id', $foodItemId)
-                ->where('is_available', true));
+        if ($foodTypeId !== null) {
+            $query->offeringFoodType($foodTypeId);
         }
 
         $paginator = $query->paginate(perPage: $perPage, pageName: $pageName, page: $page);

@@ -44,7 +44,7 @@ class Upload extends Model
 
     /**
      * Public URL for the stored file. For the public disk we return a
-     * root-relative "/storage/…" path (matching FoodItem's convention) so
+     * root-relative "/storage/…" path (matching FoodType's convention) so
      * the browser resolves it against the current origin — avoids broken
      * images when APP_URL's host differs from where the app is served.
      */
