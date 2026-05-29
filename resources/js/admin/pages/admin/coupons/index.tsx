@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { decodePaginationLabel } from '@/utils/format';
 import type { BreadcrumbItem } from '@/types';
 import type { Paginated } from '@/types/admin';
 import { TRIGGER_LABELS } from './coupon-fields';
@@ -230,8 +231,9 @@ export default function CouponsIndex({ coupons, filters }: Props) {
                                                 variant={link.active ? 'default' : 'outline'}
                                                 disabled={!link.url}
                                                 onClick={() => link.url && router.visit(link.url, { preserveState: true })}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
+                                            >
+                                                {decodePaginationLabel(link.label)}
+                                            </Button>
                                         ))}
                                     </div>
                                 </div>
