@@ -194,8 +194,9 @@ export default function FoodTypesIndex({ items, filters }: Props) {
                                                 variant={link.active ? 'default' : 'outline'}
                                                 disabled={!link.url}
                                                 onClick={() => link.url && router.visit(link.url, { preserveState: true })}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
+                                            >
+                                                {decodePaginationLabel(link.label)}
+                                            </Button>
                                         ))}
                                     </div>
                                 </div>
