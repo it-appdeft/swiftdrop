@@ -48,7 +48,7 @@ class CustomerRestaurantController extends Controller
 
         $payload = [
             'restaurants' => DashboardRestaurantResource::collection($paginator->getCollection())->resolve($request),
-            'meta' => \App\Support\PaginationMeta::make($paginator),
+            'pagination' => \App\Support\PaginationMeta::make($paginator),
         ];
 
         // Infinite-scroll subsequent pages are fetched as JSON so they can be

@@ -135,8 +135,9 @@ class CustomerCartService implements CustomerCartServiceInterface
             ->where('user_id', $user->id)
             ->with([
                 'restaurant',
+                'restaurant.uploads',
                 'items' => fn ($q) => $q->orderBy('id'),
-                'items.menuItem.foodItem',
+                'items.menuItem.foodType',
                 'items.modifiers' => fn ($q) => $q->orderBy('id'),
             ])
             ->first();

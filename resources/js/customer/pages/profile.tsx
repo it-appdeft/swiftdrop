@@ -91,7 +91,7 @@ interface SharedProps {
     customer?: ServerCustomer | null;
     deletionReasons?: ServerDeletionReason[];
     orders?: PastOrder[];
-    orders_meta?: OrdersMeta;
+    pagination?: OrdersMeta;
     flash?: {
         status?: string;
         otp?: { target: string; expires_in: number; test_code: string | null } | null;
@@ -1252,12 +1252,12 @@ function OrderHistorySection({
                 credentials: 'same-origin',
             });
             if (!res.ok) throw new Error();
-            const json = (await res.json()) as { orders: PastOrder[]; meta: OrdersMeta };
+            const json = (await res.json()) as { orders: PastOrder[]; pagination: OrdersMeta };
             setOrders((prev) => {
                 const seen = new Set(prev.map((o) => o.id));
                 return [...prev, ...json.orders.filter((o) => !seen.has(o.id))];
             });
-            setMeta(json.meta);
+            setMeta(json.pagination);
         } catch {
             toast.error('Could not load more orders.');
         } finally {
@@ -1749,12 +1749,12 @@ function useFavorites<T extends { id: number }>(endpoint: string, active: boolea
                     credentials: 'same-origin',
                 });
                 if (!res.ok) throw new Error();
-                const json = (await res.json()) as { data: T[]; meta: FavMeta };
+                const json = (await res.json()) as { data: T[]; pagination: FavMeta };
                 setItems((prev) => {
                     const seen = new Set(prev.map((r) => r.id));
                     return page === 1 ? json.data : [...prev, ...json.data.filter((r) => !seen.has(r.id))];
                 });
-                setMeta(json.meta);
+                setMeta(json.pagination);
                 setLoaded(true);
             } catch {
                 toast.error('Could not load favourites.');
@@ -2561,9 +2561,9 @@ function ProfileHeader({ name, email, photo, onEdit }: { name: string; email: st
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CustomerProfile() {
-    const { auth, customer, deletionReasons, orders: serverOrders, orders_meta } = usePage<SharedProps>().props;
+    const { auth, customer, deletionReasons, orders: serverOrders, pagination } = usePage<SharedProps>().props;
     const orders = serverOrders ?? [];
-    const ordersMeta: OrdersMeta = orders_meta ?? {
+    const ordersMeta: OrdersMeta = pagination ?? {
         current_page: 1,
         last_page: 1,
         per_page: orders.length || 10,

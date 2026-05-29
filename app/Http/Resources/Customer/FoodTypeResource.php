@@ -2,12 +2,12 @@
 
 namespace App\Http\Resources\Customer;
 
-use App\Models\FoodItem;
+use App\Models\FoodType;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin FoodItem */
-class FoodItemResource extends JsonResource
+/** @mixin FoodType */
+class FoodTypeResource extends JsonResource
 {
     public function toArray(Request $request): array
     {

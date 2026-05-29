@@ -13,7 +13,7 @@ use Inertia\Response;
 
 /**
  * Admin CRUD for coupons (backed by the {@see Offer} model). Mirrors the
- * FoodItem/Driver admin pattern: thin controller + FormRequest validation +
+ * FoodType/Driver admin pattern: thin controller + FormRequest validation +
  * Inertia pages, with a PATCH toggle for active/inactive.
  */
 class CouponController extends Controller

@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
-use App\Models\FoodItem;
+use App\Models\FoodType;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 
-class FoodItemSeeder extends Seeder
+class FoodTypeSeeder extends Seeder
 {
     public function run(): void
     {
@@ -50,7 +50,7 @@ class FoodItemSeeder extends Seeder
                 }
             }
 
-            FoodItem::updateOrCreate(
+            FoodType::updateOrCreate(
                 ['slug' => $item['slug']],
                 ['name' => $item['name'], 'image' => $image],
             );

@@ -189,9 +189,9 @@ export interface Restaurant {
     orders?: RestaurantOrder[];
 }
 
-// ─── Food Item ────────────────────────────────────────────────────────────────
+// ─── Food Type ────────────────────────────────────────────────────────────────
 
-export interface FoodItem {
+export interface FoodType {
     id: number;
     name: string;
     slug: string;

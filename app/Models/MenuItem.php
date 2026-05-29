@@ -15,7 +15,7 @@ class MenuItem extends Model
     protected $fillable = [
         'restaurant_id',
         'category_id',
-        'food_item_id',
+        'food_type_id',
         'name',
         'description',
         'price',
@@ -119,7 +119,7 @@ class MenuItem extends Model
     {
         return $query->where(function (Builder $w) use ($keyword) {
             $w->where('name', 'like', "%{$keyword}%")
-                ->orWhereHas('foodItem', fn (Builder $f) => $f->where('name', 'like', "%{$keyword}%"));
+                ->orWhereHas('foodType', fn (Builder $f) => $f->where('name', 'like', "%{$keyword}%"));
         });
     }
 
@@ -133,9 +133,9 @@ class MenuItem extends Model
         return $this->belongsTo(MenuCategory::class, 'category_id');
     }
 
-    public function foodItem(): BelongsTo
+    public function foodType(): BelongsTo
     {
-        return $this->belongsTo(FoodItem::class);
+        return $this->belongsTo(FoodType::class);
     }
 
     /**

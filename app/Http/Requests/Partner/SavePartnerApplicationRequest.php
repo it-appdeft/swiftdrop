@@ -44,7 +44,7 @@ class SavePartnerApplicationRequest extends FormRequest
             'data.restaurantName' => 'restaurantName',
             'data.legalName' => 'legalName',
             'data.restaurantType' => 'restaurantType',
-            'data.foodItemIds' => 'foodItemIds',
+            'data.foodTypeIds' => 'foodTypeIds',
             'data.branches' => 'branches',
             'data.seating' => 'seating',
             'data.fullAddress' => 'fullAddress',
@@ -95,9 +95,9 @@ class SavePartnerApplicationRequest extends FormRequest
                 'data.legalName' => ['nullable', 'string', 'max:200'],
                 'data.restaurantType' => ['nullable', 'string', 'max:50'],
                 // Food categories — the partner picks from the admin-managed
-                // `food_items` catalog. Existence is enforced at the writer.
-                'data.foodItemIds' => ['nullable', 'array', 'max:50'],
-                'data.foodItemIds.*' => ['integer', 'exists:food_items,id'],
+                // `food_types` catalog. Existence is enforced at the writer.
+                'data.foodTypeIds' => ['nullable', 'array', 'max:50'],
+                'data.foodTypeIds.*' => ['integer', 'exists:food_types,id'],
                 'data.branches' => ['nullable', 'integer', 'min:1', 'max:1000'],
                 'data.seating' => ['nullable', 'integer', 'min:0'],
             ],

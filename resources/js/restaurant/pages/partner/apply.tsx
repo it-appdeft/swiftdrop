@@ -30,7 +30,7 @@ import {
     LegalBankStep,
     LocationHoursStep,
     type DocSlot,
-    type FoodItemOption,
+    type FoodTypeOption,
     type FormState,
 } from '../../components/partner-application-form';
 
@@ -62,7 +62,7 @@ interface PartnerApplyProps {
     initialData?: Partial<FormState>;
     initialDocuments?: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
     /** Catalog of food items managed by the admin — picker for Step 1. */
-    foodItems?: FoodItemOption[];
+    foodTypes?: FoodTypeOption[];
     /** Browser key for the Step 2 location picker. Null hides the map. */
     googleMapsApiKey?: string | null;
     /** When true, render the post-submit celebration instead of the form. */
@@ -201,22 +201,22 @@ function ReviewStep({
     onAccept,
     onEditStep,
     errors,
-    foodItems,
+    foodTypes,
 }: {
     data: FormState;
     documents: Partial<Record<DocSlot, { uploaded: boolean } | null>>;
     onAccept: (v: boolean) => void;
     onEditStep: (step: StepKey) => void;
     errors: Record<string, string>;
-    foodItems: FoodItemOption[];
+    foodTypes: FoodTypeOption[];
 }) {
     const uploadedCount = DOC_FIELDS.filter((d) => documents[d.key]?.uploaded).length;
     const openDays = DAYS.filter((d) => data.hours[d.key].open)
         .map((d) => d.label)
         .join(', ');
     const filledCategories = data.categories.filter((c) => c.name.trim() !== '');
-    const selectedFoodItemNames = foodItems
-        .filter((f) => data.foodItemIds.includes(f.id))
+    const selectedFoodTypeNames = foodTypes
+        .filter((f) => data.foodTypeIds.includes(f.id))
         .map((f) => f.name)
         .join(', ');
 
@@ -235,7 +235,7 @@ function ReviewStep({
                 <SummaryRow label="Mobile" value={data.contactPhone} />
                 <SummaryRow label="Restaurant" value={data.restaurantName} />
                 <SummaryRow label="Type" value={data.restaurantType} />
-                <SummaryRow label="Food items" value={selectedFoodItemNames || '—'} />
+                <SummaryRow label="Food types" value={selectedFoodTypeNames || '—'} />
             </SummaryCard>
 
             <SummaryCard title="Location & Hours" onEdit={() => onEditStep(2)}>
@@ -345,7 +345,7 @@ export default function PartnerApply({
     initialStep = 1,
     initialData = {},
     initialDocuments = {},
-    foodItems = [],
+    foodTypes = [],
     googleMapsApiKey = null,
     completed = false,
 }: PartnerApplyProps) {
@@ -456,7 +456,7 @@ export default function PartnerApply({
                         data={data}
                         update={update}
                         errors={errors}
-                        foodItems={foodItems}
+                        foodTypes={foodTypes}
                         documents={documents}
                         onUploadDoc={handleDocUpload}
                     />
@@ -490,7 +490,7 @@ export default function PartnerApply({
                         onAccept={(v) => update({ termsAccepted: v })}
                         onEditStep={(s) => setStep(s)}
                         errors={errors}
-                        foodItems={foodItems}
+                        foodTypes={foodTypes}
                     />
                 );
         }

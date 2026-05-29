@@ -3,25 +3,25 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\FoodItem;
+use App\Models\FoodType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
-class FoodItemController extends Controller
+class FoodTypeController extends Controller
 {
     public function index(Request $request)
     {
-        $items = FoodItem::query()
+        $items = FoodType::query()
             ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%")
                 ->orWhere('slug', 'like', "%{$request->search}%"))
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('admin/food-items/index', [
+        return Inertia::render('admin/food-types/index', [
             'items'   => $items,
             'filters' => $request->only(['search']),
         ]);
@@ -29,7 +29,7 @@ class FoodItemController extends Controller
 
     public function create()
     {
-        return Inertia::render('admin/food-items/create');
+        return Inertia::render('admin/food-types/create');
     }
 
     public function store(Request $request)
@@ -48,24 +48,24 @@ class FoodItemController extends Controller
         }
         $data['image'] = $path;
 
-        FoodItem::create($data);
+        FoodType::create($data);
 
-        return redirect()->route('admin.food-items.index')
-            ->with('success', 'Food item created.');
+        return redirect()->route('admin.food-types.index')
+            ->with('success', 'Food type created.');
     }
 
     public function edit(int $id)
     {
-        $item = FoodItem::findOrFail($id);
+        $item = FoodType::findOrFail($id);
 
-        return Inertia::render('admin/food-items/edit', [
+        return Inertia::render('admin/food-types/edit', [
             'item' => $item,
         ]);
     }
 
     public function update(Request $request, int $id)
     {
-        $item = FoodItem::findOrFail($id);
+        $item = FoodType::findOrFail($id);
         $data = $this->validated($request, $item->id);
 
         $data['slug'] = $this->uniqueSlug($data['slug'] ?: $data['name'], $item->id);
@@ -89,13 +89,13 @@ class FoodItemController extends Controller
 
         $item->update($data);
 
-        return redirect()->route('admin.food-items.index')
-            ->with('success', 'Food item updated.');
+        return redirect()->route('admin.food-types.index')
+            ->with('success', 'Food type updated.');
     }
 
     public function destroy(int $id)
     {
-        $item = FoodItem::findOrFail($id);
+        $item = FoodType::findOrFail($id);
 
         if ($item->image && Storage::disk('public')->exists($item->image)) {
             Storage::disk('public')->delete($item->image);
@@ -103,19 +103,19 @@ class FoodItemController extends Controller
 
         $item->delete();
 
-        return redirect()->route('admin.food-items.index')
-            ->with('success', 'Food item deleted.');
+        return redirect()->route('admin.food-types.index')
+            ->with('success', 'Food type deleted.');
     }
 
     protected function validated(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([
-            'name'  => ['required', 'string', 'max:100', Rule::unique('food_items', 'name')->ignore($ignoreId)],
-            'slug'  => ['nullable', 'string', 'max:120', 'alpha_dash', Rule::unique('food_items', 'slug')->ignore($ignoreId)],
+            'name'  => ['required', 'string', 'max:100', Rule::unique('food_types', 'name')->ignore($ignoreId)],
+            'slug'  => ['nullable', 'string', 'max:120', 'alpha_dash', Rule::unique('food_types', 'slug')->ignore($ignoreId)],
             'image' => [$ignoreId ? 'nullable' : 'required', 'image', 'mimes:jpeg,jpg,png,webp,svg', 'max:2048'],
         ], [
-            'name.unique' => 'A food item with this name already exists.',
-            'slug.unique' => 'A food item with this slug already exists.',
+            'name.unique' => 'A food type with this name already exists.',
+            'slug.unique' => 'A food type with this slug already exists.',
         ]);
     }
 
@@ -125,7 +125,7 @@ class FoodItemController extends Controller
         $original = $slug;
         $i = 1;
 
-        while (FoodItem::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
+        while (FoodType::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
             $slug = "{$original}-{$i}";
             $i++;
         }

@@ -13,10 +13,12 @@ class CustomerSearchResults
      * @param  Collection<int, \App\Models\CustomerSearchHistory>  $recent
      */
     /**
-     * @param  array<string, mixed>  $restaurantsMeta  Pagination meta (incl. links) for the restaurants tab.
+     * @param  string  $type  Search mode: `restaurant` (restaurants list) or `items` (restaurants with nested dishes).
+     * @param  array<string, mixed>  $restaurantsMeta  Pagination meta for the active tab.
      * @param  array{offers: bool, highest_rated: bool}  $filters  Active post-keyword result filters.
      */
     public function __construct(
+        public readonly string $type,
         public readonly string $keyword,
         public readonly Collection $restaurants,
         public readonly Collection $dishesByRestaurant,

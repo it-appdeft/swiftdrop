@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\Customer;
 use App\Contracts\Customer\CustomerSearchServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\Search\SearchRequest;
-use App\Http\Resources\Customer\CustomerSearchResource;
+use App\Http\Resources\Customer\CustomerSearchApiResource;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -18,13 +18,17 @@ class CustomerSearchController extends Controller
     ) {
     }
 
-    public function index(SearchRequest $request): JsonResponse
+    /**
+     * @param  string  $type  `restaurant` or `items` (constrained by the route).
+     */
+    public function index(SearchRequest $request, string $type): JsonResponse
     {
         $page = max(1, (int) $request->query('page', 1));
-        $results = $this->search->search($request->user(), $request->keyword(), page: $page, filters: $request->filters());
+        $results = $this->search->search($request->user(), $type, $request->keyword(), page: $page, filters: $request->filters());
 
-        return $this->success(
-            data: new CustomerSearchResource($results),
+        return $this->successPaginated(
+            data: (new CustomerSearchApiResource($results))->resolve($request),
+            pagination: $results->restaurantsMeta,
             message: 'Search completed.',
         );
     }

@@ -3,7 +3,7 @@
 namespace App\DTO\Customer;
 
 use App\Models\CustomerAddress;
-use App\Models\FoodItem;
+use App\Models\FoodType;
 use Illuminate\Support\Collection;
 
 /**
@@ -14,20 +14,20 @@ use Illuminate\Support\Collection;
 class CustomerDashboardData
 {
     /**
-     * @param  Collection<int, FoodItem>  $foodItems
-     * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float, is_favorited: bool}>  $restaurants
+     * @param  Collection<int, FoodType>  $foodTypes   First 20, no location check.
+     * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float, is_favorited: bool}>  $topPicks     5 bookable + near + high-rated.
+     * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float, is_favorited: bool}>  $restaurants  Paginated page.
      * @param  array<string, mixed>  $restaurantsMeta  Pagination meta (incl. links) for the restaurants list.
-     * @param  array<string, mixed>  $foodItemsMeta    Pagination meta (incl. links) for the food-items strip.
      */
     public function __construct(
-        public readonly Collection $foodItems,
+        public readonly Collection $foodTypes,
+        public readonly Collection $topPicks,
         public readonly Collection $restaurants,
         public readonly ?CustomerAddress $address,
         public readonly float $radiusMiles,
         public readonly bool $usingFallback,
         public readonly array $restaurantsMeta = [],
-        public readonly array $foodItemsMeta = [],
-        public readonly ?FoodItem $selectedFoodItem = null,
+        public readonly ?FoodType $selectedFoodType = null,
     ) {
     }
 }

@@ -2,12 +2,12 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Check, ChevronLeft, ChevronRight, Heart, MapPin, Star, UtensilsCrossed, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 
 // ─── Types (mirror App\Http\Resources\Customer\CustomerDashboardResource) ────
 
-interface FoodItem {
+interface FoodType {
     id: number;
     name: string;
     slug: string;
@@ -39,25 +39,34 @@ interface DashboardAddress {
     lng: number | null;
 }
 
+interface RestaurantsMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+}
+
 interface DashboardProps {
     dashboard: {
-        food_items: FoodItem[];
+        food_types: FoodType[];
+        top_picks: DashboardRestaurant[];
         restaurants: DashboardRestaurant[];
+        pagination: RestaurantsMeta;
         address: DashboardAddress | null;
         radius_miles: number;
         using_fallback: boolean;
-        selected_food_item: FoodItem | null;
+        selected_food_type: FoodType | null;
     };
 }
 
 /**
- * Drives the dashboard's food-item filter — clicking a chip narrows the
+ * Drives the dashboard's food-type filter — clicking a chip narrows the
  * restaurant list in place (re-fetches via Inertia GET) and highlights the
  * chip. Clicking the already-selected chip clears the filter.
  */
-function setFoodItemFilter(id: number | null) {
-    const params: Record<string, number | string> = { restaurants_page: 1 };
-    if (id !== null) params.food_item_id = id;
+function setFoodTypeFilter(id: number | null) {
+    const params: Record<string, number | string> = { page: 1 };
+    if (id !== null) params.search = id;
     router.get('/customer/dashboard', params, { preserveScroll: true, preserveState: false });
 }
 
@@ -115,7 +124,7 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 
 // ─── Sections ────────────────────────────────────────────────────────────────
 
-function ExploreSection({ items, selectedId }: { items: FoodItem[]; selectedId: number | null }) {
+function ExploreSection({ items, selectedId }: { items: FoodType[]; selectedId: number | null }) {
     if (items.length === 0) return null;
 
     return (
@@ -128,7 +137,7 @@ function ExploreSection({ items, selectedId }: { items: FoodItem[]; selectedId: 
                         <button
                             key={item.id}
                             type="button"
-                            onClick={() => setFoodItemFilter(active ? null : item.id)}
+                            onClick={() => setFoodTypeFilter(active ? null : item.id)}
                             aria-pressed={active}
                             className="flex shrink-0 flex-col items-center gap-2.5 text-center transition"
                         >
@@ -169,16 +178,9 @@ function ExploreSection({ items, selectedId }: { items: FoodItem[]; selectedId: 
 /**
  * Top Pick's slides three restaurant cards at a time. We page in steps of
  * one card to avoid leftover blanks when the count isn't divisible by 3.
+ * `picks` arrives pre-sorted + capped (5) from the server.
  */
-function TopPicksSection({ restaurants }: { restaurants: DashboardRestaurant[] }) {
-    const picks = useMemo(
-        () =>
-            [...restaurants]
-                .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-                .slice(0, Math.max(restaurants.length, 0)),
-        [restaurants],
-    );
-
+function TopPicksSection({ picks }: { picks: DashboardRestaurant[] }) {
     const VISIBLE = 3;
     const [start, setStart] = useState(0);
     const maxStart = Math.max(0, picks.length - VISIBLE);
@@ -319,23 +321,76 @@ function CuisinesAndPromoSection() {
 }
 
 function AllRestaurantsSection({
-    restaurants,
+    initialRestaurants,
+    initialMeta,
     address,
     radiusMiles,
     usingFallback,
-    selectedFoodItem,
+    selectedFoodType,
 }: {
-    restaurants: DashboardRestaurant[];
+    initialRestaurants: DashboardRestaurant[];
+    initialMeta: RestaurantsMeta;
     address: DashboardAddress | null;
     radiusMiles: number;
     usingFallback: boolean;
-    selectedFoodItem: FoodItem | null;
+    selectedFoodType: FoodType | null;
 }) {
-    // Local mirror of which cards are currently favorited so the heart can
-    // flip instantly. Server is source of truth; we roll back on error.
+    // Infinite scroll: page 1 from props, subsequent pages appended from the
+    // same /customer/dashboard URL (JSON). Reset on every fresh render (e.g.
+    // applying / clearing the food-type filter re-renders the page).
+    const [restaurants, setRestaurants] = useState<DashboardRestaurant[]>(initialRestaurants);
+    const [meta, setMeta] = useState<RestaurantsMeta>(initialMeta);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+
     const [favorited, setFavorited] = useState<Set<number>>(
-        () => new Set(restaurants.filter((r) => r.is_favorited).map((r) => r.id)),
+        () => new Set(initialRestaurants.filter((r) => r.is_favorited).map((r) => r.id)),
     );
+
+    useEffect(() => {
+        setRestaurants(initialRestaurants);
+        setMeta(initialMeta);
+        setFavorited(new Set(initialRestaurants.filter((r) => r.is_favorited).map((r) => r.id)));
+    }, [initialRestaurants, initialMeta]);
+
+    const hasMore = meta.current_page < meta.last_page;
+
+    const loadMore = useCallback(async () => {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+        try {
+            const params = new URLSearchParams({ page: String(meta.current_page + 1) });
+            if (selectedFoodType) params.set('search', String(selectedFoodType.id));
+            const res = await fetch(`/customer/dashboard?${params.toString()}`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error();
+            const json = (await res.json()) as { restaurants: DashboardRestaurant[]; pagination: RestaurantsMeta };
+            setRestaurants((prev) => {
+                const seen = new Set(prev.map((r) => r.id));
+                return [...prev, ...json.restaurants.filter((r) => !seen.has(r.id))];
+            });
+            setMeta(json.pagination);
+        } catch {
+            toast.error('Could not load more restaurants.');
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [hasMore, loadingMore, meta.current_page, selectedFoodType]);
+
+    useEffect(() => {
+        if (!sentinelRef.current || !hasMore) return;
+        const el = sentinelRef.current;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((e) => e.isIntersecting)) loadMore();
+            },
+            { rootMargin: '400px 0px' },
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [hasMore, loadMore]);
 
     const toggle = async (restaurantId: number) => {
         const wasFav = favorited.has(restaurantId);
@@ -371,9 +426,9 @@ function AllRestaurantsSection({
             <div className="mb-5 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-                        {selectedFoodItem ? (
+                        {selectedFoodType ? (
                             <>
-                                Restaurants offering <span className="text-emerald-700">{selectedFoodItem.name}</span>
+                                Restaurants offering <span className="text-emerald-700">{selectedFoodType.name}</span>
                             </>
                         ) : (
                             'All Restaurants'
@@ -386,39 +441,52 @@ function AllRestaurantsSection({
                         </p>
                     ) : null}
                 </div>
-                <div className="flex items-center gap-3">
-                    {selectedFoodItem ? (
-                        <button
-                            type="button"
-                            onClick={() => setFoodItemFilter(null)}
-                            className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"
-                        >
-                            <X className="size-3.5" /> Clear filter
-                        </button>
-                    ) : null}
-                    <Link href="/customer/restaurants" className="text-sm font-semibold text-primary hover:underline">
-                        View all
-                    </Link>
-                </div>
+                {selectedFoodType ? (
+                    <button
+                        type="button"
+                        onClick={() => setFoodTypeFilter(null)}
+                        className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"
+                    >
+                        <X className="size-3.5" /> Clear filter
+                    </button>
+                ) : null}
             </div>
 
             {restaurants.length === 0 ? (
                 <div className="rounded-xl border border-dashed bg-background p-10 text-center text-sm text-muted-foreground">
-                    {selectedFoodItem
-                        ? `No restaurants nearby are serving ${selectedFoodItem.name} right now.`
+                    {selectedFoodType
+                        ? `No restaurants nearby are serving ${selectedFoodType.name} right now.`
                         : `No restaurants ${usingFallback ? 'available yet' : 'within range of your default address'}.`}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
-                    {restaurants.map((r) => (
-                        <RestaurantCard
-                            key={r.id}
-                            restaurant={r}
-                            isFavorited={favorited.has(r.id)}
-                            onToggleFavorite={() => toggle(r.id)}
-                        />
-                    ))}
-                </div>
+                <>
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
+                        {restaurants.map((r) => (
+                            <RestaurantCard
+                                key={r.id}
+                                restaurant={r}
+                                isFavorited={favorited.has(r.id)}
+                                onToggleFavorite={() => toggle(r.id)}
+                            />
+                        ))}
+                    </div>
+
+                    <div ref={sentinelRef} className="flex items-center justify-center py-8">
+                        {loadingMore ? (
+                            <span className="text-muted-foreground text-sm">Loading more…</span>
+                        ) : hasMore ? (
+                            <button
+                                type="button"
+                                onClick={loadMore}
+                                className="hover:border-primary rounded-md border border-zinc-300 px-4 py-2 text-sm font-semibold"
+                            >
+                                Load more
+                            </button>
+                        ) : meta.total > meta.per_page ? (
+                            <span className="text-muted-foreground text-xs">You've reached the end.</span>
+                        ) : null}
+                    </div>
+                </>
             )}
         </Section>
     );
@@ -517,17 +585,18 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
 
             <main className="flex-1">
                 <ExploreSection
-                    items={dashboard.food_items}
-                    selectedId={dashboard.selected_food_item?.id ?? null}
+                    items={dashboard.food_types}
+                    selectedId={dashboard.selected_food_type?.id ?? null}
                 />
-                <TopPicksSection restaurants={dashboard.restaurants} />
+                <TopPicksSection picks={dashboard.top_picks} />
                 <CuisinesAndPromoSection />
                 <AllRestaurantsSection
-                    restaurants={dashboard.restaurants}
+                    initialRestaurants={dashboard.restaurants}
+                    initialMeta={dashboard.pagination}
                     address={dashboard.address}
                     radiusMiles={dashboard.radius_miles}
                     usingFallback={dashboard.using_fallback}
-                    selectedFoodItem={dashboard.selected_food_item}
+                    selectedFoodType={dashboard.selected_food_type}
                 />
             </main>
 

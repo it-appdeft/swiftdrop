@@ -25,8 +25,8 @@ class DashboardRestaurantResource extends JsonResource
             'cuisines' => $r->cuisines,
             'city' => $r->city,
             'full_address' => $r->full_address,
-            'logo_url' => $this->absoluteUrl($r->logo_path),
-            'cover_url' => $this->absoluteUrl($r->cover_photo_path),
+            'logo_url' => $r->logo_url,
+            'cover_url' => $r->banner_url,
             'rating' => $r->rating !== null ? (float) $r->rating : null,
             'total_reviews' => (int) $r->total_reviews,
             'distance_miles' => $distance,
@@ -34,17 +34,5 @@ class DashboardRestaurantResource extends JsonResource
             // heart icon on each card reflects the customer's saved list.
             'is_favorited' => (bool) ($this->resource['is_favorited'] ?? false),
         ];
-    }
-
-    protected function absoluteUrl(?string $path): ?string
-    {
-        if (! $path) {
-            return null;
-        }
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            return $path;
-        }
-
-        return '/storage/' . ltrim($path, '/');
     }
 }

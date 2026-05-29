@@ -3,38 +3,56 @@
 namespace App\Contracts\Customer;
 
 use App\DTO\Customer\CustomerDashboardData;
+use App\Models\CustomerAddress;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 
 interface CustomerDashboardServiceInterface
 {
     /**
-     * Build the dashboard payload (food items, restaurants near the user's
-     * default address, or a fallback list when no address is on file). Both
-     * lists are paginated and the page indices can be advanced independently.
+     * Build the combined home payload for the web (single endpoint): first-20
+     * food items (no location check), 5 top picks, and the paginated
+     * restaurants list. Only restaurants paginate.
      *
-     * When `$foodItemId` is provided the restaurants list is filtered to those
-     * offering at least one available dish tagged with that food type — the
-     * food_items strip itself stays unfiltered so the customer can switch.
+     * When `$foodTypeId` is provided the restaurants list is filtered to those
+     * offering at least one available dish tagged with that food type.
      */
     public function build(
         ?User $user,
         int $restaurantsPage = 1,
-        int $foodItemsPage = 1,
-        ?int $foodItemId = null,
+        ?int $foodTypeId = null,
     ): CustomerDashboardData;
 
+    /** The customer's active delivery address (selected → default → newest). */
+    public function selectedAddress(?User $user): ?CustomerAddress;
+
     /**
-     * Paginated restaurants list — same source the home screen renders, but
-     * pageable for the /customer/restaurants index ("View all" / infinite
-     * scroll). Each row carries a per-customer `is_favorited` flag.
+     * First N food items for the Explore strip — no location check.
      *
-     * Optionally filtered to restaurants offering a specific food item.
+     * @return Collection<int, \App\Models\FoodType>
+     */
+    public function foodTypes(int $limit = 20): Collection;
+
+    /**
+     * Top picks: bookable, near + high-rated restaurants (rows carry
+     * `restaurant`, `distance_miles`, `is_favorited`). When `$foodTypeId` is
+     * provided the list is narrowed to restaurants offering at least one
+     * available dish tagged with that food type.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function topPicks(?User $user, int $limit = 5, ?int $foodTypeId = null): Collection;
+
+    /**
+     * Paginated restaurants near the customer (the only paginated section).
+     * Each row carries a per-customer `is_favorited` flag; optionally filtered
+     * to restaurants offering a specific food type.
      */
     public function paginateRestaurants(
         ?User $user,
         int $page = 1,
         int $perPage = 10,
-        ?int $foodItemId = null,
+        ?int $foodTypeId = null,
     ): LengthAwarePaginator;
 }

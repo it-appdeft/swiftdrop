@@ -23,10 +23,10 @@ class CustomerSearchController extends Controller
     ) {
     }
 
-    public function index(SearchRequest $request): Response|JsonResponse
+    public function index(SearchRequest $request, string $type): Response|JsonResponse
     {
         $page = max(1, (int) $request->query('page', 1));
-        $results = $this->search->search($request->user(), $request->keyword(), page: $page, filters: $request->filters());
+        $results = $this->search->search($request->user(), $type, $request->keyword(), page: $page, filters: $request->filters());
         $payload = (new CustomerSearchResource($results))->resolve($request);
 
         // Subsequent restaurant pages are fetched as JSON so the search page

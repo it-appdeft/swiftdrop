@@ -5,15 +5,22 @@ namespace App\Http\Controllers\Web\Customer;
 use App\Contracts\Customer\CustomerDashboardServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Customer\CustomerDashboardResource;
+use App\Http\Resources\Customer\DashboardRestaurantResource;
+use App\Services\Customer\CustomerDashboardService;
+use App\Support\PaginationMeta;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Web counterpart to {@see \App\Http\Controllers\Api\Customer\CustomerDashboardController}.
- * Both controllers delegate to {@see CustomerDashboardServiceInterface} and reuse
- * the same {@see CustomerDashboardResource}; only the response layer differs
- * (Inertia render vs. JSON envelope).
+ * The single web home endpoint: renders food items (first 20), the top-picks
+ * slider (5) and the first page of restaurants. The restaurants section is the
+ * only paginated one — its subsequent pages are fetched from this same URL as
+ * JSON (infinite scroll), so the web stays on one endpoint.
+ *
+ * The mobile app instead hits four granular endpoints (profile / food-types /
+ * top-picks / restaurants), all backed by the same service.
  */
 class CustomerDashboardController extends Controller
 {
@@ -22,13 +29,28 @@ class CustomerDashboardController extends Controller
     ) {
     }
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|JsonResponse
     {
-        $restaurantsPage = max(1, (int) $request->query('restaurants_page', 1));
-        $foodItemsPage = max(1, (int) $request->query('food_items_page', 1));
-        $foodItemId = $request->filled('food_item_id') ? max(1, (int) $request->query('food_item_id')) : null;
+        $restaurantsPage = max(1, (int) $request->query('page', 1));
+        $foodTypeId = $request->filled('search') ? max(1, (int) $request->query('search')) : null;
 
-        $data = $this->dashboard->build($request->user(), $restaurantsPage, $foodItemsPage, $foodItemId);
+        // Infinite scroll: append-only restaurant pages come back as JSON so
+        // the page isn't re-rendered and scroll position is preserved.
+        if ($request->wantsJson()) {
+            $paginator = $this->dashboard->paginateRestaurants(
+                $request->user(),
+                page: $restaurantsPage,
+                perPage: CustomerDashboardService::RESTAURANTS_PER_PAGE,
+                foodTypeId: $foodTypeId,
+            );
+
+            return response()->json([
+                'restaurants' => DashboardRestaurantResource::collection($paginator->getCollection())->resolve($request),
+                'pagination' => PaginationMeta::make($paginator),
+            ]);
+        }
+
+        $data = $this->dashboard->build($request->user(), $restaurantsPage, $foodTypeId);
 
         return Inertia::render('customer/dashboard', [
             'dashboard' => (new CustomerDashboardResource($data))->resolve($request),

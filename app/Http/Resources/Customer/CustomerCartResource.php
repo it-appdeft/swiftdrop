@@ -37,7 +37,7 @@ class CustomerCartResource extends JsonResource
             'restaurant' => $cart->restaurant ? [
                 'id' => $cart->restaurant->id,
                 'name' => $cart->restaurant->name,
-                'logo_url' => $this->absoluteUrl($cart->restaurant->logo_path),
+                'logo_url' => $cart->restaurant->logo_url,
             ] : null,
             'items' => $items->values()->all(),
             // Sum of quantities — the "2 items" badge on the bar / header.
@@ -88,9 +88,9 @@ class CustomerCartResource extends JsonResource
 
     protected function dishImageUrl(CartItem $item): ?string
     {
-        $foodItem = $item->menuItem?->foodItem;
-        if ($foodItem && $foodItem->image) {
-            return '/storage/'.ltrim($foodItem->image, '/');
+        $foodType = $item->menuItem?->foodType;
+        if ($foodType && $foodType->image) {
+            return '/storage/'.ltrim($foodType->image, '/');
         }
 
         return null;

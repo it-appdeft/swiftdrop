@@ -24,8 +24,8 @@ trait FormatsFavorites
             'tagline' => $r->tagline,
             'cuisines' => $r->cuisines,
             'city' => $r->city,
-            'logo_url' => $r->logo_path ? '/storage/'.ltrim($r->logo_path, '/') : null,
-            'cover_url' => $r->cover_photo_path ? '/storage/'.ltrim($r->cover_photo_path, '/') : null,
+            'logo_url' => $r->logo_url,
+            'cover_url' => $r->banner_url,
             // "No reviews yet" reads as unrated, matching the rest of the app.
             'rating' => ((int) $r->total_reviews) > 0 && $r->rating !== null ? (float) $r->rating : null,
             'total_reviews' => (int) $r->total_reviews,
@@ -54,8 +54,8 @@ trait FormatsFavorites
                 'description' => $m->description,
                 'price' => (float) $m->price,
                 'is_veg' => (bool) $m->is_veg,
-                'image_url' => $m->foodItem && $m->foodItem->image
-                    ? '/storage/'.ltrim($m->foodItem->image, '/')
+                'image_url' => $m->foodType && $m->foodType->image
+                    ? '/storage/'.ltrim($m->foodType->image, '/')
                     : null,
                 'rating' => $rating,
                 'is_favorited' => true,

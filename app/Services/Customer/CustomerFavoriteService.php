@@ -114,7 +114,7 @@ class CustomerFavoriteService implements CustomerFavoriteServiceInterface
         }
 
         return $profile->favoriteMenuItems()
-            ->with('foodItem')
+            ->with('foodType')
             ->orderByDesc('customer_favorite_menu_items.created_at')
             ->get();
     }
@@ -127,6 +127,7 @@ class CustomerFavoriteService implements CustomerFavoriteServiceInterface
         }
 
         return $profile->favoriteRestaurants()
+            ->with('uploads')
             ->orderByDesc('customer_favorite_restaurants.created_at')
             ->paginate(perPage: $perPage, page: $page);
     }
@@ -139,7 +140,7 @@ class CustomerFavoriteService implements CustomerFavoriteServiceInterface
         }
 
         return $profile->favoriteMenuItems()
-            ->with(['foodItem', 'restaurant:id,name,rating,total_reviews'])
+            ->with(['foodType', 'restaurant:id,name,rating,total_reviews'])
             ->orderByDesc('customer_favorite_menu_items.created_at')
             ->paginate(perPage: $perPage, page: $page);
     }

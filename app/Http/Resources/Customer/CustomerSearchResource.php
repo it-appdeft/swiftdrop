@@ -3,7 +3,6 @@
 namespace App\Http\Resources\Customer;
 
 use App\DTO\Customer\CustomerSearchResults;
-use App\Models\MenuItem;
 use App\Models\Restaurant;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -17,13 +16,14 @@ class CustomerSearchResource extends JsonResource
         $data = $this->resource;
 
         return [
+            'type' => $data->type,
             'keyword' => $data->keyword,
             'filters' => [
                 'offers' => (bool) ($data->filters['offers'] ?? false),
                 'highest_rated' => (bool) ($data->filters['highest_rated'] ?? false),
             ],
             'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
-            'restaurants_meta' => $data->restaurantsMeta,
+            'pagination' => $data->restaurantsMeta,
             'dishes_by_restaurant' => $data->dishesByRestaurant->map(function (array $row) {
                 /** @var Restaurant $restaurant */
                 $restaurant = $row['restaurant'];
@@ -33,38 +33,13 @@ class CustomerSearchResource extends JsonResource
                         'id' => $restaurant->id,
                         'name' => $restaurant->name,
                         'city' => $restaurant->city,
-                        'logo_url' => $this->absoluteUrl($restaurant->logo_path),
-                        'cover_url' => $this->absoluteUrl($restaurant->cover_photo_path),
+                        'logo_url' => $restaurant->logo_url,
+                        'cover_url' => $restaurant->banner_url,
                         'rating' => $restaurant->rating !== null ? (float) $restaurant->rating : null,
                         'total_reviews' => (int) $restaurant->total_reviews,
                         'distance_miles' => $row['distance_miles'] ?? null,
                     ],
-                    'dishes' => $row['dishes']->map(fn (MenuItem $m) => [
-                        'id' => $m->id,
-                        'name' => $m->name,
-                        'description' => $m->description,
-                        'price' => (float) $m->price,
-                        'is_veg' => (bool) $m->is_veg,
-                        'image_url' => $this->dishImageUrl($m),
-                        // Drives the customise dialog on the search dish-card.
-                        // Empty array → dish adds straight to cart.
-                        'modifier_groups' => $m->relationLoaded('modifierGroups')
-                            ? $m->modifierGroups->map(fn ($g) => [
-                                'id' => $g->id,
-                                'name' => $g->name,
-                                'description' => $g->description,
-                                'selection_type' => $g->selection_type,
-                                'is_required' => (bool) $g->is_required,
-                                'min_selections' => (int) $g->min_selections,
-                                'max_selections' => $g->max_selections !== null ? (int) $g->max_selections : null,
-                                'options' => $g->options->map(fn ($o) => [
-                                    'id' => $o->id,
-                                    'name' => $o->name,
-                                    'price_delta' => (float) $o->price_delta,
-                                ])->values()->all(),
-                            ])->values()->all()
-                            : [],
-                    ])->values()->all(),
+                    'dishes' => SearchDishResource::collection($row['dishes'])->resolve($request),
                 ];
             })->values()->all(),
             'recent' => $data->recent->map(fn ($row) => [
@@ -82,27 +57,5 @@ class CustomerSearchResource extends JsonResource
             'radius_miles' => $data->radiusMiles,
             'using_fallback' => $data->usingFallback,
         ];
-    }
-
-    protected function dishImageUrl(MenuItem $item): ?string
-    {
-        $foodItem = $item->foodItem;
-        if ($foodItem && $foodItem->image) {
-            return '/storage/'.ltrim($foodItem->image, '/');
-        }
-
-        return null;
-    }
-
-    protected function absoluteUrl(?string $path): ?string
-    {
-        if (! $path) {
-            return null;
-        }
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            return $path;
-        }
-
-        return '/storage/'.ltrim($path, '/');
     }
 }

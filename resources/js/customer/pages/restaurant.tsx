@@ -117,7 +117,7 @@ interface RestaurantPayload {
     keyword: string;
     filters: MenuFilters;
     menu: Dish[];
-    menu_meta: MenuMeta;
+    pagination: MenuMeta;
     recommended: Dish[];
 }
 
@@ -162,14 +162,14 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     // JSON fetch (infinite scroll). Reset whenever the underlying menu changes
     // (e.g. a new keyword search re-renders the page).
     const [menuItems, setMenuItems] = useState<Dish[]>(data.menu);
-    const [menuMeta, setMenuMeta] = useState<MenuMeta>(data.menu_meta);
+    const [menuMeta, setMenuMeta] = useState<MenuMeta>(data.pagination);
     const [loadingMore, setLoadingMore] = useState(false);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setMenuItems(data.menu);
-        setMenuMeta(data.menu_meta);
-    }, [data.menu, data.menu_meta]);
+        setMenuMeta(data.pagination);
+    }, [data.menu, data.pagination]);
 
     const hasMoreMenu = menuMeta.current_page < menuMeta.last_page;
 
@@ -191,7 +191,7 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                 const seen = new Set(prev.map((d) => d.id));
                 return [...prev, ...json.menu.filter((d) => !seen.has(d.id))];
             });
-            setMenuMeta(json.menu_meta);
+            setMenuMeta(json.pagination);
         } catch {
             toast.error('Could not load more dishes.');
         } finally {

@@ -46,7 +46,7 @@ class CustomerProfileController extends Controller
 
         $paginator = Order::query()
             ->where('user_id', $user->id)
-            ->with(['restaurant:id,name,city,full_address,logo_path,cover_photo_path', 'items:id,order_id,name,quantity'])
+            ->with(['restaurant:id,name,city,full_address', 'restaurant.uploads', 'items:id,order_id,name,quantity'])
             ->orderByDesc('placed_at')
             ->orderByDesc('id')
             ->paginate(perPage: $perPage, page: $page);
@@ -54,13 +54,12 @@ class CustomerProfileController extends Controller
         $rows = $paginator->getCollection()
             ->map(function (Order $order) {
                 $restaurant = $order->restaurant;
-                $image = $restaurant?->cover_photo_path ?? $restaurant?->logo_path;
 
                 return [
                     'id' => $order->id,
                     'restaurant' => $restaurant?->name ?? 'Restaurant',
                     'location' => $restaurant?->city ?? $restaurant?->full_address ?? '',
-                    'image' => $image ? '/storage/'.ltrim($image, '/') : null,
+                    'image' => $restaurant?->banner_url ?? $restaurant?->logo_url,
                     'status' => $order->status,
                     'items' => $order->items->map(fn ($i) => [
                         'qty' => (int) $i->quantity,
@@ -73,7 +72,7 @@ class CustomerProfileController extends Controller
         return $this->success(
             data: [
                 'orders' => $rows,
-                'meta' => PaginationMeta::make($paginator),
+                'pagination' => PaginationMeta::make($paginator),
             ],
             message: 'Orders retrieved.',
         );
@@ -111,7 +110,7 @@ class CustomerProfileController extends Controller
         return $this->success(
             data: [
                 'addresses' => AddressResource::collection($paginator->getCollection())->resolve($request),
-                'meta' => PaginationMeta::make($paginator),
+                'pagination' => PaginationMeta::make($paginator),
             ],
             message: 'Addresses retrieved.',
         );
