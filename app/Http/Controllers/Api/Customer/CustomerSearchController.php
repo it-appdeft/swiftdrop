@@ -26,9 +26,11 @@ class CustomerSearchController extends Controller
         $page = max(1, (int) $request->query('page', 1));
         $results = $this->search->search($request->user(), $type, $request->keyword(), page: $page, filters: $request->filters());
 
-        return $this->successPaginated(
-            data: (new CustomerSearchApiResource($results))->resolve($request),
-            pagination: $results->restaurantsMeta,
+        return $this->success(
+            data: [
+                'results' => (new CustomerSearchApiResource($results))->resolve($request),
+                'pagination' => $results->restaurantsMeta,
+            ],
             message: 'Search completed.',
         );
     }
