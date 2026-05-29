@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { FoodItem, Paginated } from '@/types/admin';
-import { formatRelative } from '@/utils/format';
+import { decodePaginationLabel, formatRelative } from '@/utils/format';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Admin', href: '/admin/food-items' },
@@ -194,8 +194,9 @@ export default function FoodItemsIndex({ items, filters }: Props) {
                                                 variant={link.active ? 'default' : 'outline'}
                                                 disabled={!link.url}
                                                 onClick={() => link.url && router.visit(link.url, { preserveState: true })}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
+                                            >
+                                                {decodePaginationLabel(link.label)}
+                                            </Button>
                                         ))}
                                     </div>
                                 </div>
