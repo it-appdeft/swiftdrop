@@ -660,7 +660,7 @@ export function LegalBankStep({
                 <h3 className="text-sm font-semibold text-foreground">Tax & licenses</h3>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <TextField
-                        label="GST number"
+                        label="VAT number"
                         required
                         placeholder="29ABCDE1234F1Z5"
                         value={data.gst}
