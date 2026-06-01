@@ -59,6 +59,8 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
 
     Route::controller(CheckoutController::class)->prefix('checkout')->group(function () {
         Route::get('/', 'summary');
+        Route::post('/apply-coupon', 'applyCoupon');
+        Route::post('/cooking-request', 'cookingRequest');
         Route::post('/', 'store');
     });
 

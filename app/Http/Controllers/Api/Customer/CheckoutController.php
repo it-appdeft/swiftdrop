@@ -36,6 +36,31 @@ class CheckoutController extends Controller
         );
     }
 
+    public function applyCoupon(Request $request): JsonResponse
+    {
+        $couponId = $request->integer('coupon_id') ?: null;
+        $coupon = $request->string('coupon')->toString() ?: null;
+
+        $data = $this->checkout->applyCoupon($request->user(), $couponId, $coupon);
+
+        return $this->success(
+            data: new CheckoutResource($data),
+            message: 'Coupon applied.',
+        );
+    }
+
+    public function cookingRequest(Request $request): JsonResponse
+    {
+        $instructions = $request->string('special_instructions')->toString() ?: null;
+
+        $data = $this->checkout->updateCookingRequest($request->user(), $instructions);
+
+        return $this->success(
+            data: new CheckoutResource($data),
+            message: 'Cooking request saved.',
+        );
+    }
+
     public function store(PlaceOrderRequest $request): JsonResponse
     {
         $order = $this->checkout->place(

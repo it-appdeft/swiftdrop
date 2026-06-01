@@ -50,6 +50,8 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
     // Checkout: summary recomputes on GET (address_id / coupon query params),
     // place order on POST.
     Route::get('checkout', [CheckoutController::class, 'index'])->name('checkout');
+    Route::post('checkout/apply-coupon', [CheckoutController::class, 'applyCoupon'])->name('checkout.apply-coupon');
+    Route::post('checkout/cooking-request', [CheckoutController::class, 'cookingRequest'])->name('checkout.cooking-request');
     Route::post('checkout', [CheckoutController::class, 'store'])->name('checkout.place');
 
     Route::controller(CustomerProfileController::class)->group(function () {

@@ -32,6 +32,7 @@ interface CheckoutAddress {
 }
 
 interface AvailableCoupon {
+    id: number;
     code: string;
     title: string | null;
     description: string | null;
@@ -55,7 +56,8 @@ interface Checkout {
     range_message: string | null;
     distance_miles: number | null;
     accepts_cooking_requests: boolean;
-    applied_coupon: { code: string; title: string | null; type: string; discount: number; free_delivery: boolean } | null;
+    special_instructions: string | null;
+    applied_coupon: { id: number; code: string; title: string | null; type: string; discount: number; free_delivery: boolean } | null;
     coupon_error: string | null;
     available_coupons: AvailableCoupon[];
     bill: {
@@ -77,7 +79,7 @@ export default function CustomerCheckout({ checkout }: Props) {
     const [couponOpen, setCouponOpen] = useState(false);
     const [addrOpen, setAddrOpen] = useState(false);
     const [showCooking, setShowCooking] = useState(false);
-    const [instructions, setInstructions] = useState('');
+    const [instructions, setInstructions] = useState(checkout.special_instructions ?? '');
     const [placing, setPlacing] = useState(false);
     // Success splash shown for ~2s after a coupon successfully applies — null when hidden.
     const [appliedSplash, setAppliedSplash] = useState<{ savedAmount: number; badge: string; detail: string } | null>(null);
@@ -108,19 +110,25 @@ export default function CustomerCheckout({ checkout }: Props) {
         router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true });
     };
 
-    const applyCoupon = (code: string) => {
+    const applyCoupon = (coupon: AvailableCoupon | string) => {
         setCouponOpen(false);
-        // Look up the source coupon so we can render the right badge ("EXCLUSIVE
-        // WELCOME" for welcome offers, otherwise the headline / code). Manual
-        // entry won't match — we fall back to the server-returned title in that case.
-        const source = checkout.available_coupons.find((c) => c.code.toUpperCase() === code.toUpperCase()) ?? null;
+        // Coupons picked from the list are applied by id; a manually typed code
+        // is applied by code. Either way we resolve the source coupon so we can
+        // render the right badge ("EXCLUSIVE WELCOME" for welcome offers,
+        // otherwise the headline / code) — manual entry may not match, in which
+        // case we fall back to the server-returned title.
+        const source =
+            typeof coupon === 'string'
+                ? (checkout.available_coupons.find((c) => c.code.toUpperCase() === coupon.toUpperCase()) ?? null)
+                : coupon;
+        const payload = typeof coupon === 'string' ? { coupon } : { coupon_id: coupon.id };
 
-        router.get(
-            '/customer/checkout',
-            {
-                ...(checkout.selected_address_id ? { address_id: checkout.selected_address_id } : {}),
-                coupon: code,
-            },
+        // Persist the coupon onto the cart; the redirect re-renders checkout
+        // with the stored coupon applied. It can be changed/removed any time
+        // before placing the order.
+        router.post(
+            '/customer/checkout/apply-coupon',
+            payload,
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -275,7 +283,17 @@ export default function CustomerCheckout({ checkout }: Props) {
                                     <div className="flex items-center justify-between">
                                         <button
                                             type="button"
-                                            onClick={() => setShowCooking(false)}
+                                            onClick={() =>
+                                                router.post(
+                                                    '/customer/checkout/cooking-request',
+                                                    { special_instructions: instructions },
+                                                    {
+                                                        preserveScroll: true,
+                                                        preserveState: true,
+                                                        onSuccess: () => setShowCooking(false),
+                                                    },
+                                                )
+                                            }
                                             className="text-xs font-semibold text-emerald-600 hover:underline"
                                         >
                                             Save
@@ -312,7 +330,13 @@ export default function CustomerCheckout({ checkout }: Props) {
                                     </span>
                                     <button
                                         type="button"
-                                        onClick={() => reload({ coupon: null })}
+                                        onClick={() =>
+                                            router.post(
+                                                '/customer/checkout/apply-coupon',
+                                                { coupon: null },
+                                                { preserveScroll: true, preserveState: true },
+                                            )
+                                        }
                                         className="text-sm font-semibold text-emerald-600 hover:underline"
                                     >
                                         Remove
@@ -505,7 +529,7 @@ function CouponModal({
     open: boolean;
     onClose: () => void;
     coupons: AvailableCoupon[];
-    onApply: (code: string) => void;
+    onApply: (coupon: AvailableCoupon | string) => void;
 }) {
     const [code, setCode] = useState('');
 
@@ -541,9 +565,9 @@ function CouponModal({
                                     .filter((c) => !c.upcoming)
                                     .map((c) =>
                                         c.trigger === 'welcome' ? (
-                                            <WelcomeCouponCard key={c.code} coupon={c} onApply={() => onApply(c.code)} />
+                                            <WelcomeCouponCard key={c.code} coupon={c} onApply={() => onApply(c)} />
                                         ) : (
-                                            <CouponCard key={c.code} coupon={c} onApply={() => onApply(c.code)} />
+                                            <CouponCard key={c.code} coupon={c} onApply={() => onApply(c)} />
                                         ),
                                     )}
                                 {coupons.some((c) => c.upcoming) ? (
@@ -554,7 +578,7 @@ function CouponModal({
                                         {coupons
                                             .filter((c) => c.upcoming)
                                             .map((c) => (
-                                                <CouponCard key={c.code} coupon={c} onApply={() => onApply(c.code)} />
+                                                <CouponCard key={c.code} coupon={c} onApply={() => onApply(c)} />
                                             ))}
                                     </>
                                 ) : null}

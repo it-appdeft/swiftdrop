@@ -40,7 +40,9 @@ class CheckoutResource extends JsonResource
             'range_message' => $data->rangeMessage,
             'distance_miles' => $data->distanceMiles,
             'accepts_cooking_requests' => $data->acceptsCookingRequests,
+            'special_instructions' => $data->specialInstructions,
             'applied_coupon' => $data->appliedOffer ? [
+                'id' => $data->appliedOffer->id,
                 'code' => $data->appliedOffer->code,
                 'title' => $data->appliedOffer->title,
                 'type' => $data->appliedOffer->type,
@@ -82,6 +84,7 @@ class CheckoutResource extends JsonResource
     protected function coupon(Offer $offer, bool $eligible, bool $upcoming): array
     {
         return [
+            'id' => $offer->id,
             'code' => $offer->code,
             'title' => $offer->title,
             'description' => $offer->description,

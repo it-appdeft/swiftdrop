@@ -38,6 +38,7 @@ class CheckoutService implements CheckoutServiceInterface
             return new CheckoutData(
                 cart: $cart, restaurant: null, address: $address, addresses: $addresses,
                 distanceMiles: null, inRange: false, rangeMessage: null, acceptsCookingRequests: false,
+                specialInstructions: null,
                 itemTotal: 0, itemDiscount: 0, deliveryFee: 0, freeDelivery: false, taxes: 0, toPay: 0,
                 appliedOffer: null, couponError: null, availableCoupons: collect(),
             );
@@ -45,6 +46,10 @@ class CheckoutService implements CheckoutServiceInterface
 
         $restaurant = $cart->restaurant;
         $subtotal = $this->subtotal($cart);
+
+        // The cart holds the persisted coupon; an explicit code (e.g. an API
+        // preview) overrides it for this call without being saved.
+        $couponCode = ($couponCode !== null && $couponCode !== '') ? $couponCode : $cart->coupon_code;
 
         [$distance, $inRange, $rangeMessage] = $this->resolveRange($restaurant, $address);
 
@@ -83,7 +88,10 @@ class CheckoutService implements CheckoutServiceInterface
             distanceMiles: $distance,
             inRange: $inRange,
             rangeMessage: $rangeMessage,
-            acceptsCookingRequests: (bool) $restaurant->accepts_cooking_requests,
+            // Cooking / allergy requests are offered on every restaurant,
+            // regardless of the restaurant's own preference flag.
+            acceptsCookingRequests: true,
+            specialInstructions: $cart->special_instructions,
             itemTotal: $subtotal,
             itemDiscount: $itemDiscount,
             deliveryFee: $deliveryFee,
@@ -94,6 +102,44 @@ class CheckoutService implements CheckoutServiceInterface
             couponError: $couponError,
             availableCoupons: $this->coupons->availableFor($user, $restaurant, $subtotal),
         );
+    }
+
+    /**
+     * Persist (or clear) the cart's coupon, then re-price. A coupon can be
+     * chosen by its id (preferred — what the coupon list sends) or by a manually
+     * typed code; the id wins when both are given. The resolved code is saved on
+     * the cart and re-validated on every summary / placement, so the customer
+     * can swap or drop it any time before paying. Passing nothing removes it.
+     */
+    public function applyCoupon(User $user, ?int $couponId = null, ?string $couponCode = null): CheckoutData
+    {
+        $cart = $this->cart->getCart($user)->cart;
+
+        if ($cart instanceof Cart) {
+            $code = $couponId !== null
+                ? Offer::query()->whereKey($couponId)->value('code')
+                : trim((string) $couponCode);
+
+            $cart->update(['coupon_code' => ($code === null || $code === '') ? null : $code]);
+        }
+
+        return $this->summary($user);
+    }
+
+    /**
+     * Persist (or clear) the cart's cooking / allergy request. Available for
+     * every restaurant; the saved value flows into the order at placement.
+     */
+    public function updateCookingRequest(User $user, ?string $instructions): CheckoutData
+    {
+        $cart = $this->cart->getCart($user)->cart;
+
+        if ($cart instanceof Cart) {
+            $text = trim((string) $instructions);
+            $cart->update(['special_instructions' => $text === '' ? null : mb_substr($text, 0, 300)]);
+        }
+
+        return $this->summary($user);
     }
 
     public function place(User $user, int $addressId, ?string $couponCode, ?string $specialInstructions): Order
@@ -118,6 +164,9 @@ class CheckoutService implements CheckoutServiceInterface
         ['fee' => $baseFee, 'free' => $freeByThreshold] = $this->deliveryFee($subtotal, $distance);
         $taxes = $this->taxes($subtotal);
 
+        // Fall back to the coupon saved on the cart when the request omits one.
+        $couponCode = ($couponCode !== null && $couponCode !== '') ? $couponCode : $cart->coupon_code;
+
         $eval = ($couponCode !== null && $couponCode !== '')
             ? $this->coupons->evaluate($user, $couponCode, $restaurant, $subtotal, $baseFee) // throws on invalid
             : null;
@@ -127,7 +176,11 @@ class CheckoutService implements CheckoutServiceInterface
         $deliveryFee = $freeDelivery ? 0.0 : $baseFee;
         $total = round(max(0, $subtotal - $itemDiscount) + $deliveryFee + $taxes, 2);
 
-        $instructions = $restaurant->accepts_cooking_requests ? ($specialInstructions ?: null) : null;
+        // Cooking / allergy requests apply to every restaurant; fall back to
+        // whatever was saved on the cart when the request omits one.
+        $instructions = ($specialInstructions !== null && $specialInstructions !== '')
+            ? $specialInstructions
+            : ($cart->special_instructions ?: null);
 
         return DB::transaction(function () use (
             $user, $restaurant, $cart, $address, $subtotal, $deliveryFee, $itemDiscount,
