@@ -104,14 +104,15 @@ export function DishModifierDialog({
         return base + surcharge;
     }, [selected, dish]);
 
-    // Every required group must be satisfied before the dish can be added.
+    // Modifiers are optional — the dish can always be added. We only block a
+    // multi-select group that's been partially filled below its minimum, to
+    // match the server-side rule.
     const canAdd = useMemo(
         () =>
             dish.modifier_groups.every((group) => {
+                if (group.selection_type === 'single') return true;
                 const count = selected[group.id]?.length ?? 0;
-                if (group.selection_type === 'single') return group.is_required ? count >= 1 : true;
-                const min = Math.max(group.is_required ? 1 : 0, group.min_selections);
-                return count >= min;
+                return count === 0 || count >= group.min_selections;
             }),
         [dish.modifier_groups, selected],
     );

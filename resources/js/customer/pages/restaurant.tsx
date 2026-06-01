@@ -157,7 +157,7 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     const diet: Diet = data.filters.diet ?? 'all';
     const minRating = data.filters.min_rating !== null;
 
-    const [query, setQuery] = useState('');
+    const [query, setQuery] = useState(data.keyword ? `You Searched for “${data.keyword}”` : '');
     const [openDish, setOpenDish] = useState<ModifierDish | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
@@ -470,20 +470,7 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                 </section>
 
                 {/* "You searched for X" banner — shown when arriving via search */}
-                {data.keyword ? (
-                    <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
-                        <p className="text-emerald-900">
-                            You searched for <strong className="font-semibold">“{data.keyword}”</strong>
-                        </p>
-                        <button
-                            type="button"
-                            onClick={clearSearch}
-                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                        >
-                            <X className="size-3.5" /> Clear
-                        </button>
-                    </div>
-                ) : null}
+                
 
                 {/* In-restaurant search (now always starts empty so the banner above carries the active query) */}
                 <form
@@ -497,6 +484,19 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                         placeholder="Search for dishes"
                         className="placeholder:text-muted-foreground h-full flex-1 bg-transparent text-base outline-none"
                     />
+
+                    {query && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setQuery('');
+                                clearSearch();
+                            }}
+                            className="text-zinc-500 hover:text-zinc-700"
+                        >
+                            <X className="size-4" />
+                        </button>
+                    )}
                     <button type="submit" aria-label="Search" className="hover:text-primary text-zinc-500">
                         <SearchIcon className="size-5" />
                     </button>
@@ -540,9 +540,11 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                 {recommended.length > 0 ? (
                     <section className="mt-6">
                         <h2 className="text-foreground text-lg font-bold">
-                            Top picks for “{data.keyword}” ({recommended.length})
+                            Results for “{data.keyword}” ({recommended.length})
                         </h2>
                         <div className="mt-2 divide-y divide-zinc-100">{recommended.map((dish) => renderRow(dish, 'rec'))}</div>
+                    <hr className="my-8 border-zinc-200" />
+                    
                     </section>
                 ) : null}
 

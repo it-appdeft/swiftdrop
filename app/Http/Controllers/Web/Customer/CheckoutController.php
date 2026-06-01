@@ -41,6 +41,25 @@ class CheckoutController extends Controller
         ]);
     }
 
+    public function applyCoupon(Request $request): RedirectResponse
+    {
+        $couponId = $request->integer('coupon_id') ?: null;
+        $coupon = $request->string('coupon')->toString() ?: null;
+        $this->checkout->applyCoupon($request->user(), $couponId, $coupon);
+
+        // The coupon now lives on the cart, so the summary re-reads it on the
+        // plain checkout visit — no query param needed.
+        return redirect()->route('customer.checkout');
+    }
+
+    public function cookingRequest(Request $request): RedirectResponse
+    {
+        $instructions = $request->string('special_instructions')->toString() ?: null;
+        $this->checkout->updateCookingRequest($request->user(), $instructions);
+
+        return redirect()->route('customer.checkout');
+    }
+
     public function store(PlaceOrderRequest $request): RedirectResponse
     {
         $this->checkout->place(

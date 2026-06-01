@@ -23,6 +23,19 @@ interface CheckoutServiceInterface
     public function summary(User $user, ?int $addressId = null, ?string $couponCode = null): CheckoutData;
 
     /**
+     * Save (or clear) the cart's coupon by id (preferred — what the coupon list
+     * sends) or by a manually typed code, then re-price. The resolved code
+     * sticks on the cart until it's changed or removed.
+     */
+    public function applyCoupon(User $user, ?int $couponId = null, ?string $couponCode = null): CheckoutData;
+
+    /**
+     * Save (or clear) the cart's cooking / allergy request — offered on every
+     * restaurant — then return the refreshed summary.
+     */
+    public function updateCookingRequest(User $user, ?string $instructions): CheckoutData;
+
+    /**
      * Place the order: re-validate range + coupon, snapshot items + modifiers,
      * record coupon usage, empty the cart. Throws ValidationException on an
      * out-of-range address or invalid coupon.

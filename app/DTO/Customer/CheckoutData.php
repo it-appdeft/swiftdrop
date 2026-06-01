@@ -30,6 +30,7 @@ class CheckoutData
         public readonly bool $inRange,
         public readonly ?string $rangeMessage,
         public readonly bool $acceptsCookingRequests,
+        public readonly ?string $specialInstructions,
         public readonly float $itemTotal,
         public readonly float $itemDiscount,
         public readonly float $deliveryFee,

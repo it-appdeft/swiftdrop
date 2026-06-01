@@ -130,14 +130,15 @@ class CartTest extends TestCase
             ->assertJsonPath('data.line_count', 2);
     }
 
-    public function test_rejects_missing_required_group_and_over_max_multi_select(): void
+    public function test_adds_with_no_options_and_rejects_over_max_multi_select(): void
     {
         ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
         Sanctum::actingAs($customer);
 
-        // Required "Size" not chosen.
+        // Modifiers are optional — adding with no options (the quick "+" path)
+        // succeeds even though "Size" is a required group.
         $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => []])
-            ->assertStatus(422)->assertJsonValidationErrors('options');
+            ->assertCreated();
 
         // Two options for a single-select group.
         $this->postJson('/api/customer/cart', [
@@ -272,17 +273,18 @@ class CartTest extends TestCase
         $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id]])->assertCreated();
         $itemId = $customer->cart->items()->first()->id;
 
-        // Drop the required Size group → validation error, line untouched.
-        $this->putJson("/api/customer/cart/items/{$itemId}", ['quantity' => 1, 'options' => []])
-            ->assertStatus(422)->assertJsonValidationErrors('options');
-
-        // Three toppings exceeds the max of two.
+        // Three toppings exceeds the max of two → validation error, line untouched.
         $this->putJson("/api/customer/cart/items/{$itemId}", [
             'quantity' => 1,
             'options' => array_merge([$regular->id], $toppings->options->pluck('id')->all()),
         ])->assertStatus(422)->assertJsonValidationErrors('options');
 
         $this->assertDatabaseHas('cart_item_modifiers', ['cart_item_id' => $itemId, 'option_name' => 'Regular']);
+
+        // Modifiers are optional now: clearing them is allowed (no required group).
+        $this->putJson("/api/customer/cart/items/{$itemId}", ['quantity' => 1, 'options' => []])
+            ->assertOk();
+        $this->assertDatabaseMissing('cart_item_modifiers', ['cart_item_id' => $itemId, 'option_name' => 'Regular']);
     }
 
     public function test_adds_to_cart_through_web_inertia_controller(): void

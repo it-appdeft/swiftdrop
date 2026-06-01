@@ -57,20 +57,21 @@ trait ValidatesModifierSelections
         int $count,
         string $errorKey,
     ): void {
+        // Modifiers are never required — an item can always be added with no
+        // options (the quick "+" path). We only guard the structural bounds of
+        // whatever the customer DID pick.
         if ($group->selection_type === ModifierGroup::SELECTION_SINGLE) {
             if ($count > 1) {
                 $validator->errors()->add($errorKey, "Please choose only one option for \"{$group->name}\".");
-            }
-            if ($group->is_required && $count < 1) {
-                $validator->errors()->add($errorKey, "Please choose an option for \"{$group->name}\".");
             }
 
             return;
         }
 
-        // Multiple-selection group.
-        $min = max($group->is_required ? 1 : 0, (int) $group->min_selections);
-        if ($count < $min) {
+        // Multiple-selection group: enforce the minimum only once the customer
+        // engages with the group, and always respect the maximum.
+        $min = (int) $group->min_selections;
+        if ($count > 0 && $min > 0 && $count < $min) {
             $validator->errors()->add($errorKey, "Please choose at least {$min} option(s) for \"{$group->name}\".");
         }
         if ($group->max_selections !== null && $count > $group->max_selections) {

@@ -178,7 +178,7 @@ class CustomerCartService implements CustomerCartServiceInterface
 
         if ($cart) {
             $cart->items()->delete();
-            $cart->update(['restaurant_id' => null]);
+            $cart->update(['restaurant_id' => null, 'coupon_code' => null, 'special_instructions' => null]);
         }
 
         return $this->getCart($user);

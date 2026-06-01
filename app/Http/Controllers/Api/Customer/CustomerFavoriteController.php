@@ -55,8 +55,12 @@ class CustomerFavoriteController extends Controller
         $paginator = $this->favorites->paginateFavoriteRestaurants($request->user(), $page, $perPage);
 
         return response()->json([
-            'data' => $this->favoriteRestaurantRows($paginator->getCollection()),
-            'pagination' => PaginationMeta::make($paginator),
+            'success' => true,
+            'message' => 'Favorite restaurants retrieved.',
+            'data' => [
+                'restaurants' => $this->favoriteRestaurantRows($paginator->getCollection()),
+                'pagination' => PaginationMeta::make($paginator),
+            ],
         ]);
     }
 
@@ -68,8 +72,12 @@ class CustomerFavoriteController extends Controller
         $paginator = $this->favorites->paginateFavoriteMenuItems($request->user(), $page, $perPage);
 
         return response()->json([
-            'data' => $this->favoriteMenuItemRows($paginator->getCollection()),
-            'pagination' => PaginationMeta::make($paginator),
+            'success' => true,
+            'message' => 'Favorite items retrieved.',
+            'data' => [
+                'menu_items' => $this->favoriteMenuItemRows($paginator->getCollection()),
+                'pagination' => PaginationMeta::make($paginator),
+            ],
         ]);
     }
 
