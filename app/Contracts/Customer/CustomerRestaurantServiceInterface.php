@@ -17,8 +17,6 @@ interface CustomerRestaurantServiceInterface
         User $user,
         int $restaurantId,
         string $keyword = '',
-        int $menuPage = 1,
-        int $menuPerPage = 10,
         array $filters = [],
     ): CustomerRestaurantData;
 }

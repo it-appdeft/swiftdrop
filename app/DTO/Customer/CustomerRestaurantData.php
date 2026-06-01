@@ -16,16 +16,17 @@ class CustomerRestaurantData
      * @param  Collection<int, \App\Models\MenuItem>  $menuItems              Paginated slice of the menu, partner sort order.
      * @param  Collection<int, \App\Models\MenuItem>  $recommended            Menu items matching the search keyword.
      * @param  array<int, int>                         $favoriteMenuItemIds    menu_item ids the customer has favourited.
+     * @param  array<int, \App\Models\CartItem>       $cartLookup
      */
     public function __construct(
         public readonly Restaurant $restaurant,
-        public readonly Collection $menuItems,
+        public readonly Collection $menuCategories,
         public readonly Collection $recommended,
         public readonly string $keyword,
         public readonly ?float $distanceMiles = null,
         public readonly bool $isFavorite = false,
         public readonly array $favoriteMenuItemIds = [],
-        public readonly array $menuMeta = [],
+        public readonly array $cartLookup = [],
         public readonly array $filters = ['diet' => null, 'min_rating' => null],
     ) {
     }

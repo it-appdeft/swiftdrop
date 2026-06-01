@@ -69,6 +69,13 @@ class CustomerCartResource extends JsonResource
                 'option_name' => $m->option_name,
                 'price_delta' => (float) $m->price_delta,
             ])->values()->all(),
+            // Flat option-id list — the restaurant page feeds this straight into
+            // the modifier dialog so a cart line's chosen options open pre-marked.
+            'selected_options' => $item->modifiers
+                ->pluck('modifier_option_id')
+                ->filter()
+                ->values()
+                ->all(),
         ];
     }
 

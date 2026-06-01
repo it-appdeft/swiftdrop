@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -36,6 +36,10 @@ interface Dish {
     image_url: string | null;
     rating: number | null;
     is_favorited: boolean;
+    cart_item_id: number | null;
+    is_in_cart: boolean;
+    cart_quantity: number;
+    selected_modifiers: number[];
     modifier_groups: ModifierGroup[];
 }
 
@@ -78,6 +82,7 @@ interface CartLine {
     menu_item_id: number;
     name: string | null;
     quantity: number;
+    selected_options?: number[];
 }
 
 interface Cart {
@@ -112,17 +117,24 @@ interface MenuFilters {
     min_rating: number | null;
 }
 
+interface MenuCategory {
+    id: number;
+    name: string;
+    items: Dish[];
+}
+
 interface RestaurantPayload {
     restaurant: RestaurantHeader;
     keyword: string;
     filters: MenuFilters;
-    menu: Dish[];
-    pagination: MenuMeta;
+    categories: MenuCategory[];
     recommended: Dish[];
 }
 
 interface Props {
     restaurant: RestaurantPayload;
+    dish: ModifierDish;
+    selectedOptions?: number[];
     cart: Cart;
 }
 
@@ -152,53 +164,36 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     // Local mirror of favourite state so the heart flips instantly. Server is
     // the source of truth — we just optimistically update and roll back on error.
     const [restaurantFav, setRestaurantFav] = useState(r.is_favorited);
+    const allCategoryItems = data.categories.flatMap((c) => c.items);
+
+    const linesByDish = useMemo(() => {
+        const map = new Map<number, CartLine[]>();
+        for (const line of cart.items) {
+            const list = map.get(line.menu_item_id) ?? [];
+            list.push(line);
+            map.set(line.menu_item_id, list);
+        }
+        return map;
+    }, [cart.items]);
+
+    // The line the modifier dialog edits. A dish can have several lines (one
+    // per option combo); we edit the most recently added one so its current
+    // selection opens pre-marked and "Update" rewrites that same line.
+    const openDishLines = openDish ? linesByDish.get(openDish.id) ?? [] : [];
+    const existingLine = openDishLines.length ? openDishLines[openDishLines.length - 1] : null;
+
+
     const [favoriteDishIds, setFavoriteDishIds] = useState<Set<number>>(
-        () => new Set([...data.menu, ...data.recommended].filter((d) => d.is_favorited).map((d) => d.id)),
+        () =>
+            new Set(
+                [...allCategoryItems, ...data.recommended]
+                    .filter((d) => d.is_favorited)
+                    .map((d) => d.id),
+            ),
     );
 
-    const [storeInfoOpen, setStoreInfoOpen] = useState(false);
-
-    // Paginated menu — first page from props, subsequent pages appended via
-    // JSON fetch (infinite scroll). Reset whenever the underlying menu changes
-    // (e.g. a new keyword search re-renders the page).
-    const [menuItems, setMenuItems] = useState<Dish[]>(data.menu);
-    const [menuMeta, setMenuMeta] = useState<MenuMeta>(data.pagination);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        setMenuItems(data.menu);
-        setMenuMeta(data.pagination);
-    }, [data.menu, data.pagination]);
-
-    const hasMoreMenu = menuMeta.current_page < menuMeta.last_page;
-
-    const loadMoreMenu = useCallback(async () => {
-        if (loadingMore || !hasMoreMenu) return;
-        setLoadingMore(true);
-        try {
-            const params = new URLSearchParams({ page: String(menuMeta.current_page + 1) });
-            if (data.keyword) params.set('search', data.keyword);
-            if (data.filters.diet) params.set('diet', data.filters.diet);
-            if (data.filters.min_rating !== null) params.set('min_rating', String(data.filters.min_rating));
-            const res = await fetch(`/customer/restaurants/${r.id}?${params.toString()}`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin',
-            });
-            if (!res.ok) throw new Error();
-            const json = (await res.json()) as RestaurantPayload;
-            setMenuItems((prev) => {
-                const seen = new Set(prev.map((d) => d.id));
-                return [...prev, ...json.menu.filter((d) => !seen.has(d.id))];
-            });
-            setMenuMeta(json.pagination);
-        } catch {
-            toast.error('Could not load more dishes.');
-        } finally {
-            setLoadingMore(false);
-        }
-    }, [data.keyword, data.filters, hasMoreMenu, loadingMore, menuMeta.current_page, r.id]);
-
+    const [storeInfoOpen, setStoreInfoOpen] = useState(false);   
+   
     /**
      * Apply the Veg/Non-Veg + Ratings 4.0+ filters server-side — re-runs the
      * detail query from page 1, carrying the keyword + the new filter set.
@@ -217,19 +212,6 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         );
     };
 
-    useEffect(() => {
-        if (!sentinelRef.current || !hasMoreMenu) return;
-        const el = sentinelRef.current;
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries.some((e) => e.isIntersecting)) loadMoreMenu();
-            },
-            { rootMargin: '400px 0px' },
-        );
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, [hasMoreMenu, loadMoreMenu]);
-
     const submitSearch = (e: React.FormEvent) => {
         e.preventDefault();
         router.get(`/customer/restaurants/${r.id}`, { search: query }, { preserveScroll: true, preserveState: false });
@@ -241,25 +223,8 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
 
     // Menu + recommended arrive already filtered (server-side). The visible
     // menu is the locally-accumulated infinite-scroll list.
-    const menu = menuItems;
+    const categories = data.categories;
     const recommended = data.recommended;
-
-    // Dishes the customer already searched-matched should not also appear in the
-    // "Other items" list below — de-duplicate by id.
-    const recommendedIds = useMemo(() => new Set(recommended.map((d) => d.id)), [recommended]);
-    const otherItems = useMemo(() => menu.filter((d) => !recommendedIds.has(d.id)), [menu, recommendedIds]);
-
-    // Cart lines grouped by dish — a dish with modifiers can occupy several
-    // lines (different customisations), so the row shows the summed quantity.
-    const linesByDish = useMemo(() => {
-        const map = new Map<number, CartLine[]>();
-        for (const line of cart.items) {
-            const list = map.get(line.menu_item_id) ?? [];
-            list.push(line);
-            map.set(line.menu_item_id, list);
-        }
-        return map;
-    }, [cart.items]);
 
     // Only reflect the cart on this page when it actually belongs to this
     // restaurant (a cart holds one restaurant at a time).
@@ -287,6 +252,26 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true });
     };
 
+    // Re-customise an existing line (options + quantity) from the modifier
+    // dialog. Sending `options` switches the server onto the edit path.
+    const updateLineSelection = (itemId: number, quantity: number, options: number[], onDone?: () => void) => {
+        setSubmitting(true);
+        router.put(
+            `/customer/cart/items/${itemId}`,
+            { quantity, options },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => onDone?.(),
+                onError: (errors) => {
+                    const first = Object.values(errors)[0];
+                    toast.error(typeof first === 'string' ? first : 'Could not update this item.');
+                },
+                onFinish: () => setSubmitting(false),
+            },
+        );
+    };
+
     const handleAdd = (dish: Dish) => {
         if (dish.modifier_groups.length > 0) {
             setOpenDish(dish);
@@ -309,8 +294,6 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         const last = lines[lines.length - 1];
         if (last) updateLine(last.id, last.quantity - 1);
     };
-
-    const quantityFor = (dishId: number) => (linesByDish.get(dishId) ?? []).reduce((sum, line) => sum + line.quantity, 0);
 
     // Restaurant favourite — optimistic toggle, roll back on failure.
     const toggleRestaurantFavorite = async () => {
@@ -382,7 +365,12 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         <MenuRow
             key={`${keyPrefix}-${dish.id}`}
             dish={dish}
-            quantity={quantityFor(dish.id)}
+            quantity={
+                (linesByDish.get(dish.id) ?? []).reduce(
+                    (sum, line) => sum + line.quantity,
+                    0
+                )
+            }
             isFavorited={favoriteDishIds.has(dish.id)}
             onAdd={() => handleAdd(dish)}
             onIncrement={() => handleIncrement(dish)}
@@ -558,37 +546,19 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                     </section>
                 ) : null}
 
-                {/* Everything else from the menu */}
-                <section className={recommended.length > 0 ? 'mt-10' : 'mt-6'}>
-                    {recommended.length > 0 ? (
-                        <h2 className="text-foreground text-lg font-bold">More to try ({otherItems.length})</h2>
-                    ) : null}
-                    <div className={(recommended.length > 0 ? 'mt-2 ' : '') + 'divide-y divide-zinc-100'}>
-                        {otherItems.length === 0 ? (
-                            <p className="text-muted-foreground py-10 text-center text-sm">No items match these filters.</p>
-                        ) : (
-                            otherItems.map((dish) => renderRow(dish, 'menu'))
-                        )}
-                    </div>
+                {categories.map((category) => (
+                    <section key={category.id} className="mt-8">
+                        <h2 className="text-foreground text-lg font-bold">
+                            {category.name}
+                        </h2>
 
-                    {menuItems.length > 0 ? (
-                        <div ref={sentinelRef} className="flex items-center justify-center py-6">
-                            {loadingMore ? (
-                                <span className="text-muted-foreground text-xs">Loading more…</span>
-                            ) : hasMoreMenu ? (
-                                <button
-                                    type="button"
-                                    onClick={loadMoreMenu}
-                                    className="hover:border-primary rounded-md border border-zinc-300 px-4 py-1.5 text-xs font-semibold"
-                                >
-                                    Load more
-                                </button>
-                            ) : menuMeta.total > menuMeta.per_page ? (
-                                <span className="text-muted-foreground text-xs">You've reached the end.</span>
-                            ) : null}
+                        <div className="mt-2 divide-y divide-zinc-100">
+                            {category.items.map((dish) =>
+                                renderRow(dish, `cat-${category.id}`)
+                            )}
                         </div>
-                    ) : null}
-                </section>
+                    </section>
+                ))}
             </main>
 
             {/* Sticky "cart added" bar — floating rounded card above the page edge */}
@@ -630,9 +600,16 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                 <DishModifierDialog
                     key={openDish.id}
                     dish={openDish}
+                    selectedOptions={existingLine?.selected_options ?? []}
+                    initialQuantity={existingLine?.quantity ?? 1}
+                    editing={existingLine !== null}
                     submitting={submitting}
                     onClose={() => setOpenDish(null)}
-                    onAdd={(optionIds, quantity) => addToCart(openDish.id, quantity, optionIds, () => setOpenDish(null))}
+                    onAdd={(optionIds, quantity) =>
+                        existingLine
+                            ? updateLineSelection(existingLine.id, quantity, optionIds, () => setOpenDish(null))
+                            : addToCart(openDish.id, quantity, optionIds, () => setOpenDish(null))
+                    }
                 />
             ) : null}
 

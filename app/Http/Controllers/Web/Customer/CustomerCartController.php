@@ -89,7 +89,13 @@ class CustomerCartController extends Controller
 
     public function update(UpdateCartItemRequest $request, int $itemId): RedirectResponse
     {
-        $this->cart->updateItemQuantity($request->user(), $itemId, $request->quantity());
+        // An `options` payload re-customises the line; otherwise it's a plain
+        // quantity change (the in-list +/- steppers).
+        if ($request->editsOptions()) {
+            $this->cart->updateItemSelection($request->user(), $itemId, $request->quantity(), $request->optionIds());
+        } else {
+            $this->cart->updateItemQuantity($request->user(), $itemId, $request->quantity());
+        }
 
         return back();
     }

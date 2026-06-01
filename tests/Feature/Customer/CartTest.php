@@ -210,6 +210,81 @@ class CartTest extends TestCase
         $this->assertDatabaseCount('cart_items', 0);
     }
 
+    public function test_edits_a_lines_options_and_quantity_via_api(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+        $large = $size->options()->where('name', 'Large')->first();
+        $cheese = $toppings->options()->where('name', 'Cheese')->first();
+
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id]])->assertCreated();
+        $itemId = $customer->cart->items()->first()->id;
+
+        // Re-customise: Large + Cheese, quantity 2 → unit (10 + 5 + 1) = 16.
+        $this->putJson("/api/customer/cart/items/{$itemId}", [
+            'quantity' => 2,
+            'options' => [$large->id, $cheese->id],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.items.0.unit_price', 16)
+            ->assertJsonPath('data.items.0.selected_options', [$large->id, $cheese->id]);
+
+        $this->assertDatabaseHas('cart_items', ['id' => $itemId, 'quantity' => 2, 'unit_price' => 16]);
+        $this->assertDatabaseCount('cart_item_modifiers', 2);
+        $this->assertDatabaseMissing('cart_item_modifiers', ['cart_item_id' => $itemId, 'option_name' => 'Regular']);
+    }
+
+    public function test_editing_a_line_to_match_another_combo_merges_them(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+        $cheese = $toppings->options()->where('name', 'Cheese')->first();
+
+        // Two distinct combos → two lines.
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 2, 'options' => [$regular->id]])->assertCreated();
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id, $cheese->id]])->assertCreated();
+        $this->assertDatabaseCount('cart_items', 2);
+
+        $cheeseLine = $customer->cart->items()->get()->first(fn ($i) => $i->modifiers->count() === 2);
+
+        // Edit the cheese line back to plain Regular → folds into the first line.
+        $this->putJson("/api/customer/cart/items/{$cheeseLine->id}", [
+            'quantity' => 1,
+            'options' => [$regular->id],
+        ])->assertOk()->assertJsonPath('data.line_count', 1);
+
+        $this->assertDatabaseCount('cart_items', 1);
+        $this->assertDatabaseMissing('cart_items', ['id' => $cheeseLine->id]);
+        $this->assertDatabaseHas('cart_items', ['menu_item_id' => $pizza->id, 'quantity' => 3]); // 2 + 1
+    }
+
+    public function test_rejects_an_option_edit_that_breaks_the_dishs_rules(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id]])->assertCreated();
+        $itemId = $customer->cart->items()->first()->id;
+
+        // Drop the required Size group → validation error, line untouched.
+        $this->putJson("/api/customer/cart/items/{$itemId}", ['quantity' => 1, 'options' => []])
+            ->assertStatus(422)->assertJsonValidationErrors('options');
+
+        // Three toppings exceeds the max of two.
+        $this->putJson("/api/customer/cart/items/{$itemId}", [
+            'quantity' => 1,
+            'options' => array_merge([$regular->id], $toppings->options->pluck('id')->all()),
+        ])->assertStatus(422)->assertJsonValidationErrors('options');
+
+        $this->assertDatabaseHas('cart_item_modifiers', ['cart_item_id' => $itemId, 'option_name' => 'Regular']);
+    }
+
     public function test_adds_to_cart_through_web_inertia_controller(): void
     {
         ['customer' => $customer, 'pizza' => $pizza, 'size' => $size] = $this->cartGraph();

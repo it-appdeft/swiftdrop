@@ -6,6 +6,7 @@ use App\DTO\Customer\CustomerRestaurantData;
 use App\Models\MenuItem;
 use App\Models\Restaurant;
 use App\Models\RestaurantHour;
+use App\Models\CartItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
@@ -43,19 +44,34 @@ class CustomerRestaurantResource extends JsonResource
         return [
             'restaurant' => $header,
             'keyword' => $data->keyword,
-            // Active menu filters echoed back so the frontend can restore the
-            // Veg/Non-Veg radio + "Ratings 4.0+" chip after a server reload.
             'filters' => [
                 'diet' => $data->filters['diet'] ?? null,
                 'min_rating' => $data->filters['min_rating'] ?? null,
             ],
-            'menu' => $data->menuItems
-                ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id])))
-                ->values()->all(),
-            'pagination' => $data->menuMeta,
+            'categories' => $data->menuCategories
+                ->map(function ($items) use ($rating, $favoriteIds, $data) {
+
+                    $category = $items->first()->category;
+
+                    return [
+                        'id' => $category?->id,
+                        'name' => $category?->name,
+                        'items' => $items
+                            ->map(fn (MenuItem $m) => $this->dish(
+                                $m,
+                                $rating,
+                                isset($favoriteIds[$m->id]),
+                                $data->cartLookup[$m->id] ?? null
+                            ))
+                            ->values()
+                            ->all(),
+                    ];
+                })
+                ->values()
+                ->all(),
             'recommended' => $data->recommended
-                ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id])))
-                ->values()->all(),
+                ->map(fn (MenuItem $m) => $this->dish($m, $rating, isset($favoriteIds[$m->id]), $data->cartLookup[$m->id] ?? null))
+                ->values()->all(),            
         ];
     }
 
@@ -65,7 +81,7 @@ class CustomerRestaurantResource extends JsonResource
      *
      * @return array<string, mixed>
      */
-    protected function dish(MenuItem $item, ?float $rating, bool $isFavorited): array
+    protected function dish(MenuItem $item, ?float $rating, bool $isFavorited, ?CartItem $cartItem = null): array
     {
         return [
             'id' => $item->id,
@@ -76,8 +92,18 @@ class CustomerRestaurantResource extends JsonResource
             'image_url' => $this->dishImageUrl($item),
             'rating' => $rating,
             'is_favorited' => $isFavorited,
-            // Drives the "Add" → customise popup. Empty array → the dish adds
-            // to the cart directly with no modal.
+            'cart_item_id' => $cartItem?->id,
+            'is_in_cart' => $cartItem !== null,
+            'cart_quantity' => $cartItem?->quantity ?? 0,
+            'selected_modifiers' => $cartItem
+                ? $cartItem->modifiers->map(fn ($modifier) => [
+                    'modifier_group_id' => $modifier->modifier_group_id,
+                    'modifier_option_id' => $modifier->modifier_option_id,
+                    'group_name' => $modifier->group_name,
+                    'option_name' => $modifier->option_name,
+                    'price_delta' => (float) $modifier->price_delta,
+                ])->values()->all()
+                : [],
             'modifier_groups' => $item->relationLoaded('modifierGroups')
                 ? $item->modifierGroups->map(fn ($group) => $this->modifierGroup($group, $item))->values()->all()
                 : [],
@@ -189,8 +215,23 @@ class CustomerRestaurantResource extends JsonResource
         ];
     }
 
+    /**
+     * Prefer the menu item's own uploaded photo (the `image` upload collection,
+     * the same one the partner sets in Menu Management). Only fall back to the
+     * linked food-type's stock image when the dish has no photo of its own.
+     */
     protected function dishImageUrl(MenuItem $item): ?string
     {
+        if ($item->relationLoaded('uploads')) {
+            $own = $item->uploads->firstWhere('collection', 'image');
+        } else {
+            $own = $item->uploadsIn('image')->first();
+        }
+
+        if ($own && $own->url) {
+            return $own->url;
+        }
+
         $foodType = $item->foodType;
         if ($foodType && $foodType->image) {
             return '/storage/'.ltrim($foodType->image, '/');

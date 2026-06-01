@@ -62,13 +62,10 @@ class CustomerRestaurantController extends Controller
 
     public function show(SearchRequest $request, int $id): Response|JsonResponse
     {
-        $menuPage = max(1, (int) $request->query('page', 1));
         $data = $this->restaurants->show(
             $request->user(),
             $id,
             $request->keyword(),
-            menuPage: $menuPage,
-            menuPerPage: CustomerRestaurantService::MENU_PER_PAGE,
             filters: $request->menuFilters(),
         );
         $cart = $this->cart->getCart($request->user());

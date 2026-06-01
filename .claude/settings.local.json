@@ -9,7 +9,11 @@
       "Bash(sed -n '322,342p' resources/js/admin/pages/admin/drivers/show.tsx)",
       "Bash(npm run *)",
       "Bash(php -l app/Models/Restaurant.php)",
-      "Bash(php -l app/Services/Customer/CustomerSearchService.php)"
+      "Bash(php -l app/Services/Customer/CustomerSearchService.php)",
+      "Bash(npx tsc *)",
+      "Bash(php -l app/Http/Resources/Customer/CustomerRestaurantResource.php)",
+      "Bash(php -l app/Http/Resources/Customer/CustomerCartResource.php)",
+      "Bash(php -l app/Services/Customer/CustomerRestaurantService.php)"
     ]
   }
 }

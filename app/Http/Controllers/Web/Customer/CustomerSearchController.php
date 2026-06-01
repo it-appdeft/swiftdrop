@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Web\Customer;
 
+use App\Contracts\Customer\CustomerCartServiceInterface;
 use App\Contracts\Customer\CustomerSearchServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\Search\SearchRequest;
+use App\Http\Resources\Customer\CustomerCartResource;
 use App\Http\Resources\Customer\CustomerSearchResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +22,7 @@ class CustomerSearchController extends Controller
 {
     public function __construct(
         protected CustomerSearchServiceInterface $search,
+        protected CustomerCartServiceInterface $cart,
     ) {
     }
 
@@ -37,6 +40,10 @@ class CustomerSearchController extends Controller
 
         return Inertia::render('customer/search', [
             'results' => $payload,
+            // Lets the Items tab show in-cart quantity steppers + pre-marked
+            // options in the customise dialog, mirroring the restaurant page.
+            // Refreshed in place (only: ['cart']) on every cart mutation.
+            'cart' => (new CustomerCartResource($this->cart->getCart($request->user())))->resolve($request),
         ]);
     }
 

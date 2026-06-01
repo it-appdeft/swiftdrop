@@ -77,7 +77,11 @@ class CustomerCartController extends Controller
 
     public function update(UpdateCartItemRequest $request, int $itemId): JsonResponse
     {
-        $data = $this->cart->updateItemQuantity($request->user(), $itemId, $request->quantity());
+        // An `options` payload re-customises the line; otherwise it's a plain
+        // quantity change.
+        $data = $request->editsOptions()
+            ? $this->cart->updateItemSelection($request->user(), $itemId, $request->quantity(), $request->optionIds())
+            : $this->cart->updateItemQuantity($request->user(), $itemId, $request->quantity());
 
         return $this->success(
             data: new CustomerCartResource($data),

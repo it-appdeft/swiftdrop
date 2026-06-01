@@ -27,6 +27,15 @@ interface CustomerCartServiceInterface
     /** Set a line's quantity; quantity <= 0 removes the line. */
     public function updateItemQuantity(User $user, int $cartItemId, int $quantity): CustomerCartData;
 
+    /**
+     * Re-customise an existing line: replace its option set + quantity and
+     * re-freeze the unit price. quantity <= 0 removes the line; if the new
+     * option set matches another line for the same dish, the two are merged.
+     *
+     * @param  array<int, int>  $optionIds  Selected modifier_option ids.
+     */
+    public function updateItemSelection(User $user, int $cartItemId, int $quantity, array $optionIds): CustomerCartData;
+
     /** Remove a single line from the cart. */
     public function removeItem(User $user, int $cartItemId): CustomerCartData;
 

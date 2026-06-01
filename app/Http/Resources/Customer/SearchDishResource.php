@@ -63,8 +63,21 @@ class SearchDishResource extends JsonResource
         ];
     }
 
+    /**
+     * Prefer the dish's own uploaded photo (the `image` collection set in Menu
+     * Management); fall back to the linked food-type's stock image only when
+     * the dish has none of its own. Mirrors the restaurant-detail resource.
+     */
     protected function imageUrl(MenuItem $item): ?string
     {
+        $own = $item->relationLoaded('uploads')
+            ? $item->uploads->firstWhere('collection', 'image')
+            : $item->uploadsIn('image')->first();
+
+        if ($own && $own->url) {
+            return $own->url;
+        }
+
         $foodType = $item->foodType;
 
         return $foodType && $foodType->image ? '/storage/'.ltrim($foodType->image, '/') : null;
