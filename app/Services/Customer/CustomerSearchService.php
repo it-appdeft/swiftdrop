@@ -237,7 +237,11 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         $dishesByRestaurant = empty($restaurantIds)
             ? collect()
             : MenuItem::query()
-                ->with(['foodType', 'modifierGroups.options'])
+                ->with([
+                    'foodType',
+                    'modifierGroups.options',
+                    'uploads' => fn ($q) => $q->where('collection', 'image'),
+                ])
                 ->whereIn('restaurant_id', $restaurantIds)
                 ->available()
                 ->matchingKeyword($keyword)

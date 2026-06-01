@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api\Customer;
 
+use App\Contracts\Customer\CustomerCartServiceInterface;
 use App\Contracts\Customer\CustomerSearchServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\Search\SearchRequest;
+use App\Http\Resources\Customer\CustomerCartResource;
 use App\Http\Resources\Customer\CustomerSearchApiResource;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +17,7 @@ class CustomerSearchController extends Controller
 
     public function __construct(
         protected CustomerSearchServiceInterface $search,
+        protected CustomerCartServiceInterface $cart,
     ) {
     }
 
@@ -30,6 +33,9 @@ class CustomerSearchController extends Controller
             data: [
                 'results' => (new CustomerSearchApiResource($results))->resolve($request),
                 'pagination' => $results->restaurantsMeta,
+                // Same cart shape the web search page + cart endpoints emit, so
+                // the Items tab can show in-cart quantity + pre-marked options.
+                'cart' => (new CustomerCartResource($this->cart->getCart($request->user())))->resolve($request),
             ],
             message: 'Search completed.',
         );

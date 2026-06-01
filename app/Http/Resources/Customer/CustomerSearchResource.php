@@ -24,7 +24,7 @@ class CustomerSearchResource extends JsonResource
             ],
             'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
             'pagination' => $data->restaurantsMeta,
-            'dishes_by_restaurant' => $data->dishesByRestaurant->map(function (array $row) {
+            'dishes_by_restaurant' => $data->dishesByRestaurant->map(function (array $row) use ($request) {
                 /** @var Restaurant $restaurant */
                 $restaurant = $row['restaurant'];
 

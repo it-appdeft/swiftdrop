@@ -99,6 +99,63 @@ class CustomerCartService implements CustomerCartServiceInterface
         return $this->getCart($user);
     }
 
+    public function updateItemSelection(User $user, int $cartItemId, int $quantity, array $optionIds): CustomerCartData
+    {
+        $item = $this->ownedItem($user, $cartItemId);
+
+        // Editing the quantity down to zero is a removal, same as a plain
+        // quantity update — no point reshuffling options on the way out.
+        if ($quantity <= 0) {
+            return $this->removeItem($user, $cartItemId);
+        }
+
+        $menuItem = MenuItem::query()
+            ->available()
+            ->with('modifierGroups.options')
+            ->findOrFail($item->menu_item_id);
+
+        // Rebuild the priced snapshot for the new selection (request already
+        // validated the options belong to this dish + satisfy its groups).
+        $selected = $this->resolveSelections($menuItem, $optionIds);
+        $unitPrice = round((float) $menuItem->price + $selected->sum('price_delta'), 2);
+        $signature = $this->signature($optionIds);
+        $quantity = min(self::MAX_QUANTITY, $quantity);
+
+        return DB::transaction(function () use ($user, $item, $menuItem, $quantity, $selected, $unitPrice, $signature) {
+            $cart = $item->cart;
+
+            // If another line already carries this exact option set, fold the
+            // edited line into it (mirrors addItem's merge) rather than leaving
+            // two identical combos in the cart.
+            $duplicate = $cart->items()
+                ->where('menu_item_id', $menuItem->id)
+                ->whereKeyNot($item->id)
+                ->with('modifiers')
+                ->get()
+                ->first(fn (CartItem $other) => $this->lineSignature($other) === $signature);
+
+            if ($duplicate) {
+                $duplicate->update([
+                    'quantity' => min(self::MAX_QUANTITY, $duplicate->quantity + $quantity),
+                    'unit_price' => $unitPrice,
+                ]);
+                $item->delete(); // its modifiers cascade away.
+
+                return $this->getCart($user);
+            }
+
+            $item->update(['quantity' => $quantity, 'unit_price' => $unitPrice]);
+
+            // Replace the frozen modifier snapshot with the new selection.
+            $item->modifiers()->delete();
+            if ($selected->isNotEmpty()) {
+                $item->modifiers()->createMany($selected->all());
+            }
+
+            return $this->getCart($user);
+        });
+    }
+
     public function removeItem(User $user, int $cartItemId): CustomerCartData
     {
         $item = $this->ownedItem($user, $cartItemId);

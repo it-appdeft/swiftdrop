@@ -1,4 +1,4 @@
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Check, Minus, Plus, UtensilsCrossed } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -31,24 +31,50 @@ export interface ModifierDish {
 
 interface Props {
     dish: ModifierDish;
+    /** Option ids already chosen (e.g. an existing cart line being edited) —
+     *  these are marked when the dialog opens. */
+    selectedOptions?: number[];
+    /** Quantity the dialog opens at — the edited line's quantity, else 1. */
+    initialQuantity?: number;
+    /** Editing an existing line (vs. adding a new one) — drives the CTA label. */
+    editing?: boolean;
     submitting?: boolean;
     onClose: () => void;
     onAdd: (optionIds: number[], quantity: number) => void;
 }
 
-/** Each single-select group defaults to its first option (matches the design,
- *  where "Regular" is pre-selected). Multi-select groups start empty. */
-function defaultSelection(groups: ModifierGroup[]): Record<number, number[]> {
+/**
+ * Seed each group's selection. Any of the dish's options already chosen
+ * (`preselected`, e.g. from an existing cart line) are marked; single-select
+ * groups keep just the first such pick. Groups with no pre-selection fall back
+ * to the design default — single-select shows its first option (like a
+ * pre-selected "Regular"), multi-select starts empty.
+ */
+function defaultSelection(groups: ModifierGroup[], preselected: number[] = []): Record<number, number[]> {
+    const preset = new Set(preselected);
     const initial: Record<number, number[]> = {};
     for (const group of groups) {
-        initial[group.id] = group.selection_type === 'single' && group.options.length > 0 ? [group.options[0].id] : [];
+        const chosen = group.options.filter((o) => preset.has(o.id)).map((o) => o.id);
+        if (chosen.length > 0) {
+            initial[group.id] = group.selection_type === 'single' ? [chosen[0]] : chosen;
+        } else {
+            initial[group.id] = group.selection_type === 'single' && group.options.length > 0 ? [group.options[0].id] : [];
+        }
     }
     return initial;
 }
 
-export function DishModifierDialog({ dish, submitting = false, onClose, onAdd }: Props) {
-    const [selected, setSelected] = useState<Record<number, number[]>>(() => defaultSelection(dish.modifier_groups));
-    const [quantity, setQuantity] = useState(1);
+export function DishModifierDialog({
+    dish,
+    selectedOptions = [],
+    initialQuantity = 1,
+    editing = false,
+    submitting = false,
+    onClose,
+    onAdd,
+}: Props) {
+    const [selected, setSelected] = useState<Record<number, number[]>>(() => defaultSelection(dish.modifier_groups, selectedOptions));
+    const [quantity, setQuantity] = useState(() => Math.max(1, initialQuantity));
 
     const deltaById = useMemo(() => {
         const map = new Map<number, number>();
@@ -95,6 +121,12 @@ export function DishModifierDialog({ dish, submitting = false, onClose, onAdd }:
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[480px]">
+                {/* Radix requires a title/description for screen readers; the
+                    visible heading below is styled separately, so these are hidden. */}
+                <DialogTitle className="sr-only">{dish.name}</DialogTitle>
+                <DialogDescription className="sr-only">
+                    {dish.description ?? `Customise ${dish.name} and add it to your cart.`}
+                </DialogDescription>
                 <div className="min-h-0 flex-1 overflow-y-auto">
                     {/* Hero image */}
                     <div className="aspect-[16/9] w-full overflow-hidden bg-amber-50">
@@ -153,7 +185,7 @@ export function DishModifierDialog({ dish, submitting = false, onClose, onAdd }:
                         onClick={() => onAdd(selectedIds, quantity)}
                         className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        Add Item £{(unitPrice * quantity).toFixed(2)}
+                        {editing ? 'Update' : 'Add Item'} £{(unitPrice * quantity).toFixed(2)}
                     </button>
                 </div>
             </DialogContent>

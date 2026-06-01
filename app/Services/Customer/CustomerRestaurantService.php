@@ -7,15 +7,13 @@ use App\Contracts\Customer\CustomerRestaurantServiceInterface;
 use App\DTO\Customer\CustomerRestaurantData;
 use App\Models\MenuItem;
 use App\Models\Restaurant;
+use App\Models\Cart;
 use App\Models\User;
 use App\Support\PaginationMeta;
 use Illuminate\Support\Collection;
 
 class CustomerRestaurantService implements CustomerRestaurantServiceInterface
 {
-    /** Default page size for the restaurant detail menu list. */
-    public const MENU_PER_PAGE = 10;
-
     public function __construct(
         protected CustomerFavoriteServiceInterface $favorites,
     ) {
@@ -25,8 +23,6 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
         User $user,
         int $restaurantId,
         string $keyword = '',
-        int $menuPage = 1,
-        int $menuPerPage = self::MENU_PER_PAGE,
         array $filters = [],
     ): CustomerRestaurantData {
         // Customers may only open live, approved restaurants — anything else 404s.
@@ -35,6 +31,18 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
             ->approved()
             ->with(['hours', 'uploads'])
             ->findOrFail($restaurantId);
+
+        $cart = Cart::query()
+            ->where('user_id', $user->id)
+            ->where('restaurant_id', $restaurant->id)
+            ->with([
+                'items.modifiers',
+            ])
+            ->first();
+
+        $cartLookup = $cart
+            ? $cart->items->keyBy('menu_item_id')->all()
+            : [];
 
         // Normalise the customer-facing menu filters (Veg / Non-Veg + Ratings 4.0+).
         $filters = [
@@ -46,14 +54,22 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
 
         // Paginated menu — same partner sort order, 10 rows per page by default,
         // narrowed by the diet/rating filters via the model scope.
-        $menuPaginator = MenuItem::query()
+        $menuItems = MenuItem::query()
             ->forRestaurant($restaurant->id)
             ->available()
             ->customerFilter($filters)
-            ->with(['foodType', 'modifierGroups.options'])
+            ->with([
+                'foodType',
+                'category',
+                'modifierGroups.options',
+                'uploads' => fn ($q) => $q->where('collection', 'image'),
+            ])
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->paginate(perPage: $menuPerPage, page: $menuPage);
+            ->get();
+
+        $categories = $menuItems
+            ->groupBy(fn ($item) => $item->category_id ?? 0);
 
         // Recommended list: the same menu narrowed to what the customer searched
         // for (e.g. "pizza"). Empty keyword → nothing recommended. Not paginated
@@ -67,7 +83,12 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
                 ->available()
                 ->matchingKeyword($keyword)
                 ->customerFilter($filters)
-                ->with(['foodType', 'modifierGroups.options'])
+                ->with([
+                    'foodType',
+                    'category',
+                    'modifierGroups.options',
+                    'uploads' => fn ($q) => $q->where('collection', 'image'),
+                ])
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get();
@@ -75,22 +96,14 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
         $favoriteRestaurantIds = $this->favorites->favoriteRestaurantIds($user);
         $favoriteMenuItemIds = $this->favorites->favoriteMenuItemIds($user);
 
-        // Keep the active keyword + filters on the menu pagination links so
-        // paging within a filtered/searched view round-trips correctly.
-        $menuPaginator->appends(array_filter([
-            'search' => $keyword !== '' ? $keyword : null,
-            'diet' => $filters['diet'],
-            'min_rating' => $filters['min_rating'],
-        ]));
-
         return new CustomerRestaurantData(
             restaurant: $restaurant,
-            menuItems: $menuPaginator->getCollection(),
+            menuCategories: $categories,
             recommended: $recommended,
             keyword: $keyword,
             isFavorite: in_array($restaurant->id, $favoriteRestaurantIds, true),
             favoriteMenuItemIds: $favoriteMenuItemIds,
-            menuMeta: PaginationMeta::make($menuPaginator),
+            cartLookup: $cartLookup,
             filters: $filters,
         );
     }

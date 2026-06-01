@@ -1,7 +1,7 @@
 import { toast } from '@/hooks/use-toast';
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronRight, Clock, Heart, Star, Tag, UtensilsCrossed } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronRight, Clock, Heart, Minus, Plus, Star, Tag, UtensilsCrossed } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish } from '../components/dish-modifier-dialog';
 
@@ -82,6 +82,18 @@ interface SearchFilters {
     highest_rated: boolean;
 }
 
+interface CartLine {
+    id: number;
+    menu_item_id: number;
+    quantity: number;
+    selected_options?: number[];
+}
+
+interface Cart {
+    restaurant_id: number | null;
+    items: CartLine[];
+}
+
 interface Props {
     results: {
         type: Tab;
@@ -95,6 +107,7 @@ interface Props {
         radius_miles: number;
         using_fallback: boolean;
     };
+    cart: Cart;
 }
 
 // Mirrors the backend `{type}` route segment.
@@ -107,10 +120,35 @@ function restaurantHref(id: number, keyword: string): string {
     return q ? `/customer/restaurants/${id}?search=${encodeURIComponent(q)}` : `/customer/restaurants/${id}`;
 }
 
-export default function CustomerSearch({ results }: Props) {
+export default function CustomerSearch({ results, cart }: Props) {
     const type = results.type;
     const [openDish, setOpenDish] = useState<{ dish: ModifierDish; restaurantId: number } | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
+    // Cart lines keyed by dish — drives the in-list quantity steppers and the
+    // pre-marked options in the customise dialog. A cart holds one restaurant
+    // at a time, so only that restaurant's dishes ever show as "in cart".
+    const linesByDish = useMemo(() => {
+        const map = new Map<number, CartLine[]>();
+        for (const line of cart.items) {
+            const list = map.get(line.menu_item_id) ?? [];
+            list.push(line);
+            map.set(line.menu_item_id, list);
+        }
+        return map;
+    }, [cart.items]);
+
+    const quantityFor = (dishId: number) =>
+        (linesByDish.get(dishId) ?? []).reduce((sum, line) => sum + line.quantity, 0);
+
+    // The line the dialog edits — most recent combo for the dish, so its
+    // current selection opens pre-marked (see restaurant page for the rationale).
+    const lastLineFor = (dishId: number): CartLine | null => {
+        const lines = linesByDish.get(dishId) ?? [];
+        return lines.length ? lines[lines.length - 1] : null;
+    };
+
+    const openExistingLine = openDish ? lastLineFor(openDish.dish.id) : null;
 
     // Both tabs use infinite scroll. The active tab's first page comes from
     // props; subsequent pages append via JSON fetch from the same
@@ -217,38 +255,58 @@ export default function CustomerSearch({ results }: Props) {
     const hasQuery = results.keyword.trim() !== '';
     const activeCount = type === 'items' ? groups.length : restaurants.length;
 
-    /**
-     * Add a dish to the cart from a search-results row, then navigate the
-     * customer into the restaurant detail page so they see the qty stepper +
-     * sticky cart bar already reflecting their addition.
-     */
-    const addToCartAndOpenRestaurant = (menuItemId: number, restaurantId: number, options: number[], quantity: number) => {
+    // All cart mutations refresh only the `cart` prop (partial reload) so the
+    // infinite-scroll dish list + scroll position survive the round-trip.
+    const cartReloadOpts = (onDone?: () => void) => ({
+        preserveScroll: true,
+        preserveState: true,
+        only: ['cart'],
+        onError: (errors: Record<string, string>) => {
+            const first = Object.values(errors)[0];
+            toast.error(typeof first === 'string' ? first : 'Could not update your cart.');
+        },
+        onSuccess: () => onDone?.(),
+        onFinish: () => setSubmitting(false),
+    });
+
+    const addToCart = (menuItemId: number, quantity: number, options: number[], onDone?: () => void) => {
         setSubmitting(true);
-        router.post(
-            '/customer/cart',
-            { menu_item_id: menuItemId, quantity, options },
-            {
-                preserveScroll: false,
-                preserveState: false,
-                onSuccess: () => {
-                    setOpenDish(null);
-                    router.visit(restaurantHref(restaurantId, results.keyword));
-                },
-                onError: (errors) => {
-                    const first = Object.values(errors)[0];
-                    toast.error(typeof first === 'string' ? first : 'Could not add this item to your cart.');
-                },
-                onFinish: () => setSubmitting(false),
-            },
-        );
+        router.post('/customer/cart', { menu_item_id: menuItemId, quantity, options }, cartReloadOpts(onDone));
     };
 
+    const updateLine = (itemId: number, quantity: number) => {
+        router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true, only: ['cart'] });
+    };
+
+    const updateLineSelection = (itemId: number, quantity: number, options: number[], onDone?: () => void) => {
+        setSubmitting(true);
+        router.put(`/customer/cart/items/${itemId}`, { quantity, options }, cartReloadOpts(onDone));
+    };
+
+    // First add from a card. Dishes with options open the customise dialog;
+    // plain dishes drop straight into the cart and the card flips to a stepper.
     const handleDishAdd = (dish: DishItem, restaurantId: number) => {
         if (dish.modifier_groups.length > 0) {
             setOpenDish({ dish, restaurantId });
             return;
         }
-        addToCartAndOpenRestaurant(dish.id, restaurantId, [], 1);
+        addToCart(dish.id, 1, []);
+    };
+
+    // Stepper +: re-open the dialog for customisable dishes (so the customer
+    // confirms a combo), else bump the existing line's quantity.
+    const handleIncrement = (dish: DishItem, restaurantId: number) => {
+        if (dish.modifier_groups.length > 0) {
+            setOpenDish({ dish, restaurantId });
+            return;
+        }
+        const line = lastLineFor(dish.id);
+        if (line) updateLine(line.id, line.quantity + 1);
+    };
+
+    const handleDecrement = (dish: DishItem) => {
+        const line = lastLineFor(dish.id);
+        if (line) updateLine(line.id, line.quantity - 1);
     };
 
     return (
@@ -290,7 +348,14 @@ export default function CustomerSearch({ results }: Props) {
                         {type === 'restaurant' ? (
                             <RestaurantsList restaurants={restaurants} keyword={results.keyword} />
                         ) : (
-                            <DishesList groups={groups} keyword={results.keyword} onAdd={handleDishAdd} />
+                            <DishesList
+                                groups={groups}
+                                keyword={results.keyword}
+                                quantityFor={quantityFor}
+                                onAdd={handleDishAdd}
+                                onIncrement={handleIncrement}
+                                onDecrement={handleDecrement}
+                            />
                         )}
 
                         {activeCount > 0 ? (
@@ -318,10 +383,15 @@ export default function CustomerSearch({ results }: Props) {
                 <DishModifierDialog
                     key={openDish.dish.id}
                     dish={openDish.dish}
+                    selectedOptions={openExistingLine?.selected_options ?? []}
+                    initialQuantity={openExistingLine?.quantity ?? 1}
+                    editing={openExistingLine !== null}
                     submitting={submitting}
                     onClose={() => setOpenDish(null)}
                     onAdd={(optionIds, quantity) =>
-                        addToCartAndOpenRestaurant(openDish.dish.id, openDish.restaurantId, optionIds, quantity)
+                        openExistingLine
+                            ? updateLineSelection(openExistingLine.id, quantity, optionIds, () => setOpenDish(null))
+                            : addToCart(openDish.dish.id, quantity, optionIds, () => setOpenDish(null))
                     }
                 />
             ) : null}
@@ -475,11 +545,17 @@ function RestaurantsList({ restaurants, keyword }: { restaurants: SearchRestaura
 function DishesList({
     groups,
     keyword,
+    quantityFor,
     onAdd,
+    onIncrement,
+    onDecrement,
 }: {
     groups: DishGroup[];
     keyword: string;
+    quantityFor: (dishId: number) => number;
     onAdd: (dish: DishItem, restaurantId: number) => void;
+    onIncrement: (dish: DishItem, restaurantId: number) => void;
+    onDecrement: (dish: DishItem) => void;
 }) {
     if (groups.length === 0) {
         return (
@@ -511,7 +587,10 @@ function DishesList({
                                 key={dish.id}
                                 dish={dish}
                                 rating={group.restaurant.rating}
+                                quantity={quantityFor(dish.id)}
                                 onAdd={() => onAdd(dish, group.restaurant.id)}
+                                onIncrement={() => onIncrement(dish, group.restaurant.id)}
+                                onDecrement={() => onDecrement(dish)}
                             />
                         ))}
                     </div>
@@ -524,11 +603,17 @@ function DishesList({
 function DishCard({
     dish,
     rating,
+    quantity,
     onAdd,
+    onIncrement,
+    onDecrement,
 }: {
     dish: DishItem;
     rating: number | null;
+    quantity: number;
     onAdd: () => void;
+    onIncrement: () => void;
+    onDecrement: () => void;
 }) {
     return (
         <article className="rounded-xl border border-zinc-200 bg-white p-3">
@@ -543,13 +628,25 @@ function DishCard({
                             </div>
                         )}
                     </div>
-                    <button
-                        type="button"
-                        onClick={onAdd}
-                        className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500 bg-white px-5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-600 shadow-sm transition hover:bg-emerald-500 hover:text-white"
-                    >
-                        Add
-                    </button>
+                    {quantity === 0 ? (
+                        <button
+                            type="button"
+                            onClick={onAdd}
+                            className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-emerald-500 bg-white px-5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-600 shadow-sm transition hover:bg-emerald-500 hover:text-white"
+                        >
+                            Add
+                        </button>
+                    ) : (
+                        <div className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-md border border-emerald-500 bg-white px-2 py-1 shadow-sm">
+                            <button type="button" aria-label="Decrease" onClick={onDecrement} className="text-emerald-600">
+                                <Minus className="size-4" />
+                            </button>
+                            <span className="min-w-4 text-center text-sm font-bold text-emerald-700">{quantity}</span>
+                            <button type="button" aria-label="Increase" onClick={onIncrement} className="text-emerald-600">
+                                <Plus className="size-4" />
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex items-start justify-between gap-2">
