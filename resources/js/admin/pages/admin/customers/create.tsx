@@ -37,7 +37,7 @@ export default function CustomerCreate() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Customer" />
 
-            <PageContainer width="narrow">
+            <PageContainer width="full">
                 <div className="mb-6 flex items-center gap-3">
                     <Button variant="ghost" size="icon-sm" asChild>
                         <Link href="/admin/customers"><ArrowLeft /></Link>
