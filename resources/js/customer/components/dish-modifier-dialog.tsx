@@ -5,7 +5,10 @@ import { useMemo, useState } from 'react';
 export interface ModifierOption {
     id: number;
     name: string;
+    /** Surcharge, or — on a price-driver group — the option's absolute price. */
     price_delta: number;
+    /** On a price-driver group, the option pre-selected as the default size. */
+    is_default?: boolean;
 }
 
 export interface ModifierGroup {
@@ -13,6 +16,8 @@ export interface ModifierGroup {
     name: string;
     description: string | null;
     selection_type: 'single' | 'multiple';
+    /** When true, the picked option sets the item's absolute price (e.g. size). */
+    is_price_driver?: boolean;
     is_required: boolean;
     min_selections: number;
     max_selections: number | null;
@@ -76,20 +81,28 @@ export function DishModifierDialog({
     const [selected, setSelected] = useState<Record<number, number[]>>(() => defaultSelection(dish.modifier_groups, selectedOptions));
     const [quantity, setQuantity] = useState(() => Math.max(1, initialQuantity));
 
-    const deltaById = useMemo(() => {
-        const map = new Map<number, number>();
-        for (const group of dish.modifier_groups) {
-            for (const option of group.options) map.set(option.id, option.price_delta);
-        }
-        return map;
-    }, [dish]);
-
     const selectedIds = useMemo(() => Object.values(selected).flat(), [selected]);
 
-    const unitPrice = useMemo(
-        () => selectedIds.reduce((sum, id) => sum + (deltaById.get(id) ?? 0), dish.price),
-        [selectedIds, deltaById, dish.price],
-    );
+    // Mirror the server's pricing: a price-driver group's picked option sets
+    // the absolute base price; every other group adds its options on top.
+    const unitPrice = useMemo(() => {
+        let base = dish.price;
+        let surcharge = 0;
+        for (const group of dish.modifier_groups) {
+            const picked = selected[group.id] ?? [];
+            if (picked.length === 0) continue;
+            if (group.is_price_driver) {
+                const opt = group.options.find((o) => o.id === picked[0]);
+                if (opt) base = opt.price_delta;
+            } else {
+                for (const id of picked) {
+                    const opt = group.options.find((o) => o.id === id);
+                    if (opt) surcharge += opt.price_delta;
+                }
+            }
+        }
+        return base + surcharge;
+    }, [selected, dish]);
 
     // Every required group must be satisfied before the dish can be added.
     const canAdd = useMemo(
@@ -211,7 +224,8 @@ function GroupBlock({
     const isSingle = group.selection_type === 'single';
     // Single groups read as a price (base + delta), like the Size selector in
     // the design; only show it when at least one option actually costs more.
-    const showAbsolutePrice = isSingle && group.options.some((o) => o.price_delta !== 0);
+    // A price-driver group's options are already absolute prices.
+    const showAbsolutePrice = !group.is_price_driver && isSingle && group.options.some((o) => o.price_delta !== 0);
     const atMax = !isSingle && group.max_selections !== null && selectedIds.length >= group.max_selections;
 
     return (
@@ -228,11 +242,13 @@ function GroupBlock({
                 {group.options.map((option) => {
                     const checked = selectedIds.includes(option.id);
                     const disabled = !isSingle && !checked && atMax;
-                    const priceLabel = showAbsolutePrice
-                        ? `£${(basePrice + option.price_delta).toFixed(2)}`
-                        : option.price_delta > 0
-                          ? `+£${option.price_delta.toFixed(2)}`
-                          : '';
+                    const priceLabel = group.is_price_driver
+                        ? `£${option.price_delta.toFixed(2)}`
+                        : showAbsolutePrice
+                          ? `£${(basePrice + option.price_delta).toFixed(2)}`
+                          : option.price_delta > 0
+                            ? `+£${option.price_delta.toFixed(2)}`
+                            : '';
 
                     return (
                         <button

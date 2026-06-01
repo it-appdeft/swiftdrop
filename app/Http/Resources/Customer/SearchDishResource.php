@@ -30,20 +30,35 @@ class SearchDishResource extends JsonResource
             // Drives the customise dialog on the search dish-card. Empty array →
             // dish adds straight to cart.
             'modifier_groups' => $m->relationLoaded('modifierGroups')
-                ? $m->modifierGroups->map(fn ($g) => [
-                    'id' => $g->id,
-                    'name' => $g->name,
-                    'description' => $g->description,
-                    'selection_type' => $g->selection_type,
-                    'is_required' => (bool) $g->is_required,
-                    'min_selections' => (int) $g->min_selections,
-                    'max_selections' => $g->max_selections !== null ? (int) $g->max_selections : null,
-                    'options' => $g->options->map(fn ($o) => [
-                        'id' => $o->id,
-                        'name' => $o->name,
-                        'price_delta' => (float) $o->price_delta,
-                    ])->values()->all(),
-                ])->values()->all()
+                ? $m->modifierGroups->map(function ($g) use ($m) {
+                    // Per-dish prices for price-driver options: option id → price.
+                    $itemPrices = $m->relationLoaded('modifierOptions')
+                        ? $m->modifierOptions->mapWithKeys(fn ($o) => [(int) $o->id => (float) $o->pivot->price])
+                        : collect();
+
+                    $options = $g->is_price_driver
+                        ? $g->options->filter(fn ($o) => $itemPrices->has((int) $o->id))
+                        : $g->options;
+
+                    return [
+                        'id' => $g->id,
+                        'name' => $g->name,
+                        'description' => $g->description,
+                        'selection_type' => $g->selection_type,
+                        'is_price_driver' => (bool) $g->is_price_driver,
+                        'is_required' => (bool) $g->is_required,
+                        'min_selections' => (int) $g->min_selections,
+                        'max_selections' => $g->max_selections !== null ? (int) $g->max_selections : null,
+                        'options' => $options->map(fn ($o) => [
+                            'id' => $o->id,
+                            'name' => $o->name,
+                            'price_delta' => $g->is_price_driver
+                                ? (float) ($itemPrices[(int) $o->id] ?? 0)
+                                : (float) $o->price_delta,
+                            'is_default' => (bool) $o->is_default,
+                        ])->values()->all(),
+                    ];
+                })->values()->all()
                 : [],
         ];
     }

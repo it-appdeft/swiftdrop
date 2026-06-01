@@ -13,8 +13,13 @@ export type SelectionType = 'single' | 'multiple';
 export interface ModifierOption {
     id: string;
     name: string;
-    /** Surcharge added to the base item price, in £. 0 = included. */
+    /**
+     * Normally a surcharge added to the base item price, in £ (0 = included).
+     * On a price-driver group this is the ABSOLUTE price for the option.
+     */
     priceDelta: number;
+    /** On a price-driver group, the option whose price prefills the item Price. */
+    isDefault?: boolean;
 }
 
 export interface ModifierGroup {
@@ -22,6 +27,12 @@ export interface ModifierGroup {
     name: string;
     description?: string;
     selectionType: SelectionType;
+    /**
+     * When true, this group sets the item's base price (variant/size pricing):
+     * options carry absolute prices and the default option prefills Price (£).
+     * Behaviour is keyed off this flag, never the group name.
+     */
+    isPriceDriver?: boolean;
     required: boolean;
     minSelections: number;
     /** null = unbounded (only meaningful for multi-select). */
