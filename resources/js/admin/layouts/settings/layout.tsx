@@ -22,7 +22,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
     return (
-        <PageContainer width="default">
+        <PageContainer width="full">
             <PageHeader
                 eyebrow="Account"
                 title="Settings"

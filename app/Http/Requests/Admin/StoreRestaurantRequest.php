@@ -35,13 +35,20 @@ class StoreRestaurantRequest extends FormRequest
             'country_iso'         => ['required', 'string', 'size:2', new ValidCountryIso()],
             'mobile'              => ['required', 'string', 'regex:/^\+?[0-9]{6,11}$/'],
             'restaurant_type'     => ['nullable', 'string', 'max:50'],
-            'cuisines'            => ['nullable', 'string', 'max:500'],
             'branches'            => ['nullable', 'integer', 'min:1'],
             'seating_capacity'    => ['nullable', 'integer', 'min:0'],
             'full_address'        => ['nullable', 'string', 'max:1000'],
+            'city'                => ['nullable', 'string', 'max:120'],
+            'pin_code'            => ['nullable', 'string', 'max:20'],
             'lat'                 => ['nullable', 'numeric', 'between:-90,90'],
             'lng'                 => ['nullable', 'numeric', 'between:-180,180'],
             'commission_rate'     => ['required', 'numeric', 'min:0', 'max:100'],
+            // Admin can preselect the food-type tags and seed initial menu
+            // categories at create-time (mirrors the partner onboarding flow).
+            'food_type_ids'       => ['sometimes', 'array'],
+            'food_type_ids.*'     => ['integer', 'exists:food_types,id'],
+            'categories'          => ['sometimes', 'array'],
+            'categories.*.name'   => ['nullable', 'string', 'max:120'],
         ];
     }
 

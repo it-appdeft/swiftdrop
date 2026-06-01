@@ -164,24 +164,25 @@ export interface RestaurantOwner {
 export interface Restaurant {
     id: number;
     name: string;
+    legal_business_name: string | null;
+    owner_name: string | null;
+    owner_email: string | null;
+    owner_mobile: string | null;
     description: string | null;
-    address_line_1: string;
-    address_line_2: string | null;
-    city: string;
-    county: string | null;
-    postcode: string;
-    lat: string;
-    lng: string;
-    phone: string;
-    cuisine_type: string | null;
-    logo_path: string | null;
-    cover_photo_path: string | null;
+    restaurant_type: string | null;
+    branches: number | null;
+    seating_capacity: number | null;
+    /** Single-line address string — schema uses this rather than line_1/line_2/postcode. */
+    full_address: string | null;
+    city: string | null;
+    pin_code: string | null;
+    lat: string | null;
+    lng: string | null;
     status: 'pending_approval' | 'active' | 'inactive' | 'suspended';
     approval_status: 'pending' | 'approved' | 'rejected';
     rating: string;
     total_reviews: number;
     commission_rate: string;
-    vat_number: string | null;
     orders_count?: number;
     created_at: string;
     user: RestaurantOwner | null;

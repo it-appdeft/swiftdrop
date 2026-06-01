@@ -56,7 +56,7 @@ export default function FoodTypeEdit({ item }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit ${item.name}`} />
 
-            <PageContainer width="narrow">
+            <PageContainer width="full">
                 <div className="mb-6 flex items-center gap-3">
                     <Button variant="ghost" size="icon-sm" asChild>
                         <Link href="/admin/food-types"><ArrowLeft /></Link>
