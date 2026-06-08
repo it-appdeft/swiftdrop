@@ -26,6 +26,14 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
     /** Top-picks slider size. */
     public const TOP_PICKS_LIMIT = 5;
 
+    /**
+     * Minimum rating a restaurant needs to qualify as a "top pick". Lower than
+     * the global {@see Restaurant::HIGH_RATING} (the explicit "highest rated"
+     * filter) so the slider is populated in newer markets, while still
+     * excluding unrated (0.00) restaurants.
+     */
+    public const TOP_PICKS_MIN_RATING = 1.0;
+
     public function __construct(
         protected PlatformConfigService $config,
         protected CustomerFavoriteServiceInterface $favorites,
@@ -87,35 +95,43 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
 
     /**
      * Top picks: restaurants that are bookable (live + approved + accepting
-     * orders), near the resolved location and highly rated, ordered by rating.
-     * Falls back to the global highest-rated list when no coordinates resolve.
+     * orders), near the resolved location and reasonably rated (rating >=
+     * {@see TOP_PICKS_MIN_RATING}, so unrated 0.00 restaurants are skipped),
+     * ordered by rating.
      *
-     * Location source — see {@see resolveLocation()}: web callers omit
-     * `$location` and discovery uses the customer's selected address; API
-     * callers pass an explicit context built from the frontend latitude/
-     * longitude (null coords → no geo filter, never the saved address).
+     * Discovery is location-driven on every surface — see {@see resolveLocation()}:
+     * web callers omit `$location` and the coordinates come from the customer's
+     * selected address; API callers pass an explicit context built from the
+     * frontend latitude/longitude. When no usable coordinates resolve (no
+     * geocoded address on the web, no lat/long on the API) the list comes back
+     * empty: there is no "nearby", so we never substitute a global list. The
+     * frontend prompts the customer to set an address instead.
      *
      * @return Collection<int, array{restaurant: Restaurant, distance_miles: ?float, is_favorited: bool}>
      */
     public function topPicks(?User $user, int $limit = self::TOP_PICKS_LIMIT, ?int $foodTypeId = null, ?LocationContext $location = null): Collection
     {
         $location = $this->resolveLocation($user, $location);
+
+        // No usable coordinates → nothing is "nearby"; return an empty list
+        // rather than a global fallback (same rule for web and API).
+        if (! $location->hasCoordinates()) {
+            return collect();
+        }
+
         $radius = $this->dashboardRadius();
         $favoriteIds = $user ? array_flip($this->favorites->favoriteRestaurantIds($user)) : [];
 
         $query = Restaurant::query()
             ->bookable()
             ->with('uploads')
-            ->highRated()
-            ->orderByDesc('rating');
+            ->highRated(self::TOP_PICKS_MIN_RATING)
+            ->orderByDesc('rating')
+            ->withinRadius($location->lat, $location->lng, $radius)
+            ->orderBy('distance_miles');
 
         if ($foodTypeId !== null) {
             $query->offeringFoodType($foodTypeId);
-        }
-
-        if ($location->hasCoordinates()) {
-            $query->withinRadius($location->lat, $location->lng, $radius)
-                ->orderBy('distance_miles');
         }
 
         return $query->limit($limit)->get()
@@ -129,13 +145,15 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
 
     /**
      * Paginated restaurants for the customer surfaces (home + /customer/restaurants index).
-     * Geo-aware: when coordinates resolve we use the radius scope and sort by
-     * distance; otherwise we fall back to a global "newest" list so the page is
-     * never empty.
+     * Geo-aware: results are scoped to the discovery radius and sorted by
+     * distance.
      *
-     * Location source — see {@see resolveLocation()}: web callers omit
-     * `$location` and use the customer's saved address; API callers pass an
-     * explicit context from the frontend latitude/longitude.
+     * Discovery is location-driven on every surface — see {@see resolveLocation()}:
+     * web callers omit `$location` and use the customer's saved address; API
+     * callers pass an explicit context from the frontend latitude/longitude.
+     * When no usable coordinates resolve (no geocoded address on the web, no
+     * lat/long on the API) the page comes back empty rather than substituting a
+     * global list — the frontend prompts the customer to set an address.
      *
      * Each row carries `is_favorited` so the frontend can flip the heart icon
      * without a second roundtrip.
@@ -149,20 +167,21 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
         ?LocationContext $location = null,
     ): LengthAwarePaginator {
         $location = $this->resolveLocation($user, $location);
-        $radius = $this->dashboardRadius();
 
-        $hasGeo = $location->hasCoordinates();
+        // No usable coordinates → nothing is "nearby"; return an empty page
+        // rather than a global fallback (same rule for web and API).
+        if (! $location->hasCoordinates()) {
+            return $this->emptyPaginator($page, $perPage, $pageName);
+        }
+
+        $radius = $this->dashboardRadius();
 
         // Eager-load uploads so the logo_url / banner_url accessors resolve
         // without an N+1 across the list.
-        $query = Restaurant::query()->active()->approved()->with('uploads');
-        if ($hasGeo) {
-            $query->withinRadius($location->lat, $location->lng, $radius)
-                ->orderByDesc('rating')
-                ->orderBy('distance_miles');
-        } else {
-            $query->orderByDesc('created_at');
-        }
+        $query = Restaurant::query()->active()->approved()->with('uploads')
+            ->withinRadius($location->lat, $location->lng, $radius)
+            ->orderByDesc('rating')
+            ->orderBy('distance_miles');
 
         if ($foodTypeId !== null) {
             $query->offeringFoodType($foodTypeId);
@@ -185,6 +204,19 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
         return $paginator;
     }
 
+    /**
+     * Empty page used when an API caller supplies no usable coordinates —
+     * matches paginateRestaurants()'s shape (0 results, requested page size)
+     * without touching the database.
+     */
+    protected function emptyPaginator(int $page, int $perPage, string $pageName): LengthAwarePaginator
+    {
+        return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage, $page, [
+            'pageName' => $pageName,
+            'path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(),
+        ]);
+    }
+
     protected function dashboardRadius(): float
     {
         return max(0.1, $this->config->float(
@@ -197,11 +229,13 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
      * Resolve the coordinate source for a discovery query.
      *
      * Web callers pass no context: we derive coordinates from the customer's
-     * active address (selected → default → newest). API callers pass an
-     * explicit context built from the frontend latitude/longitude; we honour it
-     * verbatim and never fall back to the saved address — when it carries no
-     * coordinates the query runs unscoped (location-dependent values come back
-     * null) instead of throwing.
+     * active address (selected → default → newest), which may itself be empty
+     * (no address, or one without lat/lng). API callers pass an explicit context
+     * built from the frontend latitude/longitude. Either way the result may be a
+     * coordinate-less context; callers treat that as "no nearby results" (empty)
+     * — see topPicks()/paginateRestaurants() — and never fall back to a global
+     * list. The web saved address is the only address source; the API never
+     * reads it.
      */
     protected function resolveLocation(?User $user, ?LocationContext $location): LocationContext
     {

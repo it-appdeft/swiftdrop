@@ -180,6 +180,37 @@ function ExploreSection({ items, selectedId }: { items: FoodType[]; selectedId: 
  * one card to avoid leftover blanks when the count isn't divisible by 3.
  * `picks` arrives pre-sorted + capped (5) from the server.
  */
+/**
+ * Shown when the customer has no usable (geocoded) delivery address. Discovery
+ * is location-driven, so Top Picks and the restaurants list come back empty in
+ * that case — this banner tells the customer why and links them to add one.
+ */
+function SetAddressPrompt() {
+    return (
+        <Section tone="white">
+            <div className="flex flex-col items-start gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                        <MapPin className="size-5" />
+                    </span>
+                    <div>
+                        <h3 className="text-base font-bold text-emerald-900">Set a delivery address</h3>
+                        <p className="mt-0.5 text-sm text-emerald-800/80">
+                            Add an address to see Top Picks and restaurants near you.
+                        </p>
+                    </div>
+                </div>
+                <Link
+                    href="/customer/addresses"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                >
+                    <MapPin className="size-4" /> Add address
+                </Link>
+            </div>
+        </Section>
+    );
+}
+
 function TopPicksSection({ picks }: { picks: DashboardRestaurant[] }) {
     const VISIBLE = 3;
     const [start, setStart] = useState(0);
@@ -454,9 +485,11 @@ function AllRestaurantsSection({
 
             {restaurants.length === 0 ? (
                 <div className="rounded-xl border border-dashed bg-background p-10 text-center text-sm text-muted-foreground">
-                    {selectedFoodType
-                        ? `No restaurants nearby are serving ${selectedFoodType.name} right now.`
-                        : `No restaurants ${usingFallback ? 'available yet' : 'within range of your default address'}.`}
+                    {usingFallback
+                        ? 'Set a delivery address to see restaurants near you.'
+                        : selectedFoodType
+                          ? `No restaurants nearby are serving ${selectedFoodType.name} right now.`
+                          : 'No restaurants within range of your default address.'}
                 </div>
             ) : (
                 <>
@@ -588,6 +621,7 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
                     items={dashboard.food_types}
                     selectedId={dashboard.selected_food_type?.id ?? null}
                 />
+                {dashboard.using_fallback ? <SetAddressPrompt /> : null}
                 <TopPicksSection picks={dashboard.top_picks} />
                 <CuisinesAndPromoSection />
                 <AllRestaurantsSection

@@ -43,7 +43,10 @@ interface CustomerDashboardServiceInterface
      *
      * `$location` selects the discovery coordinates: omit it (web) to derive
      * them from the customer's saved address, or pass an explicit context (API)
-     * built from the frontend latitude/longitude.
+     * built from the frontend latitude/longitude. When no usable coordinates
+     * resolve (no geocoded address on the web, no lat/long on the API) the
+     * result is empty — discovery is location-driven and never falls back to a
+     * global list.
      *
      * @return Collection<int, array<string, mixed>>
      */
@@ -56,7 +59,10 @@ interface CustomerDashboardServiceInterface
      *
      * `$location` selects the discovery coordinates: omit it (web) to derive
      * them from the customer's saved address, or pass an explicit context (API)
-     * built from the frontend latitude/longitude.
+     * built from the frontend latitude/longitude. When no usable coordinates
+     * resolve (no geocoded address on the web, no lat/long on the API) the
+     * result is empty — discovery is location-driven and never falls back to a
+     * global list.
      */
     public function paginateRestaurants(
         ?User $user,
