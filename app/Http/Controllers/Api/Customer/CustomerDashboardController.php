@@ -42,10 +42,10 @@ class CustomerDashboardController extends Controller
     }
 
     /**
-     * 5 top picks — bookable, highly rated, near the frontend-provided
-     * latitude/longitude. Without a valid coordinate pair the list falls back
-     * to the global highest-rated restaurants (distances come back null); the
-     * customer's saved address is never used on the API.
+     * Up to 5 top picks (never paginated) — bookable, highly rated, near the
+     * frontend-provided latitude/longitude. Without a valid coordinate pair the
+     * list comes back empty: the customer's saved address is never used on the
+     * API and there is no global fallback.
      */
     public function topPicks(RestaurantDiscoveryRequest $request): JsonResponse
     {

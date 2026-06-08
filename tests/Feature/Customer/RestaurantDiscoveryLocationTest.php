@@ -88,21 +88,19 @@ class RestaurantDiscoveryLocationTest extends TestCase
         $this->assertEqualsWithDelta(213, $byId[$london->id], 5);
     }
 
-    public function test_api_restaurants_without_coordinates_ignore_saved_address(): void
+    public function test_api_restaurants_without_coordinates_return_empty(): void
     {
         ['customer' => $customer] = $this->graph();
         Sanctum::actingAs($customer);
 
-        // No lat/lng → the saved London address is NOT used. Both restaurants
-        // come back with null distances and no error.
+        // No lat/lng → API discovery is location-driven, so the list comes back
+        // empty: the saved London address is NOT used and there is no global
+        // fallback. The response stays valid (200, empty array).
         $rows = $this->getJson('/api/customer/restaurants')
             ->assertOk()
             ->json('data.restaurants');
 
-        $this->assertCount(2, $rows);
-        foreach ($rows as $row) {
-            $this->assertNull($row['distance_miles']);
-        }
+        $this->assertSame([], $rows);
     }
 
     public function test_api_top_picks_measure_distance_from_frontend_coordinates(): void
@@ -117,18 +115,18 @@ class RestaurantDiscoveryLocationTest extends TestCase
         $this->assertEqualsWithDelta(0, $this->distancesById($rows)[$paris->id], 0.5);
     }
 
-    public function test_api_top_picks_without_coordinates_null_distances(): void
+    public function test_api_top_picks_without_coordinates_return_empty(): void
     {
         ['customer' => $customer] = $this->graph();
         Sanctum::actingAs($customer);
 
+        // No lat/lng → empty Top Picks (location-driven, no saved-address or
+        // global fallback on the API), still a valid 200 with an empty array.
         $rows = $this->getJson('/api/customer/top-picks')
             ->assertOk()
             ->json('data');
 
-        foreach ($rows as $row) {
-            $this->assertNull($row['distance_miles']);
-        }
+        $this->assertSame([], $rows);
     }
 
     public function test_api_rejects_out_of_range_coordinates(): void
@@ -199,5 +197,51 @@ class RestaurantDiscoveryLocationTest extends TestCase
         $byId = $this->distancesById($rows);
         $this->assertEqualsWithDelta(0, $byId[$london->id], 0.5);
         $this->assertEqualsWithDelta(213, $byId[$paris->id], 5);
+    }
+
+    /** Customer with a profile but NO saved address — the "fresh signup" case. */
+    private function customerWithoutAddress(): User
+    {
+        Role::firstOrCreate(['name' => 'customer', 'guard_name' => 'web']);
+
+        $customer = User::factory()->create();
+        $customer->assignRole('customer');
+        CustomerProfile::create(['user_id' => $customer->id, 'first_name' => 'T', 'last_name' => 'U']);
+
+        // Approved restaurants exist — the point is they are NOT surfaced
+        // without a location, rather than the DB simply being empty.
+        $this->restaurant('London Bites', self::LONDON);
+        $this->restaurant('Paris Bistro', self::PARIS);
+
+        return $customer;
+    }
+
+    public function test_web_restaurants_without_address_return_empty(): void
+    {
+        $customer = $this->customerWithoutAddress();
+
+        // No geocoded address → no "nearby"; the list is empty even though
+        // approved restaurants exist (no global fallback on the web either).
+        $rows = $this->actingAs($customer)
+            ->getJson('/customer/restaurants')
+            ->assertOk()
+            ->json('restaurants');
+
+        $this->assertSame([], $rows);
+    }
+
+    public function test_web_dashboard_without_address_returns_empty_sections(): void
+    {
+        $customer = $this->customerWithoutAddress();
+
+        // Dashboard signals the missing address (using_fallback) and serves
+        // empty Top Picks + restaurants so the page can prompt for an address.
+        $this->actingAs($customer)
+            ->get('/customer/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('dashboard.using_fallback', true)
+                ->where('dashboard.top_picks', [])
+                ->where('dashboard.restaurants', []));
     }
 }
