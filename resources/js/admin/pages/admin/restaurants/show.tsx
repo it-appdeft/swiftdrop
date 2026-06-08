@@ -24,6 +24,8 @@ import { formatDate, formatRelative } from '@/utils/format';
 
 interface Props {
     restaurant: Restaurant;
+    foodTypeNames: string[];
+    menuCategories: string[];
 }
 
 const DOCUMENT_TYPE_LABELS: Record<string, string> = {
@@ -128,7 +130,7 @@ function RejectDocumentDialog({ document }: { document: RestaurantDocument }) {
     );
 }
 
-export default function RestaurantShow({ restaurant }: Props) {
+export default function RestaurantShow({ restaurant, foodTypeNames, menuCategories }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Admin', href: '/admin/restaurants' },
         { title: 'Restaurants', href: '/admin/restaurants' },
@@ -161,8 +163,12 @@ export default function RestaurantShow({ restaurant }: Props) {
                         </Button>
                         <div>
                             <h1 className="text-2xl font-semibold">{restaurant.name}</h1>
-                            {restaurant.cuisine_type && (
-                                <p className="text-sm text-muted-foreground">{restaurant.cuisine_type}</p>
+                            {(restaurant.restaurant_type || restaurant.legal_business_name) && (
+                                <p className="text-sm text-muted-foreground">
+                                    {[restaurant.restaurant_type, restaurant.legal_business_name]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                </p>
                             )}
                             <div className="mt-1 flex flex-wrap items-center gap-2">
                                 <Badge variant={STATUS_VARIANT[restaurant.status]} dot>
@@ -212,15 +218,24 @@ export default function RestaurantShow({ restaurant }: Props) {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                <div className="flex items-center gap-2 text-sm">
-                                    <Phone className="size-4 shrink-0 text-muted-foreground" />
-                                    <span className="font-mono">{restaurant.phone}</span>
-                                </div>
-                                {restaurant.user?.email && (
+                                {(restaurant.user?.canonical_mobile || restaurant.owner_mobile) && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Phone className="size-4 shrink-0 text-muted-foreground" />
+                                        <span className="font-mono">
+                                            {restaurant.user?.canonical_mobile ?? restaurant.owner_mobile}
+                                        </span>
+                                    </div>
+                                )}
+                                {(restaurant.user?.email || restaurant.owner_email) && (
                                     <div className="flex items-center gap-2 text-sm">
                                         <Mail className="size-4 shrink-0 text-muted-foreground" />
-                                        <span className="truncate">{restaurant.user.email}</span>
+                                        <span className="truncate">
+                                            {restaurant.user?.email ?? restaurant.owner_email}
+                                        </span>
                                     </div>
+                                )}
+                                {restaurant.owner_name && (
+                                    <p className="text-xs text-muted-foreground">Owner: {restaurant.owner_name}</p>
                                 )}
                             </CardContent>
                         </Card>
@@ -234,11 +249,20 @@ export default function RestaurantShow({ restaurant }: Props) {
                             <CardContent className="space-y-1 text-sm">
                                 <div className="flex items-start gap-2">
                                     <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                                    <div>
-                                        <p>{restaurant.address_line_1}</p>
-                                        {restaurant.address_line_2 && <p>{restaurant.address_line_2}</p>}
-                                        <p>{restaurant.city}{restaurant.county ? `, ${restaurant.county}` : ''}</p>
-                                        <p className="font-mono uppercase">{restaurant.postcode}</p>
+                                    <div className="space-y-0.5">
+                                        {restaurant.full_address && <p>{restaurant.full_address}</p>}
+                                        {(restaurant.city || restaurant.pin_code) && (
+                                            <p>
+                                                {restaurant.city}
+                                                {restaurant.city && restaurant.pin_code ? ', ' : ''}
+                                                {restaurant.pin_code && (
+                                                    <span className="font-mono uppercase">{restaurant.pin_code}</span>
+                                                )}
+                                            </p>
+                                        )}
+                                        {!restaurant.full_address && !restaurant.city && !restaurant.pin_code && (
+                                            <p className="text-muted-foreground">No address on file.</p>
+                                        )}
                                     </div>
                                 </div>
                             </CardContent>
@@ -263,16 +287,73 @@ export default function RestaurantShow({ restaurant }: Props) {
                                         <span className="text-muted-foreground">({restaurant.total_reviews})</span>
                                     </span>
                                 </div>
-                                {restaurant.vat_number && (
+                                {restaurant.branches != null && (
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">VAT number</span>
-                                        <span className="font-mono">{restaurant.vat_number}</span>
+                                        <span className="text-muted-foreground">Branches</span>
+                                        <span>{restaurant.branches}</span>
+                                    </div>
+                                )}
+                                {restaurant.seating_capacity != null && (
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Seating</span>
+                                        <span>{restaurant.seating_capacity}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Total orders</span>
                                     <span>{restaurant.orders_count ?? 0}</span>
                                 </div>
+                            </CardContent>
+                        </Card>
+
+                        {restaurant.description && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                        Description
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="whitespace-pre-wrap text-sm">
+                                    {restaurant.description}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                    Food types
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-sm">
+                                {foodTypeNames.length === 0 ? (
+                                    <p className="text-muted-foreground">No food types selected.</p>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        {foodTypeNames.map((name) => (
+                                            <Badge key={name} variant="secondary">{name}</Badge>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                                    Menu categories
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-sm">
+                                {menuCategories.length === 0 ? (
+                                    <p className="text-muted-foreground">No categories defined.</p>
+                                ) : (
+                                    <ul className="space-y-1">
+                                        {menuCategories.map((name) => (
+                                            <li key={name}>• {name}</li>
+                                        ))}
+                                    </ul>
+                                )}
                             </CardContent>
                         </Card>
                     </div>

@@ -135,43 +135,48 @@ export default function RestaurantIndex({ restaurants, filters, stats }: Props) 
             align: 'right',
             width: '48px',
             cell: (row) => (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm" aria-label="Row actions">
-                            <MoreHorizontal />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                            <Link href={`/admin/restaurants/${row.id}`}>View</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <Link href={`/admin/restaurants/${row.id}/edit`}>Edit</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {row.approval_status !== 'approved' && (
-                            <DropdownMenuItem
-                                onClick={() => router.patch(`/admin/restaurants/${row.id}/approval`, { approval_status: 'approved' })}
-                            >
-                                <CheckCircle className="mr-2 size-4" /> Approve
+                // Stop clicks from bubbling to onRowClick — otherwise the dropdown
+                // triggers Edit/Approve/etc. AND the row's "open detail page" handler
+                // fires right after, landing the user on /admin/restaurants/{id}.
+                <div onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" aria-label="Row actions">
+                                <MoreHorizontal />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                                <Link href={`/admin/restaurants/${row.id}`}>View</Link>
                             </DropdownMenuItem>
-                        )}
-                        {row.status === 'active' ? (
-                            <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => router.patch(`/admin/restaurants/${row.id}/status`, { status: 'suspended' })}
-                            >
-                                <XCircle className="mr-2 size-4" /> Suspend
+                            <DropdownMenuItem asChild>
+                                <Link href={`/admin/restaurants/${row.id}/edit`}>Edit</Link>
                             </DropdownMenuItem>
-                        ) : (
-                            <DropdownMenuItem
-                                onClick={() => router.patch(`/admin/restaurants/${row.id}/status`, { status: 'active' })}
-                            >
-                                <CheckCircle className="mr-2 size-4" /> Activate
-                            </DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                            <DropdownMenuSeparator />
+                            {row.approval_status !== 'approved' && (
+                                <DropdownMenuItem
+                                    onClick={() => router.patch(`/admin/restaurants/${row.id}/approval`, { approval_status: 'approved' })}
+                                >
+                                    <CheckCircle className="mr-2 size-4" /> Approve
+                                </DropdownMenuItem>
+                            )}
+                            {row.status === 'active' ? (
+                                <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => router.patch(`/admin/restaurants/${row.id}/status`, { status: 'suspended' })}
+                                >
+                                    <XCircle className="mr-2 size-4" /> Suspend
+                                </DropdownMenuItem>
+                            ) : (
+                                <DropdownMenuItem
+                                    onClick={() => router.patch(`/admin/restaurants/${row.id}/status`, { status: 'active' })}
+                                >
+                                    <CheckCircle className="mr-2 size-4" /> Activate
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             ),
         },
     ];

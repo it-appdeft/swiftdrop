@@ -47,7 +47,7 @@ export default function PlatformSettingsEdit({ settings }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Platform Settings" />
 
-            <PageContainer width="narrow">
+            <PageContainer width="full">
                 <PageHeader
                     eyebrow="Admin"
                     title="Platform Settings"
