@@ -32,6 +32,7 @@ class PlatformSettingsController extends Controller
                 'delivery_fee_per_mile_gbp' => $this->config->float(PlatformConfigService::KEY_DELIVERY_FEE_PER_MILE, 0.80),
                 'free_delivery_threshold_gbp' => $this->config->float(PlatformConfigService::KEY_FREE_DELIVERY_THRESHOLD, 25.0),
                 'order_tax_rate_percent' => $this->config->float(PlatformConfigService::KEY_ORDER_TAX_RATE, 5.0),
+                'delivery_request_timeout_seconds' => $this->config->int(PlatformConfigService::KEY_DELIVERY_REQUEST_TIMEOUT_SECONDS, 30),
             ],
         ]);
     }

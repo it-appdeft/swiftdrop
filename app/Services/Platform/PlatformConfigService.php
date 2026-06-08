@@ -25,6 +25,10 @@ class PlatformConfigService
 
     public const KEY_ORDER_TAX_RATE = 'order_tax_rate_percent';
 
+    // Seconds a driver has to accept/reject an incoming delivery request before
+    // it's offered to the next driver — the countdown shown on the request card.
+    public const KEY_DELIVERY_REQUEST_TIMEOUT_SECONDS = 'delivery_request_timeout_seconds';
+
     /** @var array<string, string>|null */
     protected ?array $cache = null;
 

@@ -27,7 +27,16 @@ class CustomerSearchController extends Controller
     public function index(SearchRequest $request, string $type): JsonResponse
     {
         $page = max(1, (int) $request->query('page', 1));
-        $results = $this->search->search($request->user(), $type, $request->keyword(), page: $page, filters: $request->filters());
+        // API discovery is driven by the frontend latitude/longitude, not the
+        // customer's saved address (which still backs the web search).
+        $results = $this->search->search(
+            $request->user(),
+            $type,
+            $request->keyword(),
+            page: $page,
+            filters: $request->filters(),
+            location: $request->locationContext(),
+        );
 
         return $this->success(
             data: [

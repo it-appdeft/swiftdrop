@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Customer\Search;
 
+use App\Http\Requests\Concerns\ResolvesDiscoveryCoordinates;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SearchRequest extends FormRequest
 {
+    use ResolvesDiscoveryCoordinates;
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -13,14 +16,16 @@ class SearchRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        return array_merge([
             'search' => ['nullable', 'string', 'max:120'],
             'offers' => ['nullable', 'boolean'],
             'highest_rated' => ['nullable', 'boolean'],
             // Restaurant-detail menu filters.
             'diet' => ['nullable', 'in:veg,non_veg,all'],
             'min_rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
-        ];
+            // Optional discovery coordinates — only the API search reads these
+            // (via locationContext()); the web search ignores them.
+        ], $this->coordinateRules());
     }
 
     public function keyword(): string

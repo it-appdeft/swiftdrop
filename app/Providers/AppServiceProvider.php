@@ -91,6 +91,10 @@ class AppServiceProvider extends ServiceProvider
             \App\Contracts\Customer\CustomerFavoriteServiceInterface::class,
             \App\Services\Customer\CustomerFavoriteService::class,
         );
+        $this->app->bind(
+            \App\Contracts\Driver\DriverDashboardServiceInterface::class,
+            \App\Services\Driver\DriverDashboardService::class,
+        );
         $this->app->singleton(\App\Services\Files\ImageUploadService::class);
         $this->app->singleton(\App\Services\Platform\PlatformConfigService::class);
     }
