@@ -16,6 +16,7 @@ class PlatformConfigSeeder extends Seeder
             ['key' => 'max_driver_assignment_attempts', 'value' => '3', 'description' => 'Max driver reassignment attempts before admin escalation'],
             ['key' => 'driver_location_update_interval_seconds', 'value' => '5', 'description' => 'How often drivers push location updates'],
             ['key' => 'restaurant_accept_timeout_minutes', 'value' => '10', 'description' => 'Auto-cancel if restaurant does not accept within this time'],
+            ['key' => 'delivery_request_timeout_seconds', 'value' => '30', 'description' => 'Seconds a driver has to accept/reject an incoming delivery request (countdown shown on the request card)'],
             ['key' => 'base_delivery_fee_gbp', 'value' => '1.99', 'description' => 'Base delivery fee in GBP'],
             ['key' => 'delivery_fee_per_mile_gbp', 'value' => '0.80', 'description' => 'Delivery fee added per mile between customer and restaurant'],
             ['key' => 'free_delivery_threshold_gbp', 'value' => '25.00', 'description' => 'Order total above which delivery is free'],

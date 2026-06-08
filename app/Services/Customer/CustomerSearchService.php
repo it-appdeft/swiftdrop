@@ -11,6 +11,7 @@ use App\Models\MenuItem;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Services\Platform\PlatformConfigService;
+use App\Support\Location\LocationContext;
 use App\Support\PaginationMeta;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,7 +49,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
      * Both modes paginate restaurants identically (10/page) so the two tabs
      * share the restaurant API's pagination contract.
      */
-    public function search(User $user, string $type, string $keyword, int $page = 1, int $perPage = self::RESTAURANTS_PER_PAGE, array $filters = []): CustomerSearchResults
+    public function search(User $user, string $type, string $keyword, int $page = 1, int $perPage = self::RESTAURANTS_PER_PAGE, array $filters = [], ?LocationContext $location = null): CustomerSearchResults
     {
         $type = $type === self::TYPE_ITEMS ? self::TYPE_ITEMS : self::TYPE_RESTAURANT;
         $profile = $user->customerProfile;
@@ -58,12 +59,17 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             'highest_rated' => (bool) ($filters['highest_rated'] ?? false),
         ];
 
-        $address = $this->selectedAddressFor($profile);
+        // Web omits $location and discovery uses the customer's saved address;
+        // the API passes an explicit context from the frontend latitude/
+        // longitude and the saved address is never read (the API response omits
+        // it anyway).
+        $address = $location === null ? $this->selectedAddressFor($profile) : null;
+        $resolved = $location ?? LocationContext::fromAddress($address);
         $radius = max(0.1, $this->config->float(
             PlatformConfigService::KEY_DASHBOARD_RADIUS_MILES,
             5.0,
         ));
-        $hasGeo = $address && $address->lat !== null && $address->lng !== null;
+        $hasGeo = $resolved->hasCoordinates();
 
         if ($keyword === '' || ! $profile) {
             $empty = $this->emptyPaginator($page, $perPage);
@@ -89,8 +95,8 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         }
 
         $paginator = $type === self::TYPE_ITEMS
-            ? $this->paginateItemRestaurants($keyword, $hasGeo ? $address : null, $radius, $page, $perPage, $filters)
-            : $this->paginateNameRestaurants($keyword, $hasGeo ? $address : null, $radius, $page, $perPage, $filters);
+            ? $this->paginateItemRestaurants($keyword, $resolved, $radius, $page, $perPage, $filters)
+            : $this->paginateNameRestaurants($keyword, $resolved, $radius, $page, $perPage, $filters);
 
         // Keep the keyword + active filters on the pagination links so paging
         // within a filtered search round-trips correctly.
@@ -176,13 +182,13 @@ class CustomerSearchService implements CustomerSearchServiceInterface
 
     /**
      * Restaurants tab: paginate restaurants matched by name OR an offered food
-     * type. Geo-aware (radius + distance sort) when the customer has coords,
+     * type. Geo-aware (radius + distance sort) when coordinates resolve,
      * otherwise a global rating-sorted list. No dishes are nested.
      *
      * @param  array{offers: bool, highest_rated: bool}  $filters
      * @return LengthAwarePaginator<int, array{restaurant: Restaurant, distance_miles: ?float}>
      */
-    protected function paginateNameRestaurants(string $keyword, ?CustomerAddress $address, float $radius, int $page, int $perPage, array $filters): LengthAwarePaginator
+    protected function paginateNameRestaurants(string $keyword, LocationContext $location, float $radius, int $page, int $perPage, array $filters): LengthAwarePaginator
     {
         $query = Restaurant::query()
             ->active()
@@ -192,7 +198,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             ->when($filters['offers'], fn (Builder $q) => $q->withOffers())
             ->when($filters['highest_rated'], fn (Builder $q) => $q->highRated());
 
-        $this->applyLocationOrder($query, $address, $radius);
+        $this->applyLocationOrder($query, $location, $radius);
 
         $paginator = $query->paginate(perPage: $perPage, page: $page);
 
@@ -216,7 +222,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
      * @param  array{offers: bool, highest_rated: bool}  $filters
      * @return LengthAwarePaginator<int, array{restaurant: Restaurant, distance_miles: ?float, dishes: Collection<int, MenuItem>}>
      */
-    protected function paginateItemRestaurants(string $keyword, ?CustomerAddress $address, float $radius, int $page, int $perPage, array $filters): LengthAwarePaginator
+    protected function paginateItemRestaurants(string $keyword, LocationContext $location, float $radius, int $page, int $perPage, array $filters): LengthAwarePaginator
     {
         $query = Restaurant::query()
             ->active()
@@ -226,7 +232,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
             ->when($filters['offers'], fn (Builder $q) => $q->withOffers())
             ->when($filters['highest_rated'], fn (Builder $q) => $q->highRated());
 
-        $this->applyLocationOrder($query, $address, $radius);
+        $this->applyLocationOrder($query, $location, $radius);
 
         $paginator = $query->paginate(perPage: $perPage, page: $page);
 
@@ -265,14 +271,14 @@ class CustomerSearchService implements CustomerSearchServiceInterface
     }
 
     /**
-     * Shared ordering for both tabs: radius scope + distance sort when the
-     * customer has coords (mirrors the dashboard restaurant list), else a
+     * Shared ordering for both tabs: radius scope + distance sort when
+     * coordinates resolve (mirrors the dashboard restaurant list), else a
      * global rating-sorted fallback so the page is never empty.
      */
-    protected function applyLocationOrder(Builder $query, ?CustomerAddress $address, float $radius): void
+    protected function applyLocationOrder(Builder $query, LocationContext $location, float $radius): void
     {
-        if ($address) {
-            $query->withinRadius((float) $address->lat, (float) $address->lng, $radius)
+        if ($location->hasCoordinates()) {
+            $query->withinRadius($location->lat, $location->lng, $radius)
                 ->orderByDesc('rating')
                 ->orderBy('distance_miles');
         } else {

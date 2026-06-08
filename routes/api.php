@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Customer\CustomerProfileController;
 use App\Http\Controllers\Api\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Api\Customer\CustomerSearchController;
 use App\Http\Controllers\Api\DeletionReasonController;
+use App\Http\Controllers\Api\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\VehicleTypeController;
 use Illuminate\Support\Facades\Route;
@@ -83,6 +84,16 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
 });
 
 Route::middleware('auth:sanctum')->prefix('driver')->group(function () {
+    // Home screen: dashboard snapshot, availability toggle, live location push
+    // and accept/reject of an offered delivery request.
+    Route::controller(DriverDashboardController::class)->group(function () {
+        Route::get('dashboard', 'index');
+        Route::get('delivery-requests', 'deliveryRequests');
+        Route::post('availability', 'toggleAvailability');
+        Route::post('location', 'updateLocation');
+        Route::post('deliveries/{delivery}/respond', 'respondToDelivery')->whereNumber('delivery');
+    });
+
     Route::controller(DriverProfileController::class)->prefix('profile')->group(function () {
         Route::get('/', 'show');
         Route::put('/', 'update');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Customer;
 
 use App\Contracts\Customer\CustomerDashboardServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Customer\Discovery\RestaurantDiscoveryRequest;
 use App\Http\Resources\Customer\DashboardRestaurantResource;
 use App\Http\Resources\Customer\FoodTypeResource;
 use App\Traits\ApiResponse;
@@ -40,16 +41,18 @@ class CustomerDashboardController extends Controller
         );
     }
 
-    /** 5 top picks — bookable, near the selected address and highly rated. */
-    public function topPicks(Request $request): JsonResponse
+    /**
+     * 5 top picks — bookable, highly rated, near the frontend-provided
+     * latitude/longitude. Without a valid coordinate pair the list falls back
+     * to the global highest-rated restaurants (distances come back null); the
+     * customer's saved address is never used on the API.
+     */
+    public function topPicks(RestaurantDiscoveryRequest $request): JsonResponse
     {
-        $foodTypeId = $request->filled('search')
-            ? max(1, (int) $request->query('search'))
-            : null;
-
         $picks = $this->dashboard->topPicks(
             auth('sanctum')->user(),
-            foodTypeId: $foodTypeId,
+            foodTypeId: $request->foodTypeId(),
+            location: $request->locationContext(),
         );
 
         return $this->success(

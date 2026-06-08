@@ -23,6 +23,7 @@ interface Props {
         delivery_fee_per_mile_gbp: number;
         free_delivery_threshold_gbp: number;
         order_tax_rate_percent: number;
+        delivery_request_timeout_seconds: number;
     };
 }
 
@@ -34,6 +35,7 @@ export default function PlatformSettingsEdit({ settings }: Props) {
         delivery_fee_per_mile_gbp: String(settings.delivery_fee_per_mile_gbp),
         free_delivery_threshold_gbp: String(settings.free_delivery_threshold_gbp),
         order_tax_rate_percent: String(settings.order_tax_rate_percent),
+        delivery_request_timeout_seconds: String(settings.delivery_request_timeout_seconds),
     });
 
     const submit = (e: React.FormEvent) => {
@@ -157,6 +159,28 @@ export default function PlatformSettingsEdit({ settings }: Props) {
                                     max="100"
                                     value={data.order_tax_rate_percent}
                                     onChange={(e) => setData('order_tax_rate_percent', e.target.value)}
+                                />
+                            </FormField>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Driver operations</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <FormField
+                                label="Delivery request timeout (seconds)"
+                                error={errors.delivery_request_timeout_seconds}
+                                hint="How long a driver has to accept or reject an incoming delivery request before it's offered to the next driver — the countdown shown on the request card."
+                                required
+                            >
+                                <Input
+                                    type="number"
+                                    min="5"
+                                    max="300"
+                                    value={data.delivery_request_timeout_seconds}
+                                    onChange={(e) => setData('delivery_request_timeout_seconds', e.target.value)}
                                 />
                             </FormField>
                         </CardContent>

@@ -4,6 +4,7 @@ namespace App\Contracts\Customer;
 
 use App\DTO\Customer\CustomerSearchResults;
 use App\Models\User;
+use App\Support\Location\LocationContext;
 use Illuminate\Support\Collection;
 
 interface CustomerSearchServiceInterface
@@ -23,8 +24,12 @@ interface CustomerSearchServiceInterface
      * An empty / whitespace keyword skips the search and returns only the
      * recent-searches list so the same call serves both the empty state and
      * the results state.
+     *
+     * `$location` selects the discovery coordinates: omit it (web) to derive
+     * them from the customer's saved address, or pass an explicit context (API)
+     * built from the frontend latitude/longitude.
      */
-    public function search(User $user, string $type, string $keyword, int $page = 1, int $perPage = 10, array $filters = []): CustomerSearchResults;
+    public function search(User $user, string $type, string $keyword, int $page = 1, int $perPage = 10, array $filters = [], ?LocationContext $location = null): CustomerSearchResults;
 
     /**
      * Wipe the customer's search history.

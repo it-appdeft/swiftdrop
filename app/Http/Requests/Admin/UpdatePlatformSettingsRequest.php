@@ -20,6 +20,7 @@ class UpdatePlatformSettingsRequest extends FormRequest
             'delivery_fee_per_mile_gbp' => ['required', 'numeric', 'min:0', 'max:100'],
             'free_delivery_threshold_gbp' => ['required', 'numeric', 'min:0', 'max:1000'],
             'order_tax_rate_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'delivery_request_timeout_seconds' => ['required', 'integer', 'min:5', 'max:300'],
         ];
     }
 }

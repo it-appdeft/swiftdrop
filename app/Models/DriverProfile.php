@@ -39,6 +39,7 @@ class DriverProfile extends Model
         'notify_delivery_updates',
         'notify_general',
         'availability',
+        'online_since',
         'approval_status',
         'setup_step',
         'current_lat',
@@ -55,6 +56,7 @@ class DriverProfile extends Model
             'notify_delivery_updates' => 'boolean',
             'notify_general' => 'boolean',
             'setup_step' => 'integer',
+            'online_since' => 'datetime',
             'current_lat' => 'decimal:8',
             'current_lng' => 'decimal:8',
         ];
@@ -91,6 +93,16 @@ class DriverProfile extends Model
     public function deliveries(): HasMany
     {
         return $this->hasMany(Delivery::class, 'driver_id');
+    }
+
+    public function earnings(): HasMany
+    {
+        return $this->hasMany(DriverEarning::class, 'driver_id');
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->approval_status === 'approved';
     }
 
     public function locationLogs(): HasMany

@@ -10,6 +10,7 @@ use App\Models\FoodType;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Services\Platform\PlatformConfigService;
+use App\Support\Location\LocationContext;
 use App\Support\PaginationMeta;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -86,15 +87,19 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
 
     /**
      * Top picks: restaurants that are bookable (live + approved + accepting
-     * orders), near the customer's selected address and highly rated, ordered
-     * by rating. Falls back to the global highest-rated list when the customer
-     * has no geocoded address.
+     * orders), near the resolved location and highly rated, ordered by rating.
+     * Falls back to the global highest-rated list when no coordinates resolve.
+     *
+     * Location source — see {@see resolveLocation()}: web callers omit
+     * `$location` and discovery uses the customer's selected address; API
+     * callers pass an explicit context built from the frontend latitude/
+     * longitude (null coords → no geo filter, never the saved address).
      *
      * @return Collection<int, array{restaurant: Restaurant, distance_miles: ?float, is_favorited: bool}>
      */
-    public function topPicks(?User $user, int $limit = self::TOP_PICKS_LIMIT, ?int $foodTypeId = null): Collection
+    public function topPicks(?User $user, int $limit = self::TOP_PICKS_LIMIT, ?int $foodTypeId = null, ?LocationContext $location = null): Collection
     {
-        $address = $this->selectedAddress($user);
+        $location = $this->resolveLocation($user, $location);
         $radius = $this->dashboardRadius();
         $favoriteIds = $user ? array_flip($this->favorites->favoriteRestaurantIds($user)) : [];
 
@@ -108,8 +113,8 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
             $query->offeringFoodType($foodTypeId);
         }
 
-        if ($address && $address->lat !== null && $address->lng !== null) {
-            $query->withinRadius((float) $address->lat, (float) $address->lng, $radius)
+        if ($location->hasCoordinates()) {
+            $query->withinRadius($location->lat, $location->lng, $radius)
                 ->orderBy('distance_miles');
         }
 
@@ -124,9 +129,13 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
 
     /**
      * Paginated restaurants for the customer surfaces (home + /customer/restaurants index).
-     * Geo-aware: when the customer has a saved address with coords we use the
-     * radius scope and sort by distance; otherwise we fall back to a global
-     * "newest" list so the page is never empty.
+     * Geo-aware: when coordinates resolve we use the radius scope and sort by
+     * distance; otherwise we fall back to a global "newest" list so the page is
+     * never empty.
+     *
+     * Location source — see {@see resolveLocation()}: web callers omit
+     * `$location` and use the customer's saved address; API callers pass an
+     * explicit context from the frontend latitude/longitude.
      *
      * Each row carries `is_favorited` so the frontend can flip the heart icon
      * without a second roundtrip.
@@ -137,17 +146,18 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
         int $perPage = self::RESTAURANTS_PER_PAGE,
         ?int $foodTypeId = null,
         string $pageName = 'page',
+        ?LocationContext $location = null,
     ): LengthAwarePaginator {
-        $address = $this->defaultAddressFor($user);
+        $location = $this->resolveLocation($user, $location);
         $radius = $this->dashboardRadius();
 
-        $hasGeo = $address && $address->lat !== null && $address->lng !== null;
+        $hasGeo = $location->hasCoordinates();
 
         // Eager-load uploads so the logo_url / banner_url accessors resolve
         // without an N+1 across the list.
         $query = Restaurant::query()->active()->approved()->with('uploads');
         if ($hasGeo) {
-            $query->withinRadius((float) $address->lat, (float) $address->lng, $radius)
+            $query->withinRadius($location->lat, $location->lng, $radius)
                 ->orderByDesc('rating')
                 ->orderBy('distance_miles');
         } else {
@@ -181,6 +191,25 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
             PlatformConfigService::KEY_DASHBOARD_RADIUS_MILES,
             5.0,
         ));
+    }
+
+    /**
+     * Resolve the coordinate source for a discovery query.
+     *
+     * Web callers pass no context: we derive coordinates from the customer's
+     * active address (selected → default → newest). API callers pass an
+     * explicit context built from the frontend latitude/longitude; we honour it
+     * verbatim and never fall back to the saved address — when it carries no
+     * coordinates the query runs unscoped (location-dependent values come back
+     * null) instead of throwing.
+     */
+    protected function resolveLocation(?User $user, ?LocationContext $location): LocationContext
+    {
+        if ($location !== null) {
+            return $location;
+        }
+
+        return LocationContext::fromAddress($this->selectedAddress($user));
     }
 
     protected function defaultAddressFor(?User $user): ?CustomerAddress
