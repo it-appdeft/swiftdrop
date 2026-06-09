@@ -4,6 +4,7 @@ import { ChevronRight, Clock, Heart, Minus, Plus, Star, Tag, UtensilsCrossed } f
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish } from '../components/dish-modifier-dialog';
+import { availabilityOf, HoursStatus, type TodayHours, UnavailableOverlay } from './dashboard';
 
 interface SearchRestaurant {
     id: number;
@@ -17,6 +18,9 @@ interface SearchRestaurant {
     rating: number | null;
     total_reviews: number;
     distance_miles: number | null;
+    is_accepting_orders: boolean;
+    is_open_now: boolean;
+    today_hours: TodayHours;
 }
 
 interface DishItem {
@@ -25,6 +29,7 @@ interface DishItem {
     description: string | null;
     price: number;
     is_veg: boolean;
+    is_available: boolean;
     image_url: string | null;
     modifier_groups: ModifierDish['modifier_groups'];
 }
@@ -38,6 +43,9 @@ interface DishGroupRestaurant {
     rating: number | null;
     total_reviews: number;
     distance_miles: number | null;
+    is_accepting_orders: boolean;
+    is_open_now: boolean;
+    today_hours: TodayHours;
 }
 
 interface DishGroup {
@@ -255,12 +263,13 @@ export default function CustomerSearch({ results, cart }: Props) {
     const hasQuery = results.keyword.trim() !== '';
     const activeCount = type === 'items' ? groups.length : restaurants.length;
 
-    // All cart mutations refresh only the `cart` prop (partial reload) so the
-    // infinite-scroll dish list + scroll position survive the round-trip.
+    // In-list cart mutations refresh only the cart-related props (partial
+    // reload) so the infinite-scroll dish list + scroll position survive the
+    // round-trip. `cart_summary` is included so the header cart badge updates.
     const cartReloadOpts = (onDone?: () => void) => ({
         preserveScroll: true,
         preserveState: true,
-        only: ['cart'],
+        only: ['cart', 'cart_summary'],
         onError: (errors: Record<string, string>) => {
             const first = Object.values(errors)[0];
             toast.error(typeof first === 'string' ? first : 'Could not update your cart.');
@@ -269,13 +278,31 @@ export default function CustomerSearch({ results, cart }: Props) {
         onFinish: () => setSubmitting(false),
     });
 
-    const addToCart = (menuItemId: number, quantity: number, options: number[], onDone?: () => void) => {
+    // First add from the search list drops the dish into the cart, then opens
+    // the restaurant detail page so the customer can build the rest of their
+    // order there. The full page load also refreshes the header cart badge.
+    const addToCart = (menuItemId: number, quantity: number, options: number[], restaurantId: number, onDone?: () => void) => {
         setSubmitting(true);
-        router.post('/customer/cart', { menu_item_id: menuItemId, quantity, options }, cartReloadOpts(onDone));
+        router.post(
+            '/customer/cart',
+            { menu_item_id: menuItemId, quantity, options },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    onDone?.();
+                    router.get(restaurantHref(restaurantId, results.keyword));
+                },
+                onError: (errors: Record<string, string>) => {
+                    const first = Object.values(errors)[0];
+                    toast.error(typeof first === 'string' ? first : 'Could not update your cart.');
+                },
+                onFinish: () => setSubmitting(false),
+            },
+        );
     };
 
     const updateLine = (itemId: number, quantity: number) => {
-        router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true, only: ['cart'] });
+        router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true, only: ['cart', 'cart_summary'] });
     };
 
     const updateLineSelection = (itemId: number, quantity: number, options: number[], onDone?: () => void) => {
@@ -290,7 +317,7 @@ export default function CustomerSearch({ results, cart }: Props) {
             setOpenDish({ dish, restaurantId });
             return;
         }
-        addToCart(dish.id, 1, []);
+        addToCart(dish.id, 1, [], restaurantId);
     };
 
     // Stepper +: re-open the dialog for customisable dishes (so the customer
@@ -391,7 +418,7 @@ export default function CustomerSearch({ results, cart }: Props) {
                     onAdd={(optionIds, quantity) =>
                         openExistingLine
                             ? updateLineSelection(openExistingLine.id, quantity, optionIds, () => setOpenDish(null))
-                            : addToCart(openDish.dish.id, quantity, optionIds, () => setOpenDish(null))
+                            : addToCart(openDish.dish.id, quantity, optionIds, openDish.restaurantId, () => setOpenDish(null))
                     }
                 />
             ) : null}
@@ -498,47 +525,88 @@ function RestaurantsList({ restaurants, keyword }: { restaurants: SearchRestaura
         <div className="mt-6 rounded-2xl bg-[#F6F8FA] p-4 sm:p-6">
             <div className="grid grid-cols-1 gap-x-6 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
                 {restaurants.map((r) => (
-                    <Link key={r.id} href={restaurantHref(r.id, keyword)} className="group block">
-                        <div className="relative aspect-[7/4] overflow-hidden rounded-2xl bg-zinc-200">
-                            {r.cover_url || r.logo_url ? (
-                                <img
-                                    src={(r.cover_url ?? r.logo_url)!}
-                                    alt={r.name}
-                                    className="h-full w-full object-cover transition group-hover:scale-105"
-                                    loading="lazy"
-                                />
-                            ) : (
-                                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
-                                    {r.name.charAt(0)}
-                                </div>
-                            )}
-                            <span className="absolute bottom-3 left-3 rounded-full bg-rose-500 px-3 py-1 text-xs font-medium text-white shadow">
-                                20% OFF select items
-                            </span>
-                            {r.rating !== null ? (
-                                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-zinc-900 shadow">
-                                    <Star className="size-3 fill-amber-400 text-amber-400" /> {r.rating.toFixed(1)}
-                                </span>
-                            ) : null}
-                        </div>
-                        <div className="flex items-start justify-between gap-2 pt-3">
-                            <div className="min-w-0">
-                                <p className="truncate text-base font-semibold text-foreground">{r.name}</p>
-                                <MetaLine distanceMiles={r.distance_miles} city={r.city} />
-                            </div>
-                            <button
-                                type="button"
-                                aria-label="Save"
-                                onClick={(e) => e.preventDefault()}
-                                className="shrink-0 text-zinc-400 transition hover:text-rose-500"
-                            >
-                                <Heart className="size-5" />
-                            </button>
-                        </div>
-                    </Link>
+                    <SearchRestaurantCard key={r.id} restaurant={r} keyword={keyword} />
                 ))}
             </div>
         </div>
+    );
+}
+
+/**
+ * Search restaurant card. A restaurant that's paused (not accepting orders) or
+ * shut by its operating hours is grayed out, marked with a status overlay
+ * ("Out of order" / "Closed · Opens at …") and made non-interactive — it no
+ * longer links to the menu. Orderable restaurants link through as before.
+ */
+function SearchRestaurantCard({ restaurant: r, keyword }: { restaurant: SearchRestaurant; keyword: string }) {
+    const { unavailable, label, opensAt } = availabilityOf(r);
+
+    const media = (
+        <div className="relative aspect-[7/4] overflow-hidden rounded-2xl bg-zinc-200">
+            {r.cover_url || r.logo_url ? (
+                <img
+                    src={(r.cover_url ?? r.logo_url)!}
+                    alt={r.name}
+                    className={'h-full w-full object-cover transition ' + (unavailable ? 'grayscale' : 'group-hover:scale-105')}
+                    loading="lazy"
+                />
+            ) : (
+                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
+                    {r.name.charAt(0)}
+                </div>
+            )}
+            {unavailable ? (
+                <UnavailableOverlay label={label} opensAt={opensAt} />
+            ) : (
+                <span className="absolute bottom-3 left-3 rounded-full bg-rose-500 px-3 py-1 text-xs font-medium text-white shadow">
+                    20% OFF select items
+                </span>
+            )}
+            {r.rating !== null ? (
+                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-semibold text-zinc-900 shadow">
+                    <Star className="size-3 fill-amber-400 text-amber-400" /> {r.rating.toFixed(1)}
+                </span>
+            ) : null}
+        </div>
+    );
+
+    const details = (
+        <div className="flex items-start justify-between gap-2 pt-3">
+            <div className="min-w-0">
+                <p className={'truncate text-base font-semibold ' + (unavailable ? 'text-muted-foreground' : 'text-foreground')}>{r.name}</p>
+                <MetaLine distanceMiles={r.distance_miles} city={r.city} />
+                {/* When unavailable the overlay already states why — skip the line. */}
+                {!unavailable ? (
+                    <p className="mt-1 text-xs font-medium">
+                        <HoursStatus isOpenNow={r.is_open_now} today={r.today_hours} />
+                    </p>
+                ) : null}
+            </div>
+            <button
+                type="button"
+                aria-label="Save"
+                onClick={(e) => e.preventDefault()}
+                className="shrink-0 text-zinc-400 transition hover:text-rose-500"
+            >
+                <Heart className="size-5" />
+            </button>
+        </div>
+    );
+
+    if (unavailable) {
+        return (
+            <div aria-label={`${r.name} is ${label.toLowerCase()}`} className="block cursor-default opacity-70">
+                {media}
+                {details}
+            </div>
+        );
+    }
+
+    return (
+        <Link href={restaurantHref(r.id, keyword)} className="group block">
+            {media}
+            {details}
+        </Link>
     );
 }
 
@@ -567,35 +635,59 @@ function DishesList({
 
     return (
         <div className="mt-6 space-y-4 rounded-2xl bg-[#F6F8FA] p-3 sm:p-4">
-            {groups.map((group) => (
-                <section key={group.restaurant.id} className="rounded-2xl bg-white p-4 sm:p-6">
-                    <Link
-                        href={restaurantHref(group.restaurant.id, keyword)}
-                        className="group flex items-center justify-between gap-3 border-b border-zinc-100 pb-4"
-                    >
-                        <div className="min-w-0">
-                            <p className="truncate text-lg font-bold text-foreground group-hover:text-primary">
-                                {group.restaurant.name}
-                            </p>
-                            <MetaLine distanceMiles={group.restaurant.distance_miles} city={group.restaurant.city} />
-                        </div>
-                        <ChevronRight className="size-5 shrink-0 text-muted-foreground group-hover:text-primary" />
-                    </Link>
-                    <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {group.dishes.map((dish) => (
-                            <DishCard
-                                key={dish.id}
-                                dish={dish}
-                                rating={group.restaurant.rating}
-                                quantity={quantityFor(dish.id)}
-                                onAdd={() => onAdd(dish, group.restaurant.id)}
-                                onIncrement={() => onIncrement(dish, group.restaurant.id)}
-                                onDecrement={() => onDecrement(dish)}
-                            />
-                        ))}
+            {groups.map((group) => {
+                const { unavailable, label, opensAt } = availabilityOf(group.restaurant);
+
+                // Closed / out-of-order restaurants: header is grayed and
+                // non-clickable (no menu to open), dishes are grayed with no
+                // Add button.
+                const heading = (
+                    <div className="min-w-0">
+                        <p className={'flex items-center gap-2 truncate text-lg font-bold ' + (unavailable ? 'text-muted-foreground' : 'text-foreground group-hover:text-primary')}>
+                            <span className="truncate">{group.restaurant.name}</span>
+                            {unavailable ? (
+                                <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+                                    {label}
+                                    {opensAt ? ` · ${opensAt}` : ''}
+                                </span>
+                            ) : null}
+                        </p>
+                        <MetaLine distanceMiles={group.restaurant.distance_miles} city={group.restaurant.city} />
                     </div>
-                </section>
-            ))}
+                );
+
+                return (
+                    <section key={group.restaurant.id} className="rounded-2xl bg-white p-4 sm:p-6">
+                        {unavailable ? (
+                            <div className="flex items-center justify-between gap-3 border-b border-zinc-100 pb-4 opacity-70">
+                                {heading}
+                            </div>
+                        ) : (
+                            <Link
+                                href={restaurantHref(group.restaurant.id, keyword)}
+                                className="group flex items-center justify-between gap-3 border-b border-zinc-100 pb-4"
+                            >
+                                {heading}
+                                <ChevronRight className="size-5 shrink-0 text-muted-foreground group-hover:text-primary" />
+                            </Link>
+                        )}
+                        <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {group.dishes.map((dish) => (
+                                <DishCard
+                                    key={dish.id}
+                                    dish={dish}
+                                    rating={group.restaurant.rating}
+                                    quantity={quantityFor(dish.id)}
+                                    unavailable={unavailable || !dish.is_available}
+                                    onAdd={() => onAdd(dish, group.restaurant.id)}
+                                    onIncrement={() => onIncrement(dish, group.restaurant.id)}
+                                    onDecrement={() => onDecrement(dish)}
+                                />
+                            ))}
+                        </div>
+                    </section>
+                );
+            })}
         </div>
     );
 }
@@ -604,6 +696,7 @@ function DishCard({
     dish,
     rating,
     quantity,
+    unavailable,
     onAdd,
     onIncrement,
     onDecrement,
@@ -611,24 +704,34 @@ function DishCard({
     dish: DishItem;
     rating: number | null;
     quantity: number;
+    unavailable: boolean;
     onAdd: () => void;
     onIncrement: () => void;
     onDecrement: () => void;
 }) {
     return (
-        <article className="rounded-xl border border-zinc-200 bg-white p-3">
+        <article className={'rounded-xl border border-zinc-200 bg-white p-3 ' + (unavailable ? 'opacity-70' : '')}>
             <div className="flex gap-3">
                 <div className="relative shrink-0">
                     <div className="size-28 overflow-hidden rounded-lg bg-amber-50">
                         {dish.image_url ? (
-                            <img src={dish.image_url} alt={dish.name} className="h-full w-full object-cover" loading="lazy" />
+                            <img
+                                src={dish.image_url}
+                                alt={dish.name}
+                                className={'h-full w-full object-cover ' + (unavailable ? 'grayscale' : '')}
+                                loading="lazy"
+                            />
                         ) : (
                             <div className="flex h-full w-full items-center justify-center text-amber-600">
                                 <UtensilsCrossed className="size-9" />
                             </div>
                         )}
                     </div>
-                    {quantity === 0 ? (
+                    {unavailable ? (
+                        <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-zinc-300 bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground shadow-sm">
+                            Unavailable
+                        </span>
+                    ) : quantity === 0 ? (
                         <button
                             type="button"
                             onClick={onAdd}

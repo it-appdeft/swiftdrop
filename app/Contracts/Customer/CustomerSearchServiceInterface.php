@@ -27,7 +27,10 @@ interface CustomerSearchServiceInterface
      *
      * `$location` selects the discovery coordinates: omit it (web) to derive
      * them from the customer's saved address, or pass an explicit context (API)
-     * built from the frontend latitude/longitude.
+     * built from the frontend latitude/longitude. Search is location-driven on
+     * every surface — when no usable coordinates resolve (no lat/long on the
+     * API, no geocoded address on the web) the restaurant results are empty
+     * rather than falling back to a global list.
      */
     public function search(User $user, string $type, string $keyword, int $page = 1, int $perPage = 10, array $filters = [], ?LocationContext $location = null): CustomerSearchResults;
 

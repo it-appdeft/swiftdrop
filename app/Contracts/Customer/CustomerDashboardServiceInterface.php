@@ -36,10 +36,11 @@ interface CustomerDashboardServiceInterface
     public function foodTypes(int $limit = 20): Collection;
 
     /**
-     * Top picks: bookable, near + high-rated restaurants (rows carry
-     * `restaurant`, `distance_miles`, `is_favorited`). When `$foodTypeId` is
-     * provided the list is narrowed to restaurants offering at least one
-     * available dish tagged with that food type.
+     * Top picks: live + approved, near + high-rated restaurants (rows carry
+     * `restaurant`, `distance_miles`, `is_favorited`). Paused restaurants
+     * (`is_accepting_orders = false`) are still included so the card can gray
+     * them out. When `$foodTypeId` is provided the list is narrowed to
+     * restaurants offering at least one available dish tagged with that type.
      *
      * `$location` selects the discovery coordinates: omit it (web) to derive
      * them from the customer's saved address, or pass an explicit context (API)

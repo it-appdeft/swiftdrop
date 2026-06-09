@@ -62,7 +62,9 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         // Web omits $location and discovery uses the customer's saved address;
         // the API passes an explicit context from the frontend latitude/
         // longitude and the saved address is never read (the API response omits
-        // it anyway).
+        // it anyway). Either way, when no coordinates resolve the search is
+        // empty (location-driven, no global fallback) — usingFallback signals
+        // the frontend to prompt for an address.
         $address = $location === null ? $this->selectedAddressFor($profile) : null;
         $resolved = $location ?? LocationContext::fromAddress($address);
         $radius = max(0.1, $this->config->float(
@@ -183,7 +185,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
     /**
      * Restaurants tab: paginate restaurants matched by name OR an offered food
      * type. Geo-aware (radius + distance sort) when coordinates resolve,
-     * otherwise a global rating-sorted list. No dishes are nested.
+     * otherwise empty (location-driven — no global fallback). No dishes nested.
      *
      * @param  array{offers: bool, highest_rated: bool}  $filters
      * @return LengthAwarePaginator<int, array{restaurant: Restaurant, distance_miles: ?float}>
@@ -193,7 +195,7 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         $query = Restaurant::query()
             ->active()
             ->approved()
-            ->with('uploads')
+            ->with(['uploads', 'hours'])
             ->matchingNameOrFoodType($keyword)
             ->when($filters['offers'], fn (Builder $q) => $q->withOffers())
             ->when($filters['highest_rated'], fn (Builder $q) => $q->highRated());
@@ -219,6 +221,11 @@ class CustomerSearchService implements CustomerSearchServiceInterface
      * nest up to {@see ITEMS_PER_RESTAURANT} matching dishes under each. Only
      * the current page's restaurants are hydrated with dishes.
      *
+     * Out-of-order (paused) and closed (outside operating hours) restaurants
+     * are deliberately kept in the result set — the frontend grays them out and
+     * strips the Add button rather than hiding them. `is_accepting_orders` +
+     * `is_open_now` ride along on the resource so each surface can do that.
+     *
      * @param  array{offers: bool, highest_rated: bool}  $filters
      * @return LengthAwarePaginator<int, array{restaurant: Restaurant, distance_miles: ?float, dishes: Collection<int, MenuItem>}>
      */
@@ -227,8 +234,8 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         $query = Restaurant::query()
             ->active()
             ->approved()
-            ->with('uploads')
-            ->whereHas('menuItems', fn (Builder $q) => $q->available()->matchingKeyword($keyword))
+            ->with(['uploads', 'hours'])
+            ->whereHas('menuItems', fn (Builder $q) => $q->matchingKeyword($keyword))
             ->when($filters['offers'], fn (Builder $q) => $q->withOffers())
             ->when($filters['highest_rated'], fn (Builder $q) => $q->highRated());
 
@@ -239,7 +246,9 @@ class CustomerSearchService implements CustomerSearchServiceInterface
         $restaurantIds = $paginator->getCollection()->pluck('id')->all();
 
         // Matching dishes for just this page's restaurants, capped per
-        // restaurant below so the payload stays small.
+        // restaurant below so the payload stays small. Unavailable dishes are
+        // kept (the frontend grays them with no Add button) but sorted after
+        // available ones so the cap favours orderable dishes.
         $dishesByRestaurant = empty($restaurantIds)
             ? collect()
             : MenuItem::query()
@@ -249,8 +258,8 @@ class CustomerSearchService implements CustomerSearchServiceInterface
                     'uploads' => fn ($q) => $q->where('collection', 'image'),
                 ])
                 ->whereIn('restaurant_id', $restaurantIds)
-                ->available()
                 ->matchingKeyword($keyword)
+                ->orderByDesc('is_available')
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get()
@@ -272,8 +281,10 @@ class CustomerSearchService implements CustomerSearchServiceInterface
 
     /**
      * Shared ordering for both tabs: radius scope + distance sort when
-     * coordinates resolve (mirrors the dashboard restaurant list), else a
-     * global rating-sorted fallback so the page is never empty.
+     * coordinates resolve (mirrors the dashboard restaurant list). Search is
+     * location-driven on every surface — when no coordinates resolve (no
+     * lat/long on the API, no geocoded address on the web) the query is forced
+     * empty rather than falling back to a global list, matching the dashboard.
      */
     protected function applyLocationOrder(Builder $query, LocationContext $location, float $radius): void
     {
@@ -282,7 +293,8 @@ class CustomerSearchService implements CustomerSearchServiceInterface
                 ->orderByDesc('rating')
                 ->orderBy('distance_miles');
         } else {
-            $query->orderByDesc('rating');
+            // No "nearby" without coordinates → no results (no global fallback).
+            $query->whereRaw('1 = 0');
         }
     }
 }

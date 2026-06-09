@@ -26,6 +26,9 @@ class SearchDishResource extends JsonResource
             'description' => $m->description,
             'price' => (float) $m->price,
             'is_veg' => (bool) $m->is_veg,
+            // Off-menu dishes still appear on the Items tab — grayed, no Add
+            // button — so the card needs to know.
+            'is_available' => (bool) $m->is_available,
             'image_url' => $this->imageUrl($m),
             // Drives the customise dialog on the search dish-card. Empty array →
             // dish adds straight to cart.
