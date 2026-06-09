@@ -1,7 +1,7 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Check, ChevronLeft, ChevronRight, Heart, MapPin, Star, UtensilsCrossed, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Clock, Heart, MapPin, Star, UtensilsCrossed, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 
@@ -12,6 +12,12 @@ interface FoodType {
     name: string;
     slug: string;
     image_url: string | null;
+}
+
+interface TodayHours {
+    is_open: boolean;
+    open_from: string | null;
+    open_to: string | null;
 }
 
 interface DashboardRestaurant {
@@ -27,6 +33,9 @@ interface DashboardRestaurant {
     total_reviews: number;
     distance_miles: number | null;
     is_favorited: boolean;
+    is_accepting_orders: boolean;
+    is_open_now: boolean;
+    today_hours: TodayHours;
 }
 
 interface DashboardAddress {
@@ -258,45 +267,79 @@ function TopPicksSection({ picks }: { picks: DashboardRestaurant[] }) {
                     style={{ transform: `translateX(calc(${-start} * ((100% - 3rem) / 3 + 1.5rem)))` }}
                 >
                     {picks.map((r) => (
-                        <Link
-                            key={r.id}
-                            href={`/customer/restaurants/${r.id}`}
-                            className="group block shrink-0 basis-[calc((100%-3rem)/3)]"
-                        >
-                            <div className="aspect-[16/10] overflow-hidden rounded-xl bg-zinc-200">
-                                {r.cover_url || r.logo_url ? (
-                                    <img
-                                        src={(r.cover_url ?? r.logo_url)!}
-                                        alt={r.name}
-                                        className="h-full w-full object-cover transition group-hover:scale-105"
-                                        loading="lazy"
-                                    />
-                                ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
-                                        {r.name.charAt(0)}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex items-center justify-between pt-3">
-                                <div className="min-w-0">
-                                    <p className="truncate text-base font-semibold">{r.name}</p>
-                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                        20-30 min
-                                        {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
-                                    </p>
-                                </div>
-                                {r.rating !== null ? (
-                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground">
-                                        <Star className="size-3 fill-current" /> {r.rating.toFixed(1)}
-                                        <span className="font-normal text-emerald-700/70">({r.total_reviews})</span>
-                                    </span>
-                                ) : null}
-                            </div>
-                        </Link>
+                        <TopPickCard key={r.id} restaurant={r} />
                     ))}
                 </div>
             </div>
         </Section>
+    );
+}
+
+/**
+ * A single Top Pick slide. A restaurant that's paused (not accepting orders)
+ * or shut by its operating hours is grayed out, marked with a status overlay
+ * ("Out of order" / "Closed · Opens at …") and made non-clickable rather than
+ * linking to a menu that can't be ordered from.
+ */
+function TopPickCard({ restaurant: r }: { restaurant: DashboardRestaurant }) {
+    const { unavailable, label, opensAt } = availabilityOf(r);
+    const wrapperClass = 'group block shrink-0 basis-[calc((100%-3rem)/3)]';
+
+    const media = (
+        <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-zinc-200">
+            {r.cover_url || r.logo_url ? (
+                <img
+                    src={(r.cover_url ?? r.logo_url)!}
+                    alt={r.name}
+                    className={'h-full w-full object-cover transition ' + (unavailable ? 'grayscale' : 'group-hover:scale-105')}
+                    loading="lazy"
+                />
+            ) : (
+                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
+                    {r.name.charAt(0)}
+                </div>
+            )}
+            {unavailable ? <UnavailableOverlay label={label} opensAt={opensAt} /> : null}
+        </div>
+    );
+
+    const details = (
+        <div className="flex items-center justify-between pt-3">
+            <div className="min-w-0">
+                <p className={'truncate text-base font-semibold ' + (unavailable ? 'text-muted-foreground' : '')}>{r.name}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    20-30 min
+                    {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
+                </p>
+                {!unavailable ? (
+                    <p className="mt-1 text-xs font-medium">
+                        <HoursStatus isOpenNow={r.is_open_now} today={r.today_hours} />
+                    </p>
+                ) : null}
+            </div>
+            {r.rating !== null ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground">
+                    <Star className="size-3 fill-current" /> {r.rating.toFixed(1)}
+                    <span className="font-normal text-emerald-700/70">({r.total_reviews})</span>
+                </span>
+            ) : null}
+        </div>
+    );
+
+    if (unavailable) {
+        return (
+            <div aria-label={`${r.name} is ${label.toLowerCase()}`} className={wrapperClass + ' cursor-default opacity-70'}>
+                {media}
+                {details}
+            </div>
+        );
+    }
+
+    return (
+        <Link href={`/customer/restaurants/${r.id}`} className={wrapperClass}>
+            {media}
+            {details}
+        </Link>
     );
 }
 
@@ -525,7 +568,85 @@ function AllRestaurantsSection({
     );
 }
 
-/** Restaurant card with an in-card heart toggle (used on home + restaurants index). */
+/** Today's open/close status line for a restaurant card. */
+function HoursStatus({ isOpenNow, today }: { isOpenNow: boolean; today: TodayHours }) {
+    if (isOpenNow) {
+        return (
+            <span className="inline-flex items-center gap-1 text-emerald-600">
+                <Clock className="size-3.5" />
+                Open{today.open_to ? ` · til ${today.open_to}` : ''}
+            </span>
+        );
+    }
+    return (
+        <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <Clock className="size-3.5" />
+            Closed{today.is_open && today.open_from ? ` · opens ${today.open_from}` : ''}
+        </span>
+    );
+}
+
+// ─── Availability (paused / closed) — shared with the search page ───────────
+
+/** Minimal shape every "is this restaurant orderable right now" check needs. */
+type OrderState = { is_accepting_orders: boolean; is_open_now: boolean; today_hours: TodayHours };
+
+interface Availability {
+    /** Paused by the partner, or shut by today's operating hours. */
+    unavailable: boolean;
+    /** Badge text: "Out of order" (paused) takes priority over "Closed" (hours). */
+    label: string;
+    /** "1:00 PM" when the restaurant is closed now but opens later today. */
+    opensAt: string | null;
+}
+
+/** Turn a 24h "HH:MM" string into a 12h "1:00 PM" label. */
+function formatTime12(hm: string | null): string | null {
+    if (!hm) return null;
+    const [h, m = '00'] = hm.split(':');
+    const hour = Number(h);
+    if (Number.isNaN(hour)) return null;
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const h12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${h12}:${m} ${period}`;
+}
+
+/**
+ * Whether a restaurant can be ordered from right now. The partner's pause
+ * toggle (is_accepting_orders) and today's operating hours (is_open_now) both
+ * block ordering; either way the card is grayed and stripped of its link / Add
+ * controls. Pause wins the label since it's a deliberate override of the hours.
+ */
+function availabilityOf(r: OrderState): Availability {
+    if (!r.is_accepting_orders) {
+        return { unavailable: true, label: 'Out of order', opensAt: null };
+    }
+    if (!r.is_open_now) {
+        const opensAt = r.today_hours.is_open ? formatTime12(r.today_hours.open_from) : null;
+        return { unavailable: true, label: 'Closed', opensAt };
+    }
+    return { unavailable: false, label: '', opensAt: null };
+}
+
+/** Grayscale-image overlay: a red status pill + optional "Opens at …" line. */
+function UnavailableOverlay({ label, opensAt }: { label: string; opensAt: string | null }) {
+    return (
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/30">
+            <span className="rounded-full bg-red-600 px-4 py-1 text-xs font-bold uppercase tracking-wide text-white shadow">
+                {label}
+            </span>
+            {opensAt ? <span className="text-xs font-semibold text-white drop-shadow">Opens at {opensAt}</span> : null}
+        </span>
+    );
+}
+
+/**
+ * Restaurant card with an in-card heart toggle (used on home + restaurants
+ * index). A restaurant that's paused (not accepting orders) or shut by its
+ * operating hours is grayed out, marked with a status overlay ("Out of order"
+ * / "Closed · Opens at …") and made non-clickable rather than linking to a
+ * menu that can't be ordered from.
+ */
 function RestaurantCard({
     restaurant: r,
     isFavorited,
@@ -535,61 +656,93 @@ function RestaurantCard({
     isFavorited: boolean;
     onToggleFavorite: () => void;
 }) {
-    return (
-        <Link href={`/customer/restaurants/${r.id}`} className="group block">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-zinc-200">
-                {r.cover_url || r.logo_url ? (
-                    <img
-                        src={(r.cover_url ?? r.logo_url)!}
-                        alt={r.name}
-                        className="h-full w-full object-cover transition group-hover:scale-105"
-                        loading="lazy"
-                    />
-                ) : (
-                    <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
-                        {r.name.charAt(0)}
-                    </div>
-                )}
+    const { unavailable, label, opensAt } = availabilityOf(r);
+
+    const media = (
+        <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-zinc-200">
+            {r.cover_url || r.logo_url ? (
+                <img
+                    src={(r.cover_url ?? r.logo_url)!}
+                    alt={r.name}
+                    className={
+                        'h-full w-full object-cover transition ' +
+                        (unavailable ? 'grayscale' : 'group-hover:scale-105')
+                    }
+                    loading="lazy"
+                />
+            ) : (
+                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
+                    {r.name.charAt(0)}
+                </div>
+            )}
+            {unavailable ? (
+                <UnavailableOverlay label={label} opensAt={opensAt} />
+            ) : (
                 <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
                     20% OFF select items
                 </span>
-                {r.rating !== null ? (
-                    <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
-                        <Star className="size-3 fill-current text-amber-500" /> {r.rating.toFixed(1)}
-                    </span>
+            )}
+            {r.rating !== null ? (
+                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
+                    <Star className="size-3 fill-current text-amber-500" /> {r.rating.toFixed(1)}
+                </span>
+            ) : null}
+        </div>
+    );
+
+    const details = (
+        <div className="flex items-center justify-between pt-3">
+            <div className="min-w-0">
+                <p className={'truncate text-base font-semibold ' + (unavailable ? 'text-muted-foreground' : '')}>{r.name}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    20-30 min
+                    {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
+                </p>
+                {!unavailable ? (
+                    <p className="mt-1 text-xs font-medium">
+                        <HoursStatus isOpenNow={r.is_open_now} today={r.today_hours} />
+                    </p>
                 ) : null}
             </div>
-            <div className="flex items-center justify-between pt-3">
-                <div className="min-w-0">
-                    <p className="truncate text-base font-semibold">{r.name}</p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        20-30 min
-                        {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    aria-label={isFavorited ? 'Remove from favourites' : 'Save to favourites'}
-                    aria-pressed={isFavorited}
-                    onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onToggleFavorite();
-                    }}
-                    className={
-                        'shrink-0 transition ' +
-                        (isFavorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')
-                    }
-                >
-                    <Heart className={'size-5 ' + (isFavorited ? 'fill-current' : '')} />
-                </button>
+            <button
+                type="button"
+                aria-label={isFavorited ? 'Remove from favourites' : 'Save to favourites'}
+                aria-pressed={isFavorited}
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onToggleFavorite();
+                }}
+                className={
+                    'shrink-0 transition ' +
+                    (isFavorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')
+                }
+            >
+                <Heart className={'size-5 ' + (isFavorited ? 'fill-current' : '')} />
+            </button>
+        </div>
+    );
+
+    // Paused or closed → don't link to the menu; render a non-clickable card.
+    if (unavailable) {
+        return (
+            <div aria-label={`${r.name} is ${label.toLowerCase()}`} className="group block cursor-default opacity-70">
+                {media}
+                {details}
             </div>
+        );
+    }
+
+    return (
+        <Link href={`/customer/restaurants/${r.id}`} className="group block">
+            {media}
+            {details}
         </Link>
     );
 }
 
-export { RestaurantCard };
-export type { DashboardRestaurant };
+export { RestaurantCard, HoursStatus, availabilityOf, UnavailableOverlay };
+export type { DashboardRestaurant, TodayHours };
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 

@@ -154,19 +154,19 @@ class RestaurantDiscoveryLocationTest extends TestCase
         $this->assertEqualsWithDelta(213, $byId[$london->id], 5);
     }
 
-    public function test_api_search_without_coordinates_ignores_saved_address(): void
+    public function test_api_search_without_coordinates_returns_empty(): void
     {
         ['customer' => $customer] = $this->graph();
         Sanctum::actingAs($customer);
 
+        // No lat/lng → location-driven search has nothing "nearby": the saved
+        // address is NOT used and there is no global fallback, so results are
+        // empty even though matching restaurants exist.
         $rows = $this->getJson('/api/customer/search/restaurant?search=Bi')
             ->assertOk()
             ->json('data.results');
 
-        $this->assertCount(2, $rows);
-        foreach ($rows as $row) {
-            $this->assertNull($row['distance_miles']);
-        }
+        $this->assertSame([], $rows);
     }
 
     public function test_web_search_still_measures_distance_from_selected_address(): void
@@ -224,6 +224,20 @@ class RestaurantDiscoveryLocationTest extends TestCase
         // approved restaurants exist (no global fallback on the web either).
         $rows = $this->actingAs($customer)
             ->getJson('/customer/restaurants')
+            ->assertOk()
+            ->json('restaurants');
+
+        $this->assertSame([], $rows);
+    }
+
+    public function test_web_search_without_address_returns_empty(): void
+    {
+        $customer = $this->customerWithoutAddress();
+
+        // No geocoded address → web search has no "nearby" either, so results
+        // are empty (no global fallback) and the page can prompt for an address.
+        $rows = $this->actingAs($customer)
+            ->getJson('/customer/search/restaurant?search=Bi')
             ->assertOk()
             ->json('restaurants');
 

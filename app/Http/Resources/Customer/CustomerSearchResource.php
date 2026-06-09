@@ -27,6 +27,7 @@ class CustomerSearchResource extends JsonResource
             'dishes_by_restaurant' => $data->dishesByRestaurant->map(function (array $row) use ($request) {
                 /** @var Restaurant $restaurant */
                 $restaurant = $row['restaurant'];
+                $today = $restaurant->todayHours();
 
                 return [
                     'restaurant' => [
@@ -38,6 +39,13 @@ class CustomerSearchResource extends JsonResource
                         'rating' => $restaurant->rating !== null ? (float) $restaurant->rating : null,
                         'total_reviews' => (int) $restaurant->total_reviews,
                         'distance_miles' => $row['distance_miles'] ?? null,
+                        'is_accepting_orders' => (bool) $restaurant->is_accepting_orders,
+                        'is_open_now' => $restaurant->isOpenNow(),
+                        'today_hours' => [
+                            'is_open' => $today ? (bool) $today->is_open : false,
+                            'open_from' => $today && $today->open_from ? substr((string) $today->open_from, 0, 5) : null,
+                            'open_to' => $today && $today->open_to ? substr((string) $today->open_to, 0, 5) : null,
+                        ],
                     ],
                     'dishes' => SearchDishResource::collection($row['dishes'])->resolve($request),
                 ];

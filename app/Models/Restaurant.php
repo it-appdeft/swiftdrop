@@ -360,6 +360,49 @@ class Restaurant extends Model
         return $this->hasMany(RestaurantHour::class);
     }
 
+    /**
+     * Today's operating-hours row (keyed by the {@see RestaurantHour::DAYS}
+     * weekday abbreviation), or null when the restaurant has no row for today.
+     * Reuses the eager-loaded `hours` relation when present so callers can
+     * resolve this across a card list without an N+1.
+     */
+    public function todayHours(): ?RestaurantHour
+    {
+        $today = strtolower(Carbon::now()->format('D')); // mon, tue, ...
+        $hours = $this->relationLoaded('hours') ? $this->hours : $this->hours()->get();
+
+        return $hours->firstWhere('day_of_week', $today);
+    }
+
+    /**
+     * Whether the restaurant is open right now per its operating hours: today's
+     * row must be marked open and the current local time must fall inside the
+     * open_from..open_to window. Overnight windows (close time <= open time,
+     * e.g. 18:00–02:00) are handled. A missing row or missing times for today
+     * counts as closed.
+     *
+     * Note: this reflects operating hours only — it is independent of
+     * `is_accepting_orders` (the partner's manual pause toggle).
+     */
+    public function isOpenNow(): bool
+    {
+        $row = $this->todayHours();
+        if (! $row || ! $row->is_open || ! $row->open_from || ! $row->open_to) {
+            return false;
+        }
+
+        $now = Carbon::now()->format('H:i');
+        $from = substr((string) $row->open_from, 0, 5);
+        $to = substr((string) $row->open_to, 0, 5);
+
+        // Overnight window: the open period spans midnight.
+        if ($to <= $from) {
+            return $now >= $from || $now <= $to;
+        }
+
+        return $now >= $from && $now <= $to;
+    }
+
     public function galleryImages(): HasMany
     {
         return $this->hasMany(RestaurantGalleryImage::class)->orderBy('sort_order');

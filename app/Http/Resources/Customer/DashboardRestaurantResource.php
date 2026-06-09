@@ -30,9 +30,34 @@ class DashboardRestaurantResource extends JsonResource
             'rating' => $r->rating !== null ? (float) $r->rating : null,
             'total_reviews' => (int) $r->total_reviews,
             'distance_miles' => $distance,
+            // Whether the partner is currently taking orders (the manual pause
+            // toggle). The web grays out and blocks cards where this is false.
+            'is_accepting_orders' => (bool) $r->is_accepting_orders,
+            // Live open/closed per today's operating hours (independent of the
+            // pause toggle above) plus today's window so the card can show a
+            // "Open · til HH:MM" / "Closed" status line.
+            'is_open_now' => $r->isOpenNow(),
+            'today_hours' => $this->todayHours($r),
             // Optional — present on dashboard / restaurants index rows so the
             // heart icon on each card reflects the customer's saved list.
             'is_favorited' => (bool) ($this->resource['is_favorited'] ?? false),
+        ];
+    }
+
+    /**
+     * Today's open/close window in HH:MM, or an all-null "closed" shape when
+     * the restaurant has no hours row for today.
+     *
+     * @return array{is_open: bool, open_from: ?string, open_to: ?string}
+     */
+    protected function todayHours(Restaurant $r): array
+    {
+        $row = $r->todayHours();
+
+        return [
+            'is_open' => $row ? (bool) $row->is_open : false,
+            'open_from' => $row && $row->open_from ? substr((string) $row->open_from, 0, 5) : null,
+            'open_to' => $row && $row->open_to ? substr((string) $row->open_to, 0, 5) : null,
         ];
     }
 }

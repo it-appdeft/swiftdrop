@@ -94,10 +94,13 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
     }
 
     /**
-     * Top picks: restaurants that are bookable (live + approved + accepting
-     * orders), near the resolved location and reasonably rated (rating >=
-     * {@see TOP_PICKS_MIN_RATING}, so unrated 0.00 restaurants are skipped),
-     * ordered by rating.
+     * Top picks: live + approved restaurants near the resolved location and
+     * reasonably rated (rating >= {@see TOP_PICKS_MIN_RATING}, so unrated 0.00
+     * restaurants are skipped), ordered by rating.
+     *
+     * Restaurants that have paused orders (`is_accepting_orders = false`) are
+     * still included — like the restaurants list — so the card can render them
+     * grayed out with an "out of order" affordance rather than hiding them.
      *
      * Discovery is location-driven on every surface — see {@see resolveLocation()}:
      * web callers omit `$location` and the coordinates come from the customer's
@@ -123,8 +126,9 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
         $favoriteIds = $user ? array_flip($this->favorites->favoriteRestaurantIds($user)) : [];
 
         $query = Restaurant::query()
-            ->bookable()
-            ->with('uploads')
+            ->active()
+            ->approved()
+            ->with(['uploads', 'hours'])
             ->highRated(self::TOP_PICKS_MIN_RATING)
             ->orderByDesc('rating')
             ->withinRadius($location->lat, $location->lng, $radius)
@@ -178,7 +182,7 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
 
         // Eager-load uploads so the logo_url / banner_url accessors resolve
         // without an N+1 across the list.
-        $query = Restaurant::query()->active()->approved()->with('uploads')
+        $query = Restaurant::query()->active()->approved()->with(['uploads', 'hours'])
             ->withinRadius($location->lat, $location->lng, $radius)
             ->orderByDesc('rating')
             ->orderBy('distance_miles');
