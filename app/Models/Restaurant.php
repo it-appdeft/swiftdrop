@@ -117,6 +117,18 @@ class Restaurant extends Model
         return $this->approval_status === 'approved';
     }
 
+    /**
+     * Orderable right now per its lifecycle state: live, approved and with the
+     * partner's "Paused" toggle off. Instance mirror of {@see scopeBookable} —
+     * note it does NOT consider operating hours (use {@see isOpenNow} for that).
+     */
+    public function isBookable(): bool
+    {
+        return $this->status === 'active'
+            && $this->isApproved()
+            && (bool) $this->is_accepting_orders;
+    }
+
     // ─── Query scopes ────────────────────────────────────────────────────────
 
     /** Restaurants that are live (not suspended / paused). */
