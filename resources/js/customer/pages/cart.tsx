@@ -19,6 +19,7 @@ interface CartLine {
     menu_item_id: number;
     name: string | null;
     is_veg: boolean;
+    is_available: boolean;
     image_url: string | null;
     unit_price: number;
     quantity: number;
@@ -47,7 +48,7 @@ interface ItemsMeta {
 interface Cart {
     id: number | null;
     restaurant_id: number | null;
-    restaurant: { id: number; name: string; logo_url: string | null } | null;
+    restaurant: { id: number; name: string; logo_url: string | null; is_orderable: boolean; is_open_now: boolean } | null;
     items: CartLine[];
     pagination: ItemsMeta;
     item_count: number;
@@ -131,6 +132,17 @@ export default function CustomerCart({ cart }: Props) {
 
     const empty = cart.item_count === 0;
 
+    // A restaurant that has gone paused/closed since the cart was built: block
+    // checkout and adding more, leaving only decrease / remove.
+    const restaurantUnavailable = cart.restaurant ? !cart.restaurant.is_orderable || !cart.restaurant.is_open_now : false;
+    const restaurantWarning = !cart.restaurant
+        ? null
+        : !cart.restaurant.is_orderable
+          ? 'This restaurant is not accepting orders right now. You can’t check out until it reopens.'
+          : !cart.restaurant.is_open_now
+            ? 'This restaurant is currently closed. You can’t check out until it reopens.'
+            : null;
+
     return (
         <div className="bg-background flex min-h-screen flex-col">
             <Head title="Your Cart" />
@@ -161,17 +173,35 @@ export default function CustomerCart({ cart }: Props) {
                 ) : (
                     <>
                         {cart.restaurant ? (
-                            <Link
-                                href={route('customer.restaurants.show', cart.restaurant.id)}
-                                className="text-foreground hover:text-primary mt-4 inline-flex items-center gap-3 text-sm font-semibold"
-                            >
-                                <span className="size-9 overflow-hidden rounded-full bg-zinc-100">
-                                    {cart.restaurant.logo_url ? (
-                                        <img src={cart.restaurant.logo_url} alt={cart.restaurant.name} className="h-full w-full object-cover" />
-                                    ) : null}
-                                </span>
-                                {cart.restaurant.name}
-                            </Link>
+                            restaurantUnavailable ? (
+                                // Closed/paused → not a link; the menu can't be ordered from.
+                                <div className="text-muted-foreground mt-4 inline-flex items-center gap-3 text-sm font-semibold">
+                                    <span className="size-9 overflow-hidden rounded-full bg-zinc-100 grayscale">
+                                        {cart.restaurant.logo_url ? (
+                                            <img src={cart.restaurant.logo_url} alt={cart.restaurant.name} className="h-full w-full object-cover" />
+                                        ) : null}
+                                    </span>
+                                    {cart.restaurant.name}
+                                </div>
+                            ) : (
+                                <Link
+                                    href={route('customer.restaurants.show', cart.restaurant.id)}
+                                    className="text-foreground hover:text-primary mt-4 inline-flex items-center gap-3 text-sm font-semibold"
+                                >
+                                    <span className="size-9 overflow-hidden rounded-full bg-zinc-100">
+                                        {cart.restaurant.logo_url ? (
+                                            <img src={cart.restaurant.logo_url} alt={cart.restaurant.name} className="h-full w-full object-cover" />
+                                        ) : null}
+                                    </span>
+                                    {cart.restaurant.name}
+                                </Link>
+                            )
+                        ) : null}
+
+                        {restaurantWarning ? (
+                            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700">
+                                {restaurantWarning}
+                            </div>
                         ) : null}
 
                         <div className="mt-4 divide-y divide-zinc-100 rounded-xl border border-zinc-100">
@@ -179,6 +209,7 @@ export default function CustomerCart({ cart }: Props) {
                                 <CartRow
                                     key={line.id}
                                     line={line}
+                                    canAdd={!restaurantUnavailable}
                                     onIncrement={() => updateLine(line.id, line.quantity + 1)}
                                     onDecrement={() => updateLine(line.id, line.quantity - 1)}
                                     onRemove={() => setPendingDelete(line)}
@@ -214,9 +245,10 @@ export default function CustomerCart({ cart }: Props) {
                             <button
                                 type="button"
                                 onClick={() => router.visit('/customer/checkout')}
-                                className="mt-4 w-full rounded-md bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
+                                disabled={restaurantUnavailable}
+                                className="mt-4 w-full rounded-md bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                Proceed to Checkout
+                                {restaurantUnavailable ? 'Restaurant unavailable' : 'Proceed to Checkout'}
                             </button>
                         </div>
                     </>
@@ -257,22 +289,25 @@ export default function CustomerCart({ cart }: Props) {
 
 function CartRow({
     line,
+    canAdd,
     onIncrement,
     onDecrement,
     onRemove,
 }: {
     line: CartLine;
+    canAdd: boolean;
     onIncrement: () => void;
     onDecrement: () => void;
     onRemove: () => void;
 }) {
     const modifierSummary = line.modifiers.map((m) => m.option_name).join(', ');
+    const unavailable = !line.is_available;
 
     return (
-        <div className="flex gap-4 p-4">
+        <div className={'flex gap-4 p-4 ' + (unavailable ? 'opacity-70' : '')}>
             <div className="size-20 shrink-0 overflow-hidden rounded-lg bg-amber-50">
                 {line.image_url ? (
-                    <img src={line.image_url} alt={line.name ?? ''} className="h-full w-full object-cover" />
+                    <img src={line.image_url} alt={line.name ?? ''} className={'h-full w-full object-cover ' + (unavailable ? 'grayscale' : '')} />
                 ) : (
                     <div className="flex h-full w-full items-center justify-center text-amber-600">
                         <UtensilsCrossed className="size-7" />
@@ -289,18 +324,37 @@ function CartRow({
                 </div>
                 {modifierSummary ? <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">{modifierSummary}</p> : null}
 
-                <div className="mt-2 flex items-center justify-between">
-                    <div className="flex items-center gap-3 rounded-md border border-emerald-500 px-2 py-1">
-                        <button type="button" aria-label="Decrease" onClick={onDecrement} className="text-emerald-600">
-                            <Minus className="size-4" />
-                        </button>
-                        <span className="min-w-4 text-center text-sm font-bold text-emerald-700">{line.quantity}</span>
-                        <button type="button" aria-label="Increase" onClick={onIncrement} className="text-emerald-600">
-                            <Plus className="size-4" />
-                        </button>
+                {/* Off-menu line: no quantity stepper — the only action is remove. */}
+                {unavailable ? (
+                    <div className="mt-2 flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600">
+                            Unavailable
+                            <button type="button" onClick={onRemove} className="font-semibold underline hover:no-underline">
+                                Remove
+                            </button>
+                        </span>
+                        <span className="text-muted-foreground text-sm font-semibold tabular-nums">£{line.line_total.toFixed(2)}</span>
                     </div>
-                    <span className="text-foreground text-sm font-semibold tabular-nums">£{line.line_total.toFixed(2)}</span>
-                </div>
+                ) : (
+                    <div className="mt-2 flex items-center justify-between">
+                        <div className="flex items-center gap-3 rounded-md border border-emerald-500 px-2 py-1">
+                            <button type="button" aria-label="Decrease" onClick={onDecrement} className="text-emerald-600">
+                                <Minus className="size-4" />
+                            </button>
+                            <span className="min-w-4 text-center text-sm font-bold text-emerald-700">{line.quantity}</span>
+                            <button
+                                type="button"
+                                aria-label="Increase"
+                                onClick={onIncrement}
+                                disabled={!canAdd}
+                                className="text-emerald-600 disabled:cursor-not-allowed disabled:text-zinc-300"
+                            >
+                                <Plus className="size-4" />
+                            </button>
+                        </div>
+                        <span className="text-foreground text-sm font-semibold tabular-nums">£{line.line_total.toFixed(2)}</span>
+                    </div>
+                )}
             </div>
         </div>
     );

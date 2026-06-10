@@ -149,7 +149,34 @@ class CheckoutService implements CheckoutServiceInterface
             throw ValidationException::withMessages(['cart' => 'Your cart is empty.']);
         }
 
+        // A dish can go off-menu after it was added; the order can't be paid for
+        // until the customer removes it (the cart/checkout offer a remove-only
+        // control for these lines).
+        $hasUnavailable = $cart->items->contains(
+            fn (CartItem $item) => ! ($item->menuItem?->is_available ?? false),
+        );
+        if ($hasUnavailable) {
+            throw ValidationException::withMessages([
+                'cart' => 'Please remove unavailable item from cart to proceed.',
+            ]);
+        }
+
         $restaurant = $cart->restaurant;
+
+        // The restaurant must still be orderable at the moment of payment — it
+        // could have been suspended, un-approved or paused, or simply be outside
+        // its operating hours, after the cart was built.
+        if (! $restaurant instanceof Restaurant || ! $restaurant->isBookable()) {
+            throw ValidationException::withMessages([
+                'restaurant' => 'This restaurant is not accepting orders right now. Please try again later.',
+            ]);
+        }
+        if (! $restaurant->isOpenNow()) {
+            throw ValidationException::withMessages([
+                'restaurant' => 'This restaurant is currently closed. Please try again during its opening hours.',
+            ]);
+        }
+
         $address = $this->resolveAddress($user, $addressId);
         if (! $address) {
             throw ValidationException::withMessages(['address_id' => 'Please choose a delivery address.']);

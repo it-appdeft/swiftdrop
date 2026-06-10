@@ -38,6 +38,10 @@ class CustomerCartResource extends JsonResource
                 'id' => $cart->restaurant->id,
                 'name' => $cart->restaurant->name,
                 'logo_url' => $cart->restaurant->logo_url,
+                // Orderable-now state — the cart page disables "Proceed to
+                // Checkout" and the restaurant link when this is false.
+                'is_orderable' => $cart->restaurant->isBookable(),
+                'is_open_now' => $cart->restaurant->isOpenNow(),
             ] : null,
             'items' => $items->values()->all(),
             // Sum of quantities — the "2 items" badge on the bar / header.
@@ -58,6 +62,10 @@ class CustomerCartResource extends JsonResource
             'menu_item_id' => $item->menu_item_id,
             'name' => $item->menuItem?->name,
             'is_veg' => (bool) $item->menuItem?->is_veg,
+            // Whether the dish can still be ordered. A line can outlive the
+            // dish going off-menu — the cart/checkout gray it and offer only
+            // "remove", and checkout blocks payment until it's gone.
+            'is_available' => (bool) ($item->menuItem?->is_available ?? false),
             'image_url' => $this->dishImageUrl($item),
             'unit_price' => $unitPrice,
             'quantity' => (int) $item->quantity,

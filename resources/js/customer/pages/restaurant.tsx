@@ -26,6 +26,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish, type ModifierGroup } from '../components/dish-modifier-dialog';
+import { RepeatCustomisationDialog, summariseSelection } from '../components/repeat-customisation-dialog';
 
 interface Dish {
     id: number;
@@ -33,6 +34,7 @@ interface Dish {
     description: string | null;
     price: number;
     is_veg: boolean;
+    is_available: boolean;
     image_url: string | null;
     rating: number | null;
     is_favorited: boolean;
@@ -73,6 +75,8 @@ interface RestaurantHeader {
     description: string | null;
     is_top_rated: boolean;
     is_favorited: boolean;
+    is_accepting_orders: boolean;
+    is_open_now: boolean;
     share_url: string;
     store_info: StoreInfo;
 }
@@ -158,7 +162,12 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     const minRating = data.filters.min_rating !== null;
 
     const [query, setQuery] = useState(data.keyword ? `You Searched for “${data.keyword}”` : '');
-    const [openDish, setOpenDish] = useState<ModifierDish | null>(null);
+    // The modifier dialog. `editLine` null → adding a new combo; set → editing
+    // that existing line (opens pre-filled, "Update" rewrites it).
+    const [openDish, setOpenDish] = useState<{ dish: ModifierDish; editLine: CartLine | null } | null>(null);
+    // A customisable dish tapped "+" while already in the cart — prompts the
+    // "repeat previous customisation?" choice (repeat / edit / choose new).
+    const [repeatDish, setRepeatDish] = useState<Dish | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
     // Local mirror of favourite state so the heart flips instantly. Server is
@@ -176,11 +185,10 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         return map;
     }, [cart.items]);
 
-    // The line the modifier dialog edits. A dish can have several lines (one
-    // per option combo); we edit the most recently added one so its current
-    // selection opens pre-marked and "Update" rewrites that same line.
-    const openDishLines = openDish ? linesByDish.get(openDish.id) ?? [] : [];
-    const existingLine = openDishLines.length ? openDishLines[openDishLines.length - 1] : null;
+    // Every combo of the tapped dish already in the cart — the "repeat" prompt
+    // lists them all so the customer can add another of any one (one dish can
+    // sit in the cart under several option combos).
+    const repeatLines = repeatDish ? linesByDish.get(repeatDish.id) ?? [] : [];
 
 
     const [favoriteDishIds, setFavoriteDishIds] = useState<Set<number>>(
@@ -230,6 +238,11 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     // restaurant (a cart holds one restaurant at a time).
     const cartIsThisRestaurant = cart.item_count > 0 && cart.restaurant_id === r.id;
 
+    // The restaurant as a whole can't take orders — paused (not accepting) or
+    // shut by its operating hours. Every dish then behaves like an unavailable
+    // one (grayed, no Add); the server enforces this too.
+    const restaurantUnavailable = !r.is_accepting_orders || !r.is_open_now;
+
     const addToCart = (menuItemId: number, quantity: number, options: number[], onDone?: () => void) => {
         setSubmitting(true);
         router.post(
@@ -252,8 +265,9 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true });
     };
 
-    // Re-customise an existing line (options + quantity) from the modifier
-    // dialog. Sending `options` switches the server onto the edit path.
+    // Re-customise an existing line (options + quantity). Sending `options`
+    // switches the server onto the edit path, which merges into a matching
+    // combo or rewrites this line in place.
     const updateLineSelection = (itemId: number, quantity: number, options: number[], onDone?: () => void) => {
         setSubmitting(true);
         router.put(
@@ -273,17 +287,22 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     };
 
     const handleAdd = (dish: Dish) => {
+        if (!dish.is_available || restaurantUnavailable) return;
         if (dish.modifier_groups.length > 0) {
-            setOpenDish(dish);
+            setOpenDish({ dish, editLine: null });
             return;
         }
         addToCart(dish.id, 1, []);
     };
 
+    // "+" on a dish already in the cart. A customisable dish asks whether to
+    // repeat the last combo or pick new modifiers (so the same dish can sit in
+    // the cart under several combos); a plain dish just bumps its quantity.
     const handleIncrement = (dish: Dish) => {
+        if (restaurantUnavailable) return;
         const lines = linesByDish.get(dish.id) ?? [];
         if (dish.modifier_groups.length > 0) {
-            setOpenDish(dish);
+            setRepeatDish(dish);
             return;
         }
         if (lines[0]) updateLine(lines[0].id, lines[0].quantity + 1);
@@ -372,6 +391,7 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                 )
             }
             isFavorited={favoriteDishIds.has(dish.id)}
+            restaurantUnavailable={restaurantUnavailable}
             onAdd={() => handleAdd(dish)}
             onIncrement={() => handleIncrement(dish)}
             onDecrement={() => handleDecrement(dish)}
@@ -385,6 +405,14 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
             <CustomerHeader />
 
             <main className={'mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 sm:py-8 ' + (cartIsThisRestaurant ? 'pb-28' : '')}>
+                {restaurantUnavailable ? (
+                    <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                        {!r.is_accepting_orders
+                            ? 'This restaurant is not accepting orders right now, so items can’t be added.'
+                            : 'This restaurant is currently closed, so items can’t be added until it reopens.'}
+                    </div>
+                ) : null}
+
                 {/* Hero banner */}
                 <section className="relative overflow-hidden rounded-2xl bg-zinc-800">
                     {r.cover_url || r.logo_url ? (
@@ -600,18 +628,52 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
 
             {openDish ? (
                 <DishModifierDialog
-                    key={openDish.id}
-                    dish={openDish}
-                    selectedOptions={existingLine?.selected_options ?? []}
-                    initialQuantity={existingLine?.quantity ?? 1}
-                    editing={existingLine !== null}
+                    key={`${openDish.dish.id}-${openDish.editLine?.id ?? 'new'}`}
+                    dish={openDish.dish}
+                    selectedOptions={openDish.editLine?.selected_options ?? []}
+                    initialQuantity={openDish.editLine?.quantity ?? 1}
+                    editing={openDish.editLine !== null}
                     submitting={submitting}
                     onClose={() => setOpenDish(null)}
                     onAdd={(optionIds, quantity) =>
-                        existingLine
-                            ? updateLineSelection(existingLine.id, quantity, optionIds, () => setOpenDish(null))
-                            : addToCart(openDish.id, quantity, optionIds, () => setOpenDish(null))
+                        openDish.editLine
+                            ? updateLineSelection(openDish.editLine.id, quantity, optionIds, () => setOpenDish(null))
+                            : addToCart(openDish.dish.id, quantity, optionIds, () => setOpenDish(null))
                     }
+                />
+            ) : null}
+
+            {repeatDish && repeatLines.length > 0 ? (
+                <RepeatCustomisationDialog
+                    key={`repeat-${repeatDish.id}`}
+                    dishName={repeatDish.name}
+                    combos={repeatLines.map((line) => ({
+                        lineId: line.id,
+                        quantity: line.quantity,
+                        summary: summariseSelection(repeatDish.modifier_groups, line.selected_options ?? []),
+                    }))}
+                    submitting={submitting}
+                    onClose={() => setRepeatDish(null)}
+                    // Repeat a specific combo → just bump that line's quantity.
+                    onRepeat={(lineId) => {
+                        const line = repeatLines.find((l) => l.id === lineId);
+                        if (line) updateLine(line.id, line.quantity + 1);
+                        setRepeatDish(null);
+                    }}
+                    // Edit a combo → open the modifier dialog pre-filled for that line.
+                    onEdit={(lineId) => {
+                        const line = repeatLines.find((l) => l.id === lineId);
+                        const dish = repeatDish;
+                        setRepeatDish(null);
+                        if (line) setOpenDish({ dish, editLine: line });
+                    }}
+                    // Choose fresh modifiers → the modifier dialog adds, and the
+                    // backend merges or creates a new line by its option signature.
+                    onChoose={() => {
+                        const dish = repeatDish;
+                        setRepeatDish(null);
+                        setOpenDish({ dish, editLine: null });
+                    }}
                 />
             ) : null}
 
@@ -643,6 +705,7 @@ function MenuRow({
     dish,
     quantity,
     isFavorited,
+    restaurantUnavailable,
     onAdd,
     onIncrement,
     onDecrement,
@@ -651,6 +714,7 @@ function MenuRow({
     dish: Dish;
     quantity: number;
     isFavorited: boolean;
+    restaurantUnavailable: boolean;
     onAdd: () => void;
     onIncrement: () => void;
     onDecrement: () => void;
@@ -662,20 +726,34 @@ function MenuRow({
     const isLong = description.length > DESCRIPTION_TRUNCATE;
     const shownDescription = !expanded && isLong ? description.slice(0, DESCRIPTION_TRUNCATE).trimEnd() : description;
 
+    // The whole restaurant being closed/paused makes every dish non-orderable,
+    // same as an individually off-menu dish.
+    const unavailable = !dish.is_available || restaurantUnavailable;
+
     return (
-        <article className="flex gap-4 py-5">
+        <article className={'flex gap-4 py-5 ' + (unavailable ? 'opacity-70' : '')}>
             {/* Image + Add / quantity stepper */}
             <div className="relative shrink-0">
                 <div className="size-28 overflow-hidden rounded-lg bg-amber-50">
                     {dish.image_url ? (
-                        <img src={dish.image_url} alt={dish.name} className="h-full w-full object-cover" loading="lazy" />
+                        <img
+                            src={dish.image_url}
+                            alt={dish.name}
+                            className={'h-full w-full object-cover ' + (unavailable ? 'grayscale' : '')}
+                            loading="lazy"
+                        />
                     ) : (
                         <div className="flex h-full w-full items-center justify-center text-amber-600">
                             <UtensilsCrossed className="size-9" />
                         </div>
                     )}
                 </div>
-                {quantity === 0 ? (
+                {/* Off-menu dish: shown grayed with no Add control. */}
+                {unavailable ? (
+                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-zinc-300 bg-white px-4 py-1 text-xs font-bold uppercase tracking-wide text-muted-foreground shadow-sm">
+                        Unavailable
+                    </span>
+                ) : quantity === 0 ? (
                     <button
                         type="button"
                         onClick={onAdd}
