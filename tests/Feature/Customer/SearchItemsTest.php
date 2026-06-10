@@ -41,7 +41,7 @@ class SearchItemsTest extends TestCase
 
     private function restaurant(string $name): Restaurant
     {
-        return Restaurant::create([
+        $restaurant = Restaurant::create([
             'user_id' => User::factory()->create()->id,
             'name' => $name,
             'city' => 'London',
@@ -52,6 +52,17 @@ class SearchItemsTest extends TestCase
             'lat' => self::LAT,
             'lng' => self::LNG,
         ]);
+
+        // Open today, all day — adding to cart requires the restaurant to be
+        // orderable + within its operating hours.
+        $restaurant->hours()->create([
+            'day_of_week' => strtolower(now()->format('D')),
+            'is_open' => true,
+            'open_from' => '00:00',
+            'open_to' => '23:59',
+        ]);
+
+        return $restaurant;
     }
 
     public function test_items_search_page_renders_with_dishes_and_a_cart_prop(): void

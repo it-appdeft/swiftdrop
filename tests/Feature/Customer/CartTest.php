@@ -79,13 +79,25 @@ class CartTest extends TestCase
 
     private function makeRestaurant(string $name): Restaurant
     {
-        return Restaurant::create([
+        $restaurant = Restaurant::create([
             'user_id' => User::factory()->create()->id,
             'name' => $name,
             'phone' => '+44'.fake()->numerify('##########'),
             'status' => 'active',
             'approval_status' => 'approved',
+            'is_accepting_orders' => true,
         ]);
+
+        // Open today, all day — the cart's add/increase guard requires the
+        // restaurant to be orderable + within its operating hours.
+        $restaurant->hours()->create([
+            'day_of_week' => strtolower(now()->format('D')),
+            'is_open' => true,
+            'open_from' => '00:00',
+            'open_to' => '23:59',
+        ]);
+
+        return $restaurant;
     }
 
     public function test_adds_a_dish_with_modifiers_via_api_and_records_priced_snapshot(): void
@@ -128,6 +140,75 @@ class CartTest extends TestCase
         $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id, $olives->id]])
             ->assertCreated()
             ->assertJsonPath('data.line_count', 2);
+    }
+
+    /**
+     * End-to-end "repeat previous customisation" flow over the API — the same
+     * sequence the web restaurant/search pages drive:
+     *   1. POST add combo A (Regular + Cheese)            → line A, qty 1
+     *   2. POST add combo B (Large + Olives)              → line B, qty 1 (kept distinct)
+     *   3. GET cart                                        → both combos visible with modifiers
+     *   4. PUT items/{A} quantity+1  ("Repeat" combo A)    → line A qty 2, still 2 lines
+     *   5. POST add combo A again    ("I'll Choose" → A)   → merges into line A (qty 3)
+     */
+    public function test_api_repeat_customisation_flow_lists_all_combos_and_merges_by_signature(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+        $large = $size->options()->where('name', 'Large')->first();
+        $cheese = $toppings->options()->where('name', 'Cheese')->first();
+        $olives = $toppings->options()->where('name', 'Olives')->first();
+
+        // 1. Combo A.
+        $lineA = $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id, $cheese->id]])
+            ->assertCreated()
+            ->json('data.items.0.id');
+
+        // 2. Combo B — a different option set, so it must NOT merge.
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$large->id, $olives->id]])
+            ->assertCreated()
+            ->assertJsonPath('data.line_count', 2);
+
+        // 3. Both combos are listed for the dish, each with its frozen modifiers —
+        //    this is what the "repeat" prompt renders (all combos, not just last).
+        $cart = $this->getJson('/api/customer/cart')->assertOk();
+        $cart->assertJsonPath('data.line_count', 2);
+        $names = collect($cart->json('data.items'))
+            ->map(fn ($i) => collect($i['modifiers'])->pluck('option_name')->sort()->values()->all())
+            ->all();
+        $this->assertContains(['Cheese', 'Regular'], $names);
+        $this->assertContains(['Large', 'Olives'], $names);
+
+        // 4. "Repeat" combo A → bump just that line's quantity, no new line.
+        $this->putJson("/api/customer/cart/items/{$lineA}", ['quantity' => 2])
+            ->assertOk()
+            ->assertJsonPath('data.line_count', 2);
+
+        // 5. "I'll Choose" the same options as combo A → backend folds it into A.
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$cheese->id, $regular->id]])
+            ->assertCreated()
+            ->assertJsonPath('data.line_count', 2);
+
+        $this->assertDatabaseHas('cart_items', ['id' => $lineA, 'quantity' => 3]);
+    }
+
+    public function test_merge_ignores_the_order_options_are_submitted_in(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+        $cheese = $toppings->options()->where('name', 'Cheese')->first();
+
+        // Same modifier set, submitted in opposite order, must fold into one
+        // line — the signature is order-independent (ids are sorted).
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id, $cheese->id]])->assertCreated();
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 2, 'options' => [$cheese->id, $regular->id]])
+            ->assertCreated()
+            ->assertJsonPath('data.line_count', 1)
+            ->assertJsonPath('data.items.0.quantity', 3);
     }
 
     public function test_adds_with_no_options_and_rejects_over_max_multi_select(): void
@@ -301,5 +382,87 @@ class CartTest extends TestCase
         ])->assertRedirect();
 
         $this->assertDatabaseHas('cart_items', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'unit_price' => 10]);
+    }
+
+    public function test_adding_is_blocked_when_the_restaurant_is_not_accepting_orders(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        // The restaurant pauses after the customer opened it.
+        $pizza->restaurant->update(['is_accepting_orders' => false]);
+        $regular = $size->options()->where('name', 'Regular')->first();
+
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('menu_item_id');
+
+        $this->assertDatabaseCount('cart_items', 0);
+    }
+
+    public function test_increasing_quantity_is_blocked_when_the_restaurant_is_closed_but_removing_is_allowed(): void
+    {
+        ['customer' => $customer, 'coke' => $coke] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $coke->id, 'quantity' => 1, 'options' => []])->assertCreated();
+        $itemId = $customer->cart->items()->first()->id;
+
+        // Restaurant closes (today marked not-open).
+        $coke->restaurant->hours()->update(['is_open' => false]);
+
+        // Increase is rejected…
+        $this->putJson("/api/customer/cart/items/{$itemId}", ['quantity' => 3])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('menu_item_id');
+
+        // …but lowering / removing is still allowed so the cart can be cleared.
+        $this->putJson("/api/customer/cart/items/{$itemId}", ['quantity' => 0])
+            ->assertOk()
+            ->assertJsonPath('data.item_count', 0);
+
+        $this->assertDatabaseCount('cart_items', 0);
+    }
+
+    public function test_edits_a_lines_options_through_web_inertia_controller(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
+        $this->actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+        $large = $size->options()->where('name', 'Large')->first();
+        $cheese = $toppings->options()->where('name', 'Cheese')->first();
+
+        $this->post('/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id]])->assertRedirect();
+        $itemId = $customer->cart->items()->first()->id;
+
+        // Edit-and-save from the modifier dialog: Large + Cheese, quantity 2 →
+        // unit (10 + 5 + 1) = 16. Sending `options` routes the web controller
+        // onto the re-customise path, rewriting this line in place.
+        $this->put("/customer/cart/items/{$itemId}", ['quantity' => 2, 'options' => [$large->id, $cheese->id]])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('cart_items', ['id' => $itemId, 'quantity' => 2, 'unit_price' => 16]);
+        $this->assertDatabaseHas('cart_item_modifiers', ['cart_item_id' => $itemId, 'option_name' => 'Large']);
+        $this->assertDatabaseMissing('cart_item_modifiers', ['cart_item_id' => $itemId, 'option_name' => 'Regular']);
+    }
+
+    public function test_editing_with_an_invalid_option_set_is_rejected_through_web(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size] = $this->cartGraph();
+        $this->actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+        $this->post('/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id]])->assertRedirect();
+        $itemId = $customer->cart->items()->first()->id;
+
+        // Two picks for a single-select group is invalid — the edit is rejected
+        // and the line keeps its original customisation.
+        $this->from('/customer/cart')
+            ->put("/customer/cart/items/{$itemId}", ['quantity' => 1, 'options' => $size->options->pluck('id')->all()])
+            ->assertRedirect('/customer/cart')
+            ->assertSessionHasErrors('options');
+
+        $this->assertDatabaseHas('cart_item_modifiers', ['cart_item_id' => $itemId, 'option_name' => 'Regular']);
     }
 }

@@ -4,6 +4,7 @@ import { ChevronRight, Clock, Heart, Minus, Plus, Star, Tag, UtensilsCrossed } f
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish } from '../components/dish-modifier-dialog';
+import { RepeatCustomisationDialog, summariseSelection } from '../components/repeat-customisation-dialog';
 import { availabilityOf, HoursStatus, type TodayHours, UnavailableOverlay } from './dashboard';
 
 interface SearchRestaurant {
@@ -130,7 +131,12 @@ function restaurantHref(id: number, keyword: string): string {
 
 export default function CustomerSearch({ results, cart }: Props) {
     const type = results.type;
-    const [openDish, setOpenDish] = useState<{ dish: ModifierDish; restaurantId: number } | null>(null);
+    // The modifier dialog. `editLine` null → adding a new combo (which navigates
+    // to the restaurant page); set → editing that line in place (stays here).
+    const [openDish, setOpenDish] = useState<{ dish: ModifierDish; restaurantId: number; editLine: CartLine | null } | null>(null);
+    // A customisable dish tapped "+" while already in the cart — prompts the
+    // "repeat previous customisation?" choice (repeat / edit / choose new).
+    const [repeatDish, setRepeatDish] = useState<{ dish: DishItem; restaurantId: number } | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
     // Cart lines keyed by dish — drives the in-list quantity steppers and the
@@ -149,14 +155,16 @@ export default function CustomerSearch({ results, cart }: Props) {
     const quantityFor = (dishId: number) =>
         (linesByDish.get(dishId) ?? []).reduce((sum, line) => sum + line.quantity, 0);
 
-    // The line the dialog edits — most recent combo for the dish, so its
-    // current selection opens pre-marked (see restaurant page for the rationale).
+    // Most recent combo for the dish — drives the stepper's "-" target and the
+    // combo the "repeat previous customisation?" prompt offers.
     const lastLineFor = (dishId: number): CartLine | null => {
         const lines = linesByDish.get(dishId) ?? [];
         return lines.length ? lines[lines.length - 1] : null;
     };
 
-    const openExistingLine = openDish ? lastLineFor(openDish.dish.id) : null;
+    // Every combo of the tapped dish already in the cart — the "repeat" prompt
+    // lists them all so the customer can add another of any one.
+    const repeatLines = repeatDish ? linesByDish.get(repeatDish.dish.id) ?? [] : [];
 
     // Both tabs use infinite scroll. The active tab's first page comes from
     // props; subsequent pages append via JSON fetch from the same
@@ -263,21 +271,6 @@ export default function CustomerSearch({ results, cart }: Props) {
     const hasQuery = results.keyword.trim() !== '';
     const activeCount = type === 'items' ? groups.length : restaurants.length;
 
-    // In-list cart mutations refresh only the cart-related props (partial
-    // reload) so the infinite-scroll dish list + scroll position survive the
-    // round-trip. `cart_summary` is included so the header cart badge updates.
-    const cartReloadOpts = (onDone?: () => void) => ({
-        preserveScroll: true,
-        preserveState: true,
-        only: ['cart', 'cart_summary'],
-        onError: (errors: Record<string, string>) => {
-            const first = Object.values(errors)[0];
-            toast.error(typeof first === 'string' ? first : 'Could not update your cart.');
-        },
-        onSuccess: () => onDone?.(),
-        onFinish: () => setSubmitting(false),
-    });
-
     // First add from the search list drops the dish into the cart, then opens
     // the restaurant detail page so the customer can build the rest of their
     // order there. The full page load also refreshes the header cart badge.
@@ -305,26 +298,43 @@ export default function CustomerSearch({ results, cart }: Props) {
         router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true, only: ['cart', 'cart_summary'] });
     };
 
+    // Re-customise an existing line (options + quantity). Unlike a fresh add
+    // (which navigates to the restaurant page), an edit stays on the search list
+    // and just refreshes the cart props.
     const updateLineSelection = (itemId: number, quantity: number, options: number[], onDone?: () => void) => {
         setSubmitting(true);
-        router.put(`/customer/cart/items/${itemId}`, { quantity, options }, cartReloadOpts(onDone));
+        router.put(
+            `/customer/cart/items/${itemId}`,
+            { quantity, options },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['cart', 'cart_summary'],
+                onSuccess: () => onDone?.(),
+                onError: (errors: Record<string, string>) => {
+                    const first = Object.values(errors)[0];
+                    toast.error(typeof first === 'string' ? first : 'Could not update this item.');
+                },
+                onFinish: () => setSubmitting(false),
+            },
+        );
     };
 
     // First add from a card. Dishes with options open the customise dialog;
     // plain dishes drop straight into the cart and the card flips to a stepper.
     const handleDishAdd = (dish: DishItem, restaurantId: number) => {
         if (dish.modifier_groups.length > 0) {
-            setOpenDish({ dish, restaurantId });
+            setOpenDish({ dish, restaurantId, editLine: null });
             return;
         }
         addToCart(dish.id, 1, [], restaurantId);
     };
 
-    // Stepper +: re-open the dialog for customisable dishes (so the customer
-    // confirms a combo), else bump the existing line's quantity.
+    // Stepper +: a customisable dish asks whether to repeat the last combo or
+    // pick new modifiers; a plain dish just bumps the existing line's quantity.
     const handleIncrement = (dish: DishItem, restaurantId: number) => {
         if (dish.modifier_groups.length > 0) {
-            setOpenDish({ dish, restaurantId });
+            setRepeatDish({ dish, restaurantId });
             return;
         }
         const line = lastLineFor(dish.id);
@@ -408,18 +418,52 @@ export default function CustomerSearch({ results, cart }: Props) {
 
             {openDish ? (
                 <DishModifierDialog
-                    key={openDish.dish.id}
+                    key={`${openDish.dish.id}-${openDish.editLine?.id ?? 'new'}`}
                     dish={openDish.dish}
-                    selectedOptions={openExistingLine?.selected_options ?? []}
-                    initialQuantity={openExistingLine?.quantity ?? 1}
-                    editing={openExistingLine !== null}
+                    selectedOptions={openDish.editLine?.selected_options ?? []}
+                    initialQuantity={openDish.editLine?.quantity ?? 1}
+                    editing={openDish.editLine !== null}
                     submitting={submitting}
                     onClose={() => setOpenDish(null)}
                     onAdd={(optionIds, quantity) =>
-                        openExistingLine
-                            ? updateLineSelection(openExistingLine.id, quantity, optionIds, () => setOpenDish(null))
+                        openDish.editLine
+                            ? updateLineSelection(openDish.editLine.id, quantity, optionIds, () => setOpenDish(null))
                             : addToCart(openDish.dish.id, quantity, optionIds, openDish.restaurantId, () => setOpenDish(null))
                     }
+                />
+            ) : null}
+
+            {repeatDish && repeatLines.length > 0 ? (
+                <RepeatCustomisationDialog
+                    key={`repeat-${repeatDish.dish.id}`}
+                    dishName={repeatDish.dish.name}
+                    combos={repeatLines.map((line) => ({
+                        lineId: line.id,
+                        quantity: line.quantity,
+                        summary: summariseSelection(repeatDish.dish.modifier_groups, line.selected_options ?? []),
+                    }))}
+                    submitting={submitting}
+                    onClose={() => setRepeatDish(null)}
+                    // Repeat a specific combo → just bump that line's quantity.
+                    onRepeat={(lineId) => {
+                        const line = repeatLines.find((l) => l.id === lineId);
+                        if (line) updateLine(line.id, line.quantity + 1);
+                        setRepeatDish(null);
+                    }}
+                    // Edit a combo → open the modifier dialog pre-filled for that line.
+                    onEdit={(lineId) => {
+                        const line = repeatLines.find((l) => l.id === lineId);
+                        const next = repeatDish;
+                        setRepeatDish(null);
+                        if (line) setOpenDish({ dish: next.dish, restaurantId: next.restaurantId, editLine: line });
+                    }}
+                    // Choose fresh modifiers → the modifier dialog adds, and the
+                    // backend merges or creates a new line by its option signature.
+                    onChoose={() => {
+                        const next = repeatDish;
+                        setRepeatDish(null);
+                        setOpenDish({ dish: next.dish, restaurantId: next.restaurantId, editLine: null });
+                    }}
                 />
             ) : null}
         </div>

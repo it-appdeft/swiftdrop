@@ -32,6 +32,11 @@ class CheckoutResource extends JsonResource
                 'name' => $data->restaurant->name,
                 'area' => $data->restaurant->city ?? $data->restaurant->full_address,
                 'logo_url' => $cartPayload['restaurant']['logo_url'] ?? null,
+                // Orderable-now state — checkout blocks payment (and the
+                // frontend warns) when the restaurant is paused/suspended or
+                // outside its operating hours.
+                'is_orderable' => $data->restaurant->isBookable(),
+                'is_open_now' => $data->restaurant->isOpenNow(),
             ] : null,
             'items' => $cartPayload['items'],
             'addresses' => $data->addresses->map(fn (CustomerAddress $a) => $this->address($a))->values()->all(),

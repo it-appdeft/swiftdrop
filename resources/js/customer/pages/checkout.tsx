@@ -12,6 +12,7 @@ interface CheckoutItem {
     menu_item_id: number;
     name: string | null;
     is_veg: boolean;
+    is_available: boolean;
     image_url: string | null;
     unit_price: number;
     quantity: number;
@@ -48,7 +49,7 @@ interface AvailableCoupon {
 
 interface Checkout {
     is_empty: boolean;
-    restaurant: { id: number; name: string; area: string | null; logo_url: string | null } | null;
+    restaurant: { id: number; name: string; area: string | null; logo_url: string | null; is_orderable: boolean; is_open_now: boolean } | null;
     items: CheckoutItem[];
     addresses: CheckoutAddress[];
     selected_address_id: number | null;
@@ -109,6 +110,27 @@ export default function CustomerCheckout({ checkout }: Props) {
     const updateLine = (itemId: number, quantity: number) => {
         router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true });
     };
+
+    const removeLine = (itemId: number) => {
+        router.delete(`/customer/cart/items/${itemId}`, { preserveScroll: true, preserveState: true });
+    };
+
+    // Any off-menu line blocks the order. We surface it inline; the actual
+    // guard is server-side (place() rejects with the same message), so the
+    // button stays clickable and the customer gets that message if they try.
+    const hasUnavailable = checkout.items.some((item) => !item.is_available);
+
+    // The restaurant itself must be orderable at pay time: live + accepting
+    // orders, and open per its hours. Server enforces this in place(); we warn
+    // up front and block adding more (only remove/decrease stays open).
+    const restaurantUnavailable = r ? !r.is_orderable || !r.is_open_now : false;
+    const restaurantWarning = !r
+        ? null
+        : !r.is_orderable
+          ? 'This restaurant is not accepting orders right now. Please try again later.'
+          : !r.is_open_now
+            ? 'This restaurant is currently closed. Please try again during its opening hours.'
+            : null;
 
     const applyCoupon = (coupon: AvailableCoupon | string) => {
         setCouponOpen(false);
@@ -236,21 +258,45 @@ export default function CustomerCheckout({ checkout }: Props) {
                                     key={item.id}
                                     item={item}
                                     restaurantId={r?.id ?? null}
+                                    canAdd={!restaurantUnavailable}
                                     onIncrement={() => updateLine(item.id, item.quantity + 1)}
                                     onDecrement={() => updateLine(item.id, item.quantity - 1)}
+                                    onRemove={() => removeLine(item.id)}
                                 />
                             ))}
                         </div>
 
+                        {restaurantWarning ? (
+                            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
+                                {restaurantWarning}
+                            </div>
+                        ) : null}
+
+                        {hasUnavailable ? (
+                            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700">
+                                Please remove unavailable item from cart to proceed.
+                            </div>
+                        ) : null}
+
                         {/* Add items + cooking requests */}
                         <div className="mt-4 flex flex-wrap gap-2">
                             {r ? (
-                                <Link
-                                    href={`/customer/restaurants/${r.id}`}
-                                    className="bg-background text-foreground inline-flex items-center gap-1.5 rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium hover:border-emerald-500"
-                                >
-                                    <Plus className="size-4" /> Add Items
-                                </Link>
+                                restaurantUnavailable ? (
+                                    // Closed/paused → no navigating to a menu that can't be ordered from.
+                                    <span
+                                        aria-disabled
+                                        className="bg-background text-muted-foreground inline-flex cursor-not-allowed items-center gap-1.5 rounded-md border border-zinc-200 px-3 py-2 text-sm font-medium opacity-60"
+                                    >
+                                        <Plus className="size-4" /> Add Items
+                                    </span>
+                                ) : (
+                                    <Link
+                                        href={`/customer/restaurants/${r.id}`}
+                                        className="bg-background text-foreground inline-flex items-center gap-1.5 rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium hover:border-emerald-500"
+                                    >
+                                        <Plus className="size-4" /> Add Items
+                                    </Link>
+                                )
                             ) : null}
                             {checkout.accepts_cooking_requests ? (
                                 <button
@@ -465,21 +511,26 @@ function AddressCard({ address, selected, onSelect }: { address: CheckoutAddress
 function CheckoutItemRow({
     item,
     restaurantId,
+    canAdd,
     onIncrement,
     onDecrement,
+    onRemove,
 }: {
     item: CheckoutItem;
     restaurantId: number | null;
+    canAdd: boolean;
     onIncrement: () => void;
     onDecrement: () => void;
+    onRemove: () => void;
 }) {
     const modifierSummary = item.modifiers.map((m) => m.option_name).join(', ');
+    const unavailable = !item.is_available;
 
     return (
-        <div className="flex gap-3 py-3">
+        <div className={'flex gap-3 py-3 ' + (unavailable ? 'opacity-70' : '')}>
             <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-amber-50">
                 {item.image_url ? (
-                    <img src={item.image_url} alt={item.name ?? ''} className="h-full w-full object-cover" />
+                    <img src={item.image_url} alt={item.name ?? ''} className={'h-full w-full object-cover ' + (unavailable ? 'grayscale' : '')} />
                 ) : (
                     <div className="flex h-full w-full items-center justify-center text-amber-600">
                         <UtensilsCrossed className="size-6" />
@@ -488,7 +539,9 @@ function CheckoutItemRow({
             </div>
             <div className="min-w-0 flex-1">
                 <p className="text-foreground text-sm font-semibold">{item.name}</p>
-                {modifierSummary ? (
+                {unavailable ? (
+                    <p className="text-xs font-semibold text-rose-600">Unavailable</p>
+                ) : modifierSummary ? (
                     <p className="text-muted-foreground truncate text-xs">{modifierSummary}</p>
                 ) : restaurantId ? (
                     <Link href={`/customer/restaurants/${restaurantId}`} className="text-muted-foreground text-xs hover:text-emerald-600">
@@ -497,25 +550,37 @@ function CheckoutItemRow({
                 ) : null}
                 <p className="text-foreground mt-0.5 text-sm font-medium tabular-nums">£{item.unit_price.toFixed(2)}</p>
             </div>
-            <div className="flex items-center gap-2 self-center">
+            {/* Off-menu line: no quantity stepper — the only action is remove. */}
+            {unavailable ? (
                 <button
                     type="button"
-                    aria-label="Decrease"
-                    onClick={onDecrement}
-                    className="flex size-7 items-center justify-center rounded-md border border-zinc-200 bg-white text-emerald-600 transition hover:border-emerald-300 hover:bg-emerald-50"
+                    onClick={onRemove}
+                    className="self-center rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
                 >
-                    <Minus className="size-3.5" strokeWidth={2.5} />
+                    Remove
                 </button>
-                <span className="min-w-4 text-center text-sm font-bold text-foreground tabular-nums">{item.quantity}</span>
-                <button
-                    type="button"
-                    aria-label="Increase"
-                    onClick={onIncrement}
-                    className="flex size-7 items-center justify-center rounded-md bg-emerald-500 text-white transition hover:bg-emerald-600"
-                >
-                    <Plus className="size-3.5" strokeWidth={2.5} />
-                </button>
-            </div>
+            ) : (
+                <div className="flex items-center gap-2 self-center">
+                    <button
+                        type="button"
+                        aria-label="Decrease"
+                        onClick={onDecrement}
+                        className="flex size-7 items-center justify-center rounded-md border border-zinc-200 bg-white text-emerald-600 transition hover:border-emerald-300 hover:bg-emerald-50"
+                    >
+                        <Minus className="size-3.5" strokeWidth={2.5} />
+                    </button>
+                    <span className="min-w-4 text-center text-sm font-bold text-foreground tabular-nums">{item.quantity}</span>
+                    <button
+                        type="button"
+                        aria-label="Increase"
+                        onClick={onIncrement}
+                        disabled={!canAdd}
+                        className="flex size-7 items-center justify-center rounded-md bg-emerald-500 text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-400"
+                    >
+                        <Plus className="size-3.5" strokeWidth={2.5} />
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

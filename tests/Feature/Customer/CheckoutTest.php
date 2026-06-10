@@ -8,8 +8,10 @@ use App\Models\CustomerProfile;
 use App\Models\MenuItem;
 use App\Models\Offer;
 use App\Models\Restaurant;
+use App\Models\RestaurantHour;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -40,6 +42,15 @@ class CheckoutTest extends TestCase
             'accepts_cooking_requests' => true,
             'status' => 'active',
             'approval_status' => 'approved',
+            'is_accepting_orders' => true,
+        ]);
+
+        // Open today, all day, so checkout's open-now guard passes by default.
+        $restaurant->hours()->create([
+            'day_of_week' => strtolower(Carbon::now()->format('D')),
+            'is_open' => true,
+            'open_from' => '00:00',
+            'open_to' => '23:59',
         ]);
 
         $menuItem = MenuItem::create([
@@ -164,6 +175,108 @@ class CheckoutTest extends TestCase
 
         $this->postJson('/api/customer/checkout', ['address_id' => $far->id])
             ->assertStatus(422)->assertJsonValidationErrors('address_id');
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_checkout_summary_flags_an_unavailable_line(): void
+    {
+        ['customer' => $customer, 'restaurant' => $restaurant] = $this->checkoutGraph();
+        Sanctum::actingAs($customer);
+
+        // The dish goes off-menu after it was added to the cart.
+        $restaurant->menuItems()->update(['is_available' => false]);
+
+        $this->getJson('/api/customer/checkout')
+            ->assertOk()
+            ->assertJsonPath('data.items.0.is_available', false);
+    }
+
+    public function test_placing_with_an_unavailable_item_is_rejected_with_a_remove_message(): void
+    {
+        ['customer' => $customer, 'restaurant' => $restaurant, 'near' => $near] = $this->checkoutGraph();
+        Sanctum::actingAs($customer);
+
+        $restaurant->menuItems()->update(['is_available' => false]);
+
+        $this->postJson('/api/customer/checkout', ['address_id' => $near->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('cart')
+            ->assertJsonPath('errors.cart.0', 'Please remove unavailable item from cart to proceed.');
+
+        // Nothing ordered, cart untouched — the customer must remove it first.
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('cart_items', 1);
+    }
+
+    public function test_checkout_summary_exposes_restaurant_orderable_state(): void
+    {
+        ['customer' => $customer] = $this->checkoutGraph();
+        Sanctum::actingAs($customer);
+
+        $this->getJson('/api/customer/checkout')
+            ->assertOk()
+            ->assertJsonPath('data.restaurant.is_orderable', true)
+            ->assertJsonPath('data.restaurant.is_open_now', true);
+    }
+
+    public function test_placing_when_the_restaurant_is_not_accepting_orders_is_rejected(): void
+    {
+        ['customer' => $customer, 'restaurant' => $restaurant, 'near' => $near] = $this->checkoutGraph();
+        Sanctum::actingAs($customer);
+
+        // Partner paused the restaurant after the cart was built.
+        $restaurant->update(['is_accepting_orders' => false]);
+
+        $this->postJson('/api/customer/checkout', ['address_id' => $near->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('restaurant')
+            ->assertJsonPath('errors.restaurant.0', 'This restaurant is not accepting orders right now. Please try again later.');
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_placing_when_the_restaurant_is_suspended_is_rejected(): void
+    {
+        ['customer' => $customer, 'restaurant' => $restaurant, 'near' => $near] = $this->checkoutGraph();
+        Sanctum::actingAs($customer);
+
+        $restaurant->update(['status' => 'suspended']);
+
+        $this->postJson('/api/customer/checkout', ['address_id' => $near->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('restaurant');
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_placing_when_the_restaurant_is_closed_by_hours_is_rejected(): void
+    {
+        ['customer' => $customer, 'restaurant' => $restaurant, 'near' => $near] = $this->checkoutGraph();
+        Sanctum::actingAs($customer);
+
+        // Today is now marked closed → outside operating hours.
+        $restaurant->hours()->update(['is_open' => false]);
+
+        $this->postJson('/api/customer/checkout', ['address_id' => $near->id])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('restaurant')
+            ->assertJsonPath('errors.restaurant.0', 'This restaurant is currently closed. Please try again during its opening hours.');
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_web_place_order_is_rejected_when_the_restaurant_is_paused(): void
+    {
+        ['customer' => $customer, 'restaurant' => $restaurant, 'near' => $near] = $this->checkoutGraph();
+
+        $restaurant->update(['is_accepting_orders' => false]);
+
+        $this->actingAs($customer)
+            ->from('/customer/checkout')
+            ->post('/customer/checkout', ['address_id' => $near->id])
+            ->assertRedirect('/customer/checkout')
+            ->assertSessionHasErrors('restaurant');
 
         $this->assertDatabaseCount('orders', 0);
     }

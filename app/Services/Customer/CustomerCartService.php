@@ -8,6 +8,7 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\MenuItem;
 use App\Models\ModifierOption;
+use App\Models\Restaurant;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -28,8 +29,12 @@ class CustomerCartService implements CustomerCartServiceInterface
         // Only live, switched-on dishes can be added.
         $menuItem = MenuItem::query()
             ->available()
-            ->with(['modifierGroups.options', 'modifierOptions'])
+            ->with(['modifierGroups.options', 'modifierOptions', 'restaurant.hours'])
             ->findOrFail($menuItemId);
+
+        // …and only while the restaurant is actually orderable: a paused/closed
+        // restaurant can't take new items even if a cart against it survives.
+        $this->assertRestaurantOrderable($menuItem->restaurant);
 
         $quantity = max(1, $quantity);
 
@@ -94,6 +99,14 @@ class CustomerCartService implements CustomerCartServiceInterface
             return $this->removeItem($user, $cartItemId);
         }
 
+        // Raising the quantity is "adding" — block it on a closed/paused
+        // restaurant. Lowering or removing always stays allowed so the customer
+        // can clear a cart left over from when it was open.
+        if ($quantity > $item->quantity) {
+            $item->loadMissing('cart.restaurant.hours');
+            $this->assertRestaurantOrderable($item->cart?->restaurant);
+        }
+
         $item->update(['quantity' => min(self::MAX_QUANTITY, $quantity)]);
 
         return $this->getCart($user);
@@ -111,8 +124,12 @@ class CustomerCartService implements CustomerCartServiceInterface
 
         $menuItem = MenuItem::query()
             ->available()
-            ->with('modifierGroups.options')
+            ->with(['modifierGroups.options', 'restaurant.hours'])
             ->findOrFail($item->menu_item_id);
+
+        // Re-customising an existing line is an order-building action, so it's
+        // blocked on a closed/paused restaurant too (only removal is left).
+        $this->assertRestaurantOrderable($menuItem->restaurant);
 
         // Rebuild the priced snapshot for the new selection (request already
         // validated the options belong to this dish + satisfy its groups).
@@ -186,6 +203,26 @@ class CustomerCartService implements CustomerCartServiceInterface
 
     // ── Internals ────────────────────────────────────────────────────────────
 
+    /**
+     * Guard the order-building paths: a dish can only be added / increased /
+     * re-customised while its restaurant is live, accepting orders and inside
+     * its operating hours. Mirrors the checkout placement guard so a cart left
+     * over from when the restaurant was open can't grow.
+     */
+    private function assertRestaurantOrderable(?Restaurant $restaurant): void
+    {
+        if (! $restaurant instanceof Restaurant || ! $restaurant->isBookable()) {
+            throw ValidationException::withMessages([
+                'menu_item_id' => 'This restaurant is not accepting orders right now.',
+            ]);
+        }
+        if (! $restaurant->isOpenNow()) {
+            throw ValidationException::withMessages([
+                'menu_item_id' => 'This restaurant is currently closed.',
+            ]);
+        }
+    }
+
     private function loadCart(User $user): ?Cart
     {
         return Cart::query()
@@ -193,6 +230,7 @@ class CustomerCartService implements CustomerCartServiceInterface
             ->with([
                 'restaurant',
                 'restaurant.uploads',
+                'restaurant.hours',
                 'items' => fn ($q) => $q->orderBy('id'),
                 'items.menuItem.foodType',
                 'items.modifiers' => fn ($q) => $q->orderBy('id'),

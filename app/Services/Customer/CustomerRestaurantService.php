@@ -52,11 +52,11 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
                 : null,
         ];
 
-        // Paginated menu — same partner sort order, 10 rows per page by default,
-        // narrowed by the diet/rating filters via the model scope.
+        // Full menu — same partner sort order, narrowed by the diet/rating
+        // filters. Unavailable dishes are kept (the frontend grays them out, no
+        // Add button) but sorted after available ones within each category.
         $menuItems = MenuItem::query()
             ->forRestaurant($restaurant->id)
-            ->available()
             ->customerFilter($filters)
             ->with([
                 'foodType',
@@ -64,6 +64,7 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
                 'modifierGroups.options',
                 'uploads' => fn ($q) => $q->where('collection', 'image'),
             ])
+            ->orderByDesc('is_available')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
@@ -80,7 +81,6 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
             ? new Collection()
             : MenuItem::query()
                 ->forRestaurant($restaurant->id)
-                ->available()
                 ->matchingKeyword($keyword)
                 ->customerFilter($filters)
                 ->with([
@@ -89,6 +89,7 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
                     'modifierGroups.options',
                     'uploads' => fn ($q) => $q->where('collection', 'image'),
                 ])
+                ->orderByDesc('is_available')
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get();

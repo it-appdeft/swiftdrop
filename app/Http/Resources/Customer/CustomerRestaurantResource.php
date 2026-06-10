@@ -89,6 +89,8 @@ class CustomerRestaurantResource extends JsonResource
             'description' => $item->description,
             'price' => (float) $item->price,
             'is_veg' => (bool) $item->is_veg,
+            // Off-menu dishes are still listed (grayed, no Add button).
+            'is_available' => (bool) $item->is_available,
             'image_url' => $this->dishImageUrl($item),
             'rating' => $rating,
             'is_favorited' => $isFavorited,
