@@ -24,6 +24,7 @@ interface Coupon {
     min_order_value: string | number | null;
     max_discount: string | number | null;
     trigger: string;
+    is_exclusive: boolean;
     max_uses_per_user: number | null;
     valid_from: string | null;
     valid_until: string | null;
@@ -47,6 +48,7 @@ export default function CouponEdit({ coupon, options }: Props) {
         min_order_value: str(coupon.min_order_value),
         max_discount: str(coupon.max_discount),
         trigger: coupon.trigger,
+        is_exclusive: coupon.is_exclusive,
         max_uses_per_user: str(coupon.max_uses_per_user),
         valid_from: coupon.valid_from ?? '',
         valid_until: coupon.valid_until ?? '',

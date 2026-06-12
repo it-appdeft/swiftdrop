@@ -42,6 +42,7 @@ class StoreCouponRequest extends FormRequest
             'min_order_value' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'max_discount' => ['nullable', 'numeric', 'min:0', 'max:100000'],
             'trigger' => ['required', Rule::in(Offer::TRIGGERS)],
+            'is_exclusive' => ['required', 'boolean'],
             'max_uses_per_user' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'valid_from' => ['nullable', 'date'],
             'valid_until' => ['nullable', 'date', 'after_or_equal:valid_from'],

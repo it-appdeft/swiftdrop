@@ -98,6 +98,7 @@ class CheckoutResource extends JsonResource
             'headline' => $this->headline($offer),
             'min_order_value' => $offer->min_order_value !== null ? (float) $offer->min_order_value : null,
             'trigger' => $offer->trigger,
+            'is_exclusive' => (bool) $offer->is_exclusive,
             'valid_from' => optional($offer->valid_from)->toDateString(),
             'valid_until' => optional($offer->valid_until)->toDateString(),
             'eligible' => $eligible,

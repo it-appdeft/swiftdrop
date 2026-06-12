@@ -39,6 +39,7 @@ class Offer extends Model
         'applicable_to',
         'applicable_id',
         'trigger',
+        'is_exclusive',
         'max_uses',
         'max_uses_per_user',
         'valid_from',
@@ -53,6 +54,7 @@ class Offer extends Model
             'min_order_value' => 'decimal:2',
             'max_discount' => 'decimal:2',
             'is_active' => 'boolean',
+            'is_exclusive' => 'boolean',
             'valid_from' => 'datetime',
             'valid_until' => 'datetime',
         ];

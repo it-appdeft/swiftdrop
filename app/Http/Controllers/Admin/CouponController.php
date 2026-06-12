@@ -55,7 +55,7 @@ class CouponController extends Controller
             'coupon' => [
                 ...$coupon->only([
                     'id', 'code', 'title', 'description', 'type', 'value', 'min_order_value',
-                    'max_discount', 'trigger', 'max_uses_per_user', 'is_active',
+                    'max_discount', 'trigger', 'is_exclusive', 'max_uses_per_user', 'is_active',
                 ]),
                 'valid_from' => optional($coupon->valid_from)->toDateString(),
                 'valid_until' => optional($coupon->valid_until)->toDateString(),

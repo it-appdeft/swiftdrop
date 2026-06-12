@@ -10,6 +10,7 @@ use App\Models\CartItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /** @property CustomerRestaurantData $resource */
 class CustomerRestaurantResource extends JsonResource
@@ -81,8 +82,14 @@ class CustomerRestaurantResource extends JsonResource
      *
      * @return array<string, mixed>
      */
-    protected function dish(MenuItem $item, ?float $rating, bool $isFavorited, ?CartItem $cartItem = null): array
+    protected function dish(MenuItem $item, ?float $rating, bool $isFavorited, ?Collection $cartLines = null): array
     {
+        // A dish can sit in the cart under several option combos, each its own
+        // cart line. We surface ALL of them (with the rolled-up quantity + line
+        // count) so the API and web read one self-contained shape — no need to
+        // re-derive the dish's cart state from the separate cart payload.
+        $lines = $cartLines ?? collect();
+
         return [
             'id' => $item->id,
             'name' => $item->name,
@@ -94,21 +101,42 @@ class CustomerRestaurantResource extends JsonResource
             'image_url' => $this->dishImageUrl($item),
             'rating' => $rating,
             'is_favorited' => $isFavorited,
-            'cart_item_id' => $cartItem?->id,
-            'is_in_cart' => $cartItem !== null,
-            'cart_quantity' => $cartItem?->quantity ?? 0,
-            'selected_modifiers' => $cartItem
-                ? $cartItem->modifiers->map(fn ($modifier) => [
-                    'modifier_group_id' => $modifier->modifier_group_id,
-                    'modifier_option_id' => $modifier->modifier_option_id,
-                    'group_name' => $modifier->group_name,
-                    'option_name' => $modifier->option_name,
-                    'price_delta' => (float) $modifier->price_delta,
-                ])->values()->all()
-                : [],
+            'is_in_cart' => $lines->isNotEmpty(),
+            // Total quantity across every combo of this dish in the cart.
+            'cart_quantity' => (int) $lines->sum('quantity'),
+            // How many distinct lines (combos) this dish occupies.
+            'cart_line_count' => $lines->count(),
+            'cart_lines' => $lines->map(fn (CartItem $line) => $this->cartLine($line))->values()->all(),
             'modifier_groups' => $item->relationLoaded('modifierGroups')
                 ? $item->modifierGroups->map(fn ($group) => $this->modifierGroup($group, $item))->values()->all()
                 : [],
+        ];
+    }
+
+    /**
+     * One cart line of a dish: its quantity, the flat option-id list (fed
+     * straight into the modifier dialog so a line opens pre-marked), and the
+     * full modifier snapshot for callers that render the combo detail.
+     *
+     * @return array<string, mixed>
+     */
+    protected function cartLine(CartItem $line): array
+    {
+        return [
+            'id' => $line->id,
+            'quantity' => (int) $line->quantity,
+            'selected_options' => $line->modifiers
+                ->pluck('modifier_option_id')
+                ->filter()
+                ->values()
+                ->all(),
+            'modifiers' => $line->modifiers->map(fn ($modifier) => [
+                'modifier_group_id' => $modifier->modifier_group_id,
+                'modifier_option_id' => $modifier->modifier_option_id,
+                'group_name' => $modifier->group_name,
+                'option_name' => $modifier->option_name,
+                'price_delta' => (float) $modifier->price_delta,
+            ])->values()->all(),
         ];
     }
 

@@ -16,7 +16,7 @@ class CustomerRestaurantData
      * @param  Collection<int, \App\Models\MenuItem>  $menuItems              Paginated slice of the menu, partner sort order.
      * @param  Collection<int, \App\Models\MenuItem>  $recommended            Menu items matching the search keyword.
      * @param  array<int, int>                         $favoriteMenuItemIds    menu_item ids the customer has favourited.
-     * @param  array<int, \App\Models\CartItem>       $cartLookup
+     * @param  array<int, \Illuminate\Support\Collection<int, \App\Models\CartItem>>  $cartLookup  Cart lines grouped by menu_item_id (a dish may sit in the cart under several option combos).
      */
     public function __construct(
         public readonly Restaurant $restaurant,
