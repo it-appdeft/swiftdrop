@@ -3,9 +3,9 @@
 use App\Http\Controllers\Restaurant\DashboardController;
 use App\Http\Controllers\Restaurant\MenuManagementController;
 use App\Http\Controllers\Restaurant\ModifierController;
+use App\Http\Controllers\Restaurant\OrderController;
 use App\Http\Controllers\Restaurant\SettingsController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
     ->prefix('restaurant')
@@ -14,7 +14,7 @@ Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::patch('accepting-orders', [DashboardController::class, 'toggleAcceptingOrders'])
             ->name('accepting-orders.toggle');
-        Route::get('orders', fn () => Inertia::render('restaurant/orders'))->name('orders');
+        Route::get('orders', [OrderController::class, 'index'])->name('orders');
 
         /*
          * ─── Menu Management ────────────────────────────────────────

@@ -6,11 +6,15 @@ import { useEffect, useState } from 'react';
 import { SiteFooter } from '../../web/components/site-footer';
 import { AddressDialog } from '../components/address-dialog';
 import { CustomerHeader } from '../components/customer-header';
+import type { ModifierGroup } from '../components/dish-modifier-dialog';
+import { useDishCustomisation, type CustomisableDish, type CustomisableLine } from '../components/use-dish-customisation';
 
 interface CheckoutItem {
     id: number;
     menu_item_id: number;
     name: string | null;
+    description: string | null;
+    base_price: number;
     is_veg: boolean;
     is_available: boolean;
     image_url: string | null;
@@ -18,6 +22,8 @@ interface CheckoutItem {
     quantity: number;
     line_total: number;
     modifiers: { option_name: string }[];
+    selected_options: number[];
+    modifier_groups: ModifierGroup[];
 }
 
 interface CheckoutAddress {
@@ -111,6 +117,26 @@ export default function CustomerCheckout({ checkout }: Props) {
     const updateLine = (itemId: number, quantity: number) => {
         router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true });
     };
+
+    // "+" behaviour shared with the menu: a customisable line opens the
+    // repeat/edit/choose prompt instead of blindly bumping this one combo.
+    const customisation = useDishCustomisation();
+
+    const dishOf = (item: CheckoutItem): CustomisableDish => ({
+        id: item.menu_item_id,
+        name: item.name ?? '',
+        description: item.description,
+        price: item.base_price,
+        is_veg: item.is_veg,
+        image_url: item.image_url,
+        modifier_groups: item.modifier_groups,
+    });
+
+    // Every combo of the item's dish in this order — what the repeat prompt lists.
+    const combosOf = (item: CheckoutItem): CustomisableLine[] =>
+        checkout.items
+            .filter((i) => i.menu_item_id === item.menu_item_id)
+            .map((i) => ({ id: i.id, quantity: i.quantity, selected_options: i.selected_options }));
 
     const removeLine = (itemId: number) => {
         router.delete(`/customer/cart/items/${itemId}`, { preserveScroll: true, preserveState: true });
@@ -260,7 +286,7 @@ export default function CustomerCheckout({ checkout }: Props) {
                                     item={item}
                                     restaurantId={r?.id ?? null}
                                     canAdd={!restaurantUnavailable}
-                                    onIncrement={() => updateLine(item.id, item.quantity + 1)}
+                                    onIncrement={() => customisation.increment(dishOf(item), combosOf(item))}
                                     onDecrement={() => updateLine(item.id, item.quantity - 1)}
                                     onRemove={() => removeLine(item.id)}
                                 />
@@ -451,6 +477,8 @@ export default function CustomerCheckout({ checkout }: Props) {
             <CouponAppliedDialog splash={appliedSplash} onClose={() => setAppliedSplash(null)} />
 
             <ProcessingPaymentDialog open={placing} />
+
+            {customisation.dialogs}
         </div>
     );
 }
