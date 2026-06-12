@@ -22,6 +22,7 @@ export interface CouponFormState {
     min_order_value: string;
     max_discount: string;
     trigger: string;
+    is_exclusive: boolean;
     max_uses_per_user: string;
     valid_from: string;
     valid_until: string;
@@ -187,6 +188,11 @@ export function CouponFields({ data, setData, errors, options }: Props) {
                             <Input type="date" value={data.valid_until} onChange={(e) => setData('valid_until', e.target.value)} />
                         </FormField>
                     </div>
+
+                    <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+                        <Checkbox checked={data.is_exclusive} onCheckedChange={(v) => setData('is_exclusive', v === true)} />
+                        Exclusive (show as a highlighted hero card at checkout)
+                    </label>
 
                     <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
                         <Checkbox checked={data.is_active} onCheckedChange={(v) => setData('is_active', v === true)} />

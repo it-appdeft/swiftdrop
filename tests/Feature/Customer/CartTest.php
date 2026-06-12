@@ -194,6 +194,45 @@ class CartTest extends TestCase
         $this->assertDatabaseHas('cart_items', ['id' => $lineA, 'quantity' => 3]);
     }
 
+    /**
+     * The restaurant detail payload rolls a dish's cart lines up onto the dish
+     * itself: is_in_cart, the TOTAL quantity across every combo, the distinct
+     * line count, and the lines. This is what lets the API + web read the dish's
+     * cart state directly instead of re-deriving it (and the old keyBy collapse
+     * meant cart_quantity only reflected the last combo).
+     */
+    public function test_detail_payload_aggregates_all_cart_lines_onto_the_dish(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+        $large = $size->options()->where('name', 'Large')->first();
+        $cheese = $toppings->options()->where('name', 'Cheese')->first();
+        $olives = $toppings->options()->where('name', 'Olives')->first();
+
+        // Same pizza, two different combos → two lines, total quantity 2 + 1 = 3.
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 2, 'options' => [$regular->id, $cheese->id]])->assertCreated();
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$large->id, $olives->id]])->assertCreated();
+
+        $response = $this->getJson("/api/customer/restaurants/{$pizza->restaurant_id}")->assertOk();
+
+        $response
+            ->assertJsonPath('data.categories.0.items.0.id', $pizza->id)
+            ->assertJsonPath('data.categories.0.items.0.is_in_cart', true)
+            ->assertJsonPath('data.categories.0.items.0.cart_quantity', 3)
+            ->assertJsonPath('data.categories.0.items.0.cart_line_count', 2);
+
+        $this->assertCount(2, $response->json('data.categories.0.items.0.cart_lines'));
+
+        // The plain Coke is untouched — empty cart state, not in cart.
+        $this->assertSame('Coke', $response->json('data.categories.0.items.1.name'));
+        $response
+            ->assertJsonPath('data.categories.0.items.1.is_in_cart', false)
+            ->assertJsonPath('data.categories.0.items.1.cart_quantity', 0)
+            ->assertJsonPath('data.categories.0.items.1.cart_line_count', 0);
+    }
+
     public function test_merge_ignores_the_order_options_are_submitted_in(): void
     {
         ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();

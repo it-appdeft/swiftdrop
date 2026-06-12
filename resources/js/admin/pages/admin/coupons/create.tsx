@@ -28,6 +28,7 @@ export default function CouponCreate({ options }: Props) {
         min_order_value: '',
         max_discount: '',
         trigger: 'all',
+        is_exclusive: false,
         max_uses_per_user: '',
         valid_from: '',
         valid_until: '',

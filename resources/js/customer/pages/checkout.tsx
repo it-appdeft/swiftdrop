@@ -41,6 +41,7 @@ interface AvailableCoupon {
     headline: string;
     min_order_value: number | null;
     trigger: string;
+    is_exclusive: boolean;
     valid_from: string | null;
     valid_until: string | null;
     eligible: boolean;
@@ -158,7 +159,7 @@ export default function CustomerCheckout({ checkout }: Props) {
                     const next = page.props.checkout as Checkout;
                     if (next.applied_coupon && !next.coupon_error && next.bill.item_discount > 0) {
                         const badge =
-                            source?.trigger === 'welcome'
+                            source?.is_exclusive
                                 ? 'EXCLUSIVE WELCOME'
                                 : (source?.headline ?? next.applied_coupon.title ?? next.applied_coupon.code);
                         setAppliedSplash({
@@ -629,7 +630,7 @@ function CouponModal({
                                 {coupons
                                     .filter((c) => !c.upcoming)
                                     .map((c) =>
-                                        c.trigger === 'welcome' ? (
+                                        c.is_exclusive ? (
                                             <WelcomeCouponCard key={c.code} coupon={c} onApply={() => onApply(c)} />
                                         ) : (
                                             <CouponCard key={c.code} coupon={c} onApply={() => onApply(c)} />
@@ -714,7 +715,7 @@ function CouponCard({ coupon, onApply }: { coupon: AvailableCoupon; onApply: () 
 }
 
 /**
- * Welcome (first-N orders) coupons get a saturated red hero card so they read
+ * Exclusive coupons (is_exclusive) get a saturated red hero card so they read
  * as a "you just got an offer" moment rather than another row in the list.
  */
 function WelcomeCouponCard({ coupon, onApply }: { coupon: AvailableCoupon; onApply: () => void }) {

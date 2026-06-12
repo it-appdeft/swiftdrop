@@ -23,7 +23,7 @@ import {
     UtensilsCrossed,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish, type ModifierGroup } from '../components/dish-modifier-dialog';
 import { RepeatCustomisationDialog, summariseSelection } from '../components/repeat-customisation-dialog';
@@ -38,11 +38,22 @@ interface Dish {
     image_url: string | null;
     rating: number | null;
     is_favorited: boolean;
-    cart_item_id: number | null;
     is_in_cart: boolean;
+    // Rolled-up cart state for this dish, straight from the API — the total
+    // quantity across every combo, the number of distinct lines, and the lines
+    // themselves. No need to re-derive any of this from the cart payload.
     cart_quantity: number;
-    selected_modifiers: number[];
+    cart_line_count: number;
+    cart_lines: DishCartLine[];
     modifier_groups: ModifierGroup[];
+}
+
+/** One cart line of a dish — the same dish can occupy several under different
+ *  option combos. `selected_options` feeds the modifier dialog pre-marked. */
+interface DishCartLine {
+    id: number;
+    quantity: number;
+    selected_options: number[];
 }
 
 interface StoreHourRow {
@@ -164,7 +175,7 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     const [query, setQuery] = useState(data.keyword ? `You Searched for “${data.keyword}”` : '');
     // The modifier dialog. `editLine` null → adding a new combo; set → editing
     // that existing line (opens pre-filled, "Update" rewrites it).
-    const [openDish, setOpenDish] = useState<{ dish: ModifierDish; editLine: CartLine | null } | null>(null);
+    const [openDish, setOpenDish] = useState<{ dish: ModifierDish; editLine: DishCartLine | null } | null>(null);
     // A customisable dish tapped "+" while already in the cart — prompts the
     // "repeat previous customisation?" choice (repeat / edit / choose new).
     const [repeatDish, setRepeatDish] = useState<Dish | null>(null);
@@ -175,20 +186,11 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     const [restaurantFav, setRestaurantFav] = useState(r.is_favorited);
     const allCategoryItems = data.categories.flatMap((c) => c.items);
 
-    const linesByDish = useMemo(() => {
-        const map = new Map<number, CartLine[]>();
-        for (const line of cart.items) {
-            const list = map.get(line.menu_item_id) ?? [];
-            list.push(line);
-            map.set(line.menu_item_id, list);
-        }
-        return map;
-    }, [cart.items]);
-
     // Every combo of the tapped dish already in the cart — the "repeat" prompt
     // lists them all so the customer can add another of any one (one dish can
-    // sit in the cart under several option combos).
-    const repeatLines = repeatDish ? linesByDish.get(repeatDish.id) ?? [] : [];
+    // sit in the cart under several option combos). Read straight off the dish
+    // now that the API rolls its cart lines into the menu payload.
+    const repeatLines = repeatDish?.cart_lines ?? [];
 
 
     const [favoriteDishIds, setFavoriteDishIds] = useState<Set<number>>(
@@ -300,16 +302,16 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     // the cart under several combos); a plain dish just bumps its quantity.
     const handleIncrement = (dish: Dish) => {
         if (restaurantUnavailable) return;
-        const lines = linesByDish.get(dish.id) ?? [];
         if (dish.modifier_groups.length > 0) {
             setRepeatDish(dish);
             return;
         }
+        const lines = dish.cart_lines;
         if (lines[0]) updateLine(lines[0].id, lines[0].quantity + 1);
     };
 
     const handleDecrement = (dish: Dish) => {
-        const lines = linesByDish.get(dish.id) ?? [];
+        const lines = dish.cart_lines;
         const last = lines[lines.length - 1];
         if (last) updateLine(last.id, last.quantity - 1);
     };
@@ -384,12 +386,7 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
         <MenuRow
             key={`${keyPrefix}-${dish.id}`}
             dish={dish}
-            quantity={
-                (linesByDish.get(dish.id) ?? []).reduce(
-                    (sum, line) => sum + line.quantity,
-                    0
-                )
-            }
+            quantity={dish.cart_quantity}
             isFavorited={favoriteDishIds.has(dish.id)}
             restaurantUnavailable={restaurantUnavailable}
             onAdd={() => handleAdd(dish)}

@@ -40,8 +40,11 @@ class CustomerRestaurantService implements CustomerRestaurantServiceInterface
             ])
             ->first();
 
+        // Group — not keyBy — so a dish customised several ways keeps ALL of its
+        // cart lines. keyBy would collapse them to the last line, which is why
+        // the old payload only reflected the latest combo's quantity.
         $cartLookup = $cart
-            ? $cart->items->keyBy('menu_item_id')->all()
+            ? $cart->items->groupBy('menu_item_id')->all()
             : [];
 
         // Normalise the customer-facing menu filters (Veg / Non-Veg + Ratings 4.0+).
