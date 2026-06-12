@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import {
     CheckCircle2,
     Filter,
@@ -14,7 +14,7 @@ import {
 import { useEffect, useState } from 'react';
 import AppLayout from '../../layouts/app-layout';
 
-// ─── Types & mock data ────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 type OrderStatus =
     | 'new'
@@ -32,20 +32,29 @@ interface OrderItem {
     price: number;
     image: string;
     veg?: boolean;
+    modifiers?: string[];
 }
 
 interface Order {
     id: string;
-    customer: { name: string; address: string; phone?: string };
+    reference: string;
+    customer: { name: string; address: string; phone?: string | null };
     items: OrderItem[];
     subtotal: number;
-    packaging: number;
-    taxRate: number;
-    commissionRate: number;
+    deliveryFee: number;
+    discount: number;
+    vat: number;
+    total: number;
     payment: PaymentMethod;
     status: OrderStatus;
-    placedAt: string; // human display, e.g. "1m ago"
-    note?: string;
+    placedAt: string | null; // ISO 8601
+    note?: string | null;
+}
+
+interface OrdersPageProps {
+    orders: Order[];
+    commissionRate: number; // percentage, e.g. 10 = 10%
+    [key: string]: unknown;
 }
 
 const STATUS_META: Record<
@@ -84,137 +93,25 @@ const STATUS_META: Record<
     },
 };
 
-const FOOD_IMG = {
-    biryani: 'https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?w=120&h=120&fit=crop',
-    coke: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=120&h=120&fit=crop',
-    raita: 'https://images.unsplash.com/photo-1567337710282-00832b415979?w=120&h=120&fit=crop',
-    paneer: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=120&h=120&fit=crop',
-    naan: 'https://images.unsplash.com/photo-1626776876729-bab4369a5a5a?w=120&h=120&fit=crop',
-    thali: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=120&h=120&fit=crop',
-    mutton: 'https://images.unsplash.com/photo-1545247181-516773cae754?w=120&h=120&fit=crop',
-    rice: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?w=120&h=120&fit=crop',
-    noodles: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=120&h=120&fit=crop',
-    pizza: 'https://images.unsplash.com/photo-1604068549290-dea0e4a305ca?w=120&h=120&fit=crop',
-    burger: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=120&h=120&fit=crop',
-    falafel: 'https://images.unsplash.com/photo-1593504049359-74330189a345?w=120&h=120&fit=crop',
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────
 
-const ORDERS: Order[] = [
-    {
-        id: 'SD-2841',
-        customer: {
-            name: 'Priya Sharma',
-            address: '12, 4th Cross, Indiranagar — 560038',
-            phone: '+91 98765 43210',
-        },
-        items: [
-            { name: 'Chicken Biryani', qty: 2, price: 260, image: FOOD_IMG.biryani, veg: false },
-            { name: 'Coke 500ml', qty: 1, price: 60, image: FOOD_IMG.coke, veg: true },
-            { name: 'Raita', qty: 1, price: 40, image: FOOD_IMG.raita, veg: true },
-        ],
-        subtotal: 620,
-        packaging: 20,
-        taxRate: 0.05,
-        commissionRate: 0.18,
-        payment: 'prepaid',
-        status: 'new',
-        placedAt: '1m ago',
-        note: 'Note: Please don\'t ring the bell.',
-    },
-    {
-        id: 'SD-2840',
-        customer: { name: 'Amit Kumar', address: '88 MG Road, Bengaluru — 560001' },
-        items: [
-            { name: 'Paneer Tikka', qty: 1, price: 240, image: FOOD_IMG.paneer, veg: true },
-            { name: 'Butter Naan', qty: 3, price: 33, image: FOOD_IMG.naan, veg: true },
-        ],
-        subtotal: 340,
-        packaging: 15,
-        taxRate: 0.05,
-        commissionRate: 0.18,
-        payment: 'cod',
-        status: 'new',
-        placedAt: '4m ago',
-    },
-    {
-        id: 'SD-2839',
-        customer: { name: 'Riya Desai', address: '5 Brigade Road, Bengaluru' },
-        items: [{ name: 'Veg Thali', qty: 1, price: 280, image: FOOD_IMG.thali, veg: true }],
-        subtotal: 280,
-        packaging: 15,
-        taxRate: 0.05,
-        commissionRate: 0.18,
-        payment: 'prepaid',
-        status: 'preparing',
-        placedAt: '12m ago',
-    },
-    {
-        id: 'SD-2838',
-        customer: { name: 'Karan Patel', address: 'HSR Layout Sector 2' },
-        items: [
-            { name: 'Mutton Rogan Josh', qty: 1, price: 420, image: FOOD_IMG.mutton, veg: false },
-            { name: 'Jeera Rice', qty: 1, price: 140, image: FOOD_IMG.rice, veg: true },
-        ],
-        subtotal: 560,
-        packaging: 20,
-        taxRate: 0.05,
-        commissionRate: 0.18,
-        payment: 'prepaid',
-        status: 'preparing',
-        placedAt: '18m ago',
-    },
-    {
-        id: 'SD-2837',
-        customer: { name: 'Sneha Iyer', address: 'Koramangala 5th Block' },
-        items: [
-            { name: 'Hakka Noodles', qty: 1, price: 220, image: FOOD_IMG.noodles, veg: true },
-            { name: 'Veg Manchurian', qty: 1, price: 240, image: FOOD_IMG.thali, veg: true },
-        ],
-        subtotal: 460,
-        packaging: 20,
-        taxRate: 0.05,
-        commissionRate: 0.18,
-        payment: 'prepaid',
-        status: 'ready',
-        placedAt: '22m ago',
-    },
-    {
-        id: 'SD-2836',
-        customer: { name: 'Aman Singh', address: 'Whitefield ITPL Main Rd' },
-        items: [{ name: 'Pizza Margherita L', qty: 1, price: 549, image: FOOD_IMG.pizza, veg: true }],
-        subtotal: 549,
-        packaging: 20,
-        taxRate: 0.05,
-        commissionRate: 0.18,
-        payment: 'prepaid',
-        status: 'out_for_delivery',
-        placedAt: '35m ago',
-    },
-    {
-        id: 'SD-2835',
-        customer: { name: 'Diya Roy', address: 'Jayanagar 4th Block' },
-        items: [{ name: 'Burger Combo', qty: 1, price: 425, image: FOOD_IMG.burger, veg: false }],
-        subtotal: 425,
-        packaging: 15,
-        taxRate: 0.05,
-        commissionRate: 0.18,
-        payment: 'cod',
-        status: 'completed',
-        placedAt: '65m ago',
-    },
-    {
-        id: 'SD-2834',
-        customer: { name: 'Vikram J.', address: 'BTM 2nd Stage' },
-        items: [{ name: 'Falafel Wrap', qty: 1, price: 220, image: FOOD_IMG.falafel, veg: true }],
-        subtotal: 220,
-        packaging: 15,
-        taxRate: 0.05,
-        commissionRate: 0.18,
-        payment: 'prepaid',
-        status: 'cancelled',
-        placedAt: '90m ago',
-    },
-];
+function inr(n: number): string {
+    return '£ ' + n.toLocaleString('en-GB');
+}
+
+/** Compact "just now / 5m ago / 2h ago / 3d ago" from an ISO timestamp. */
+function timeAgo(iso: string | null): string {
+    if (!iso) return '—';
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) return '—';
+    const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+    if (secs < 60) return 'just now';
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+}
 
 type TabKey = 'all' | OrderStatus;
 
@@ -227,12 +124,6 @@ const TABS: TabKey[] = [
     'completed',
     'cancelled',
 ];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────
-
-function inr(n: number): string {
-    return '£ ' + n.toLocaleString('en-GB');
-}
 
 function itemsSummary(items: OrderItem[]): string {
     return items.map((i) => `${i.name}×${i.qty}`).join(', ');
@@ -276,10 +167,16 @@ function VegDot({ veg }: { veg?: boolean }) {
 
 // ─── Order detail drawer ──────────────────────────────────────────────────
 
-function OrderDrawer({ order, onClose }: { order: Order; onClose: () => void }) {
-    const taxAmount = Math.round(order.subtotal * order.taxRate);
-    const total = order.subtotal + order.packaging + taxAmount;
-    const commission = Math.round(total * order.commissionRate);
+function OrderDrawer({
+    order,
+    commissionRate,
+    onClose,
+}: {
+    order: Order;
+    commissionRate: number;
+    onClose: () => void;
+}) {
+    const commission = (order.total * commissionRate) / 100;
 
     return (
         <div className="fixed inset-0 z-40">
@@ -293,7 +190,7 @@ function OrderDrawer({ order, onClose }: { order: Order; onClose: () => void }) 
                 <header className="flex items-center justify-between border-b border-border px-5 py-4">
                     <div className="flex items-center gap-2">
                         <h2 className="text-base font-bold tracking-tight">
-                            {order.id} · {order.customer.name}
+                            {order.reference} · {order.customer.name}
                         </h2>
                         <StatusBadge status={order.status} />
                     </div>
@@ -316,11 +213,17 @@ function OrderDrawer({ order, onClose }: { order: Order; onClose: () => void }) 
                             key={idx}
                             className="flex items-center gap-3 rounded-xl border border-border bg-background p-3"
                         >
-                            <img
-                                src={item.image}
-                                alt=""
-                                className="size-12 shrink-0 rounded-lg object-cover"
-                            />
+                            {item.image ? (
+                                <img
+                                    src={item.image}
+                                    alt=""
+                                    className="size-12 shrink-0 rounded-lg object-cover"
+                                />
+                            ) : (
+                                <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted">
+                                    <Receipt className="size-5 text-muted-foreground" />
+                                </div>
+                            )}
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                     <VegDot veg={item.veg} />
@@ -329,6 +232,11 @@ function OrderDrawer({ order, onClose }: { order: Order; onClose: () => void }) 
                                 <p className="mt-0.5 text-xs text-muted-foreground">
                                     Qty {item.qty} · {inr(item.qty * item.price)}
                                 </p>
+                                {item.modifiers && item.modifiers.length > 0 && (
+                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                        {item.modifiers.join(', ')}
+                                    </p>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -341,25 +249,33 @@ function OrderDrawer({ order, onClose }: { order: Order; onClose: () => void }) 
                             <dd className="font-semibold">{inr(order.subtotal)}</dd>
                         </div>
                         <div className="flex justify-between">
-                            <dt className="text-muted-foreground">Packaging</dt>
-                            <dd className="font-semibold">{inr(order.packaging)}</dd>
+                            <dt className="text-muted-foreground">Delivery fee</dt>
+                            <dd className="font-semibold">{inr(order.deliveryFee)}</dd>
                         </div>
+                        {order.discount > 0 && (
+                            <div className="flex justify-between">
+                                <dt className="text-muted-foreground">Discount</dt>
+                                <dd className="font-semibold text-emerald-600">
+                                    −{inr(order.discount)}
+                                </dd>
+                            </div>
+                        )}
                         <div className="flex justify-between">
-                            <dt className="text-muted-foreground">
-                                Tax ({Math.round(order.taxRate * 100)}%)
-                            </dt>
-                            <dd className="font-semibold">{inr(taxAmount)}</dd>
+                            <dt className="text-muted-foreground">VAT</dt>
+                            <dd className="font-semibold">{inr(order.vat)}</dd>
                         </div>
                         <div className="flex justify-between border-t border-border pt-2 text-base">
                             <dt className="font-bold">Total</dt>
-                            <dd className="font-bold">{inr(total)}</dd>
+                            <dd className="font-bold">{inr(order.total)}</dd>
                         </div>
-                        <div className="flex justify-between text-xs">
-                            <dt className="text-muted-foreground">
-                                Commission ({Math.round(order.commissionRate * 100)}%)
-                            </dt>
-                            <dd className="text-rose-600">−{inr(commission)}</dd>
-                        </div>
+                        {commissionRate > 0 && (
+                            <div className="flex justify-between text-xs">
+                                <dt className="text-muted-foreground">
+                                    Commission ({commissionRate}%)
+                                </dt>
+                                <dd className="text-rose-600">−{inr(commission)}</dd>
+                            </div>
+                        )}
                     </dl>
                 </section>
 
@@ -445,12 +361,13 @@ function OrderDrawer({ order, onClose }: { order: Order; onClose: () => void }) 
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 export default function Orders() {
+    const { orders, commissionRate } = usePage<OrdersPageProps>().props;
     const [tab, setTab] = useState<TabKey>('all');
     const [search, setSearch] = useState('');
     const [soundOn, setSoundOn] = useState(true);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-    const counts = ORDERS.reduce<Record<TabKey, number>>(
+    const counts = orders.reduce<Record<TabKey, number>>(
         (acc, o) => {
             acc.all += 1;
             acc[o.status] = (acc[o.status] ?? 0) + 1;
@@ -467,17 +384,19 @@ export default function Orders() {
         } as Record<TabKey, number>,
     );
 
-    const filtered = ORDERS.filter((o) => tab === 'all' || o.status === tab).filter((o) => {
-        if (!search.trim()) return true;
-        const q = search.toLowerCase();
-        return (
-            o.id.toLowerCase().includes(q) ||
-            o.customer.name.toLowerCase().includes(q) ||
-            o.items.some((i) => i.name.toLowerCase().includes(q))
-        );
-    });
+    const filtered = orders
+        .filter((o) => tab === 'all' || o.status === tab)
+        .filter((o) => {
+            if (!search.trim()) return true;
+            const q = search.toLowerCase();
+            return (
+                o.reference.toLowerCase().includes(q) ||
+                o.customer.name.toLowerCase().includes(q) ||
+                o.items.some((i) => i.name.toLowerCase().includes(q))
+            );
+        });
 
-    const selectedOrder = ORDERS.find((o) => o.id === selectedOrderId) ?? null;
+    const selectedOrder = orders.find((o) => o.id === selectedOrderId) ?? null;
 
     // Lock body scroll when drawer is open.
     useEffect(() => {
@@ -612,19 +531,17 @@ export default function Orders() {
                                     </tr>
                                 ) : (
                                     filtered.map((order) => {
-                                        const total =
-                                            order.subtotal +
-                                            order.packaging +
-                                            Math.round(order.subtotal * order.taxRate);
                                         return (
                                             <tr
                                                 key={order.id}
                                                 className="hover:bg-muted/30"
                                             >
                                                 <td className="px-5 py-3 align-top">
-                                                    <p className="font-semibold">{order.id}</p>
+                                                    <p className="font-semibold">
+                                                        {order.reference}
+                                                    </p>
                                                     <p className="mt-0.5 text-xs text-muted-foreground">
-                                                        {order.placedAt}
+                                                        {timeAgo(order.placedAt)}
                                                     </p>
                                                 </td>
                                                 <td className="px-5 py-3 align-top font-medium">
@@ -634,7 +551,7 @@ export default function Orders() {
                                                     {itemsSummary(order.items)}
                                                 </td>
                                                 <td className="px-5 py-3 align-top font-semibold tabular-nums">
-                                                    {inr(total)}
+                                                    {inr(order.total)}
                                                 </td>
                                                 <td className="px-5 py-3 align-top">
                                                     <PaymentBadge method={order.payment} />
@@ -664,6 +581,7 @@ export default function Orders() {
             {selectedOrder && (
                 <OrderDrawer
                     order={selectedOrder}
+                    commissionRate={commissionRate}
                     onClose={() => setSelectedOrderId(null)}
                 />
             )}

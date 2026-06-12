@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Customer;
 
 use App\DTO\Customer\CustomerCartData;
+use App\Http\Resources\Customer\Concerns\ShapesDishModifiers;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\CartItemModifier;
@@ -19,6 +20,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class CustomerCartResource extends JsonResource
 {
+    use ShapesDishModifiers;
+
     public function toArray(Request $request): array
     {
         /** @var CustomerCartData $data */
@@ -61,6 +64,10 @@ class CustomerCartResource extends JsonResource
             'id' => $item->id,
             'menu_item_id' => $item->menu_item_id,
             'name' => $item->menuItem?->name,
+            'description' => $item->menuItem?->description,
+            // The dish's own base price (not this line's combo price) — what the
+            // modifier dialog re-prices from when the line is edited or repeated.
+            'base_price' => (float) ($item->menuItem?->price ?? $unitPrice),
             'is_veg' => (bool) $item->menuItem?->is_veg,
             // Whether the dish can still be ordered. A line can outlive the
             // dish going off-menu — the cart/checkout gray it and offer only
@@ -77,13 +84,18 @@ class CustomerCartResource extends JsonResource
                 'option_name' => $m->option_name,
                 'price_delta' => (float) $m->price_delta,
             ])->values()->all(),
-            // Flat option-id list — the restaurant page feeds this straight into
-            // the modifier dialog so a cart line's chosen options open pre-marked.
+            // Flat option-id list — the cart/checkout/restaurant pages feed this
+            // straight into the modifier dialog so a line's chosen options open
+            // pre-marked.
             'selected_options' => $item->modifiers
                 ->pluck('modifier_option_id')
                 ->filter()
                 ->values()
                 ->all(),
+            // The dish's customisation groups, so tapping "+" on a customisable
+            // line can prompt (repeat / edit / choose new) just like the menu —
+            // instead of blindly bumping this one combo's quantity.
+            'modifier_groups' => $item->menuItem ? $this->dishModifierGroups($item->menuItem) : [],
         ];
     }
 

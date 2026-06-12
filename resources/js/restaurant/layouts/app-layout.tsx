@@ -57,10 +57,10 @@ interface NavEntry {
 
 const NAV: NavEntry[] = [
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: route('restaurant.dashboard') },
-    // { key: 'orders', label: 'Orders', icon: ShoppingBag, badge: 4, href: route('restaurant.orders') },
+    { key: 'orders', label: 'Orders', icon: ShoppingBag, href: route('restaurant.orders') },
     { key: 'menu', label: 'Menu Management', icon: UtensilsCrossed, href: route('restaurant.menu') },
     { key: 'modifiers', label: 'Modifiers', icon: SlidersHorizontal, href: route('restaurant.modifiers') },
-    // { key: 'inventory', label: 'Inventory', icon: Package },
+    { key: 'inventory', label: 'Inventory', icon: Package },
     // { key: 'promotions', label: 'Promotions', icon: Receipt },
     // { key: 'reviews', label: 'Reviews', icon: Star },
     // { key: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -80,6 +80,7 @@ interface RestaurantState {
     status: string;
     approval_status: 'pending' | 'approved' | 'rejected';
     is_accepting_orders: boolean;
+    new_orders_count: number;
 }
 
 interface SharedProps {
@@ -138,6 +139,9 @@ function SidebarBody({
     showCloseButton?: boolean;
     onClose?: () => void;
 }) {
+    const { auth } = usePage<SharedProps>().props;
+    const newOrders = auth.restaurant?.new_orders_count ?? 0;
+
     const handleLogout = () => {
         onNavigate();
         router.post(route('logout'));
@@ -178,6 +182,14 @@ function SidebarBody({
                     {NAV.map((item) => {
                         const Icon = item.icon;
                         const isActive = item.key === active;
+                        // Live count for the Orders entry; static entries keep
+                        // whatever badge they declared in NAV.
+                        const badge =
+                            item.key === 'orders'
+                                ? newOrders > 0
+                                    ? newOrders
+                                    : undefined
+                                : item.badge;
                         const className =
                             'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition ' +
                             (isActive
@@ -187,7 +199,7 @@ function SidebarBody({
                             <>
                                 <Icon className="size-4" />
                                 <span className="flex-1 text-left">{item.label}</span>
-                                {item.badge !== undefined && (
+                                {badge !== undefined && (
                                     <span
                                         className={
                                             'flex size-5 items-center justify-center rounded-full text-[10px] font-bold ' +
@@ -196,7 +208,7 @@ function SidebarBody({
                                                 : 'bg-primary text-primary-foreground')
                                         }
                                     >
-                                        {item.badge}
+                                        {badge}
                                     </span>
                                 )}
                             </>

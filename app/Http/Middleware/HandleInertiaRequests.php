@@ -94,6 +94,9 @@ class HandleInertiaRequests extends Middleware
             'status' => $restaurant->status,
             'approval_status' => $restaurant->approval_status,
             'is_accepting_orders' => (bool) $restaurant->is_accepting_orders,
+            // Drives the sidebar "Orders" badge — count of orders still
+            // awaiting the partner's action (status `placed` → "New").
+            'new_orders_count' => $restaurant->orders()->where('status', 'placed')->count(),
         ];
     }
 

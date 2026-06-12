@@ -233,6 +233,10 @@ class CustomerCartService implements CustomerCartServiceInterface
                 'restaurant.hours',
                 'items' => fn ($q) => $q->orderBy('id'),
                 'items.menuItem.foodType',
+                // The dish's customisation groups + per-dish option prices, so the
+                // cart/checkout "+" can re-open the modifier dialog like the menu.
+                'items.menuItem.modifierGroups.options',
+                'items.menuItem.modifierOptions',
                 'items.modifiers' => fn ($q) => $q->orderBy('id'),
             ])
             ->first();

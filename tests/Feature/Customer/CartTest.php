@@ -233,6 +233,44 @@ class CartTest extends TestCase
             ->assertJsonPath('data.categories.0.items.1.cart_line_count', 0);
     }
 
+    /**
+     * Each cart line now carries its dish's customisation groups (+ base price
+     * and the chosen option ids). This is what lets the cart/checkout "+" re-open
+     * the modifier dialog — repeat / edit / choose new — instead of blindly
+     * bumping the line, matching the menu's behaviour.
+     */
+    public function test_cart_line_carries_the_dishs_modifier_groups_for_re_customising(): void
+    {
+        ['customer' => $customer, 'pizza' => $pizza, 'coke' => $coke, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();
+        Sanctum::actingAs($customer);
+
+        $regular = $size->options()->where('name', 'Regular')->first();
+        $cheese = $toppings->options()->where('name', 'Cheese')->first();
+
+        // A customisable pizza line, then a plain coke line (created after, so
+        // it sorts second by id).
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $pizza->id, 'quantity' => 1, 'options' => [$regular->id, $cheese->id]])->assertCreated();
+        $this->postJson('/api/customer/cart', ['menu_item_id' => $coke->id, 'quantity' => 1, 'options' => []])->assertCreated();
+
+        $cart = $this->getJson('/api/customer/cart')->assertOk();
+
+        // The dish's base price (10), the chosen options, and both groups travel
+        // with the line so the dialog can re-price and pre-mark them.
+        $cart
+            ->assertJsonPath('data.items.0.base_price', 10)
+            ->assertJsonPath('data.items.0.modifier_groups.0.name', 'Size')
+            ->assertJsonPath('data.items.0.modifier_groups.1.name', 'Toppings');
+        $this->assertCount(2, $cart->json('data.items.0.modifier_groups'));
+        $this->assertEqualsCanonicalizing(
+            [$regular->id, $cheese->id],
+            $cart->json('data.items.0.selected_options'),
+        );
+
+        // A plain dish reports an empty group list — its "+" just bumps quantity.
+        $cart->assertJsonPath('data.items.1.name', 'Coke');
+        $this->assertSame([], $cart->json('data.items.1.modifier_groups'));
+    }
+
     public function test_merge_ignores_the_order_options_are_submitted_in(): void
     {
         ['customer' => $customer, 'pizza' => $pizza, 'size' => $size, 'toppings' => $toppings] = $this->cartGraph();

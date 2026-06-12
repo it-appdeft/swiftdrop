@@ -5,6 +5,8 @@ import { Minus, Plus, ShoppingBag, Trash2, UtensilsCrossed } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SiteFooter } from '../../web/components/site-footer';
 import { CustomerHeader } from '../components/customer-header';
+import type { ModifierGroup } from '../components/dish-modifier-dialog';
+import { useDishCustomisation, type CustomisableDish, type CustomisableLine } from '../components/use-dish-customisation';
 
 interface CartModifier {
     group_id: number | null;
@@ -18,6 +20,8 @@ interface CartLine {
     id: number;
     menu_item_id: number;
     name: string | null;
+    description: string | null;
+    base_price: number;
     is_veg: boolean;
     is_available: boolean;
     image_url: string | null;
@@ -25,6 +29,8 @@ interface CartLine {
     quantity: number;
     line_total: number;
     modifiers: CartModifier[];
+    selected_options: number[];
+    modifier_groups: ModifierGroup[];
 }
 
 interface PaginationLink {
@@ -116,6 +122,26 @@ export default function CustomerCart({ cart }: Props) {
     const updateLine = (itemId: number, quantity: number) => {
         router.put(`/customer/cart/items/${itemId}`, { quantity }, { preserveScroll: true, preserveState: true });
     };
+
+    // "+" behaviour shared with the menu: a customisable line opens the
+    // repeat/edit/choose prompt instead of blindly bumping this one combo.
+    const customisation = useDishCustomisation();
+
+    const dishOf = (line: CartLine): CustomisableDish => ({
+        id: line.menu_item_id,
+        name: line.name ?? '',
+        description: line.description,
+        price: line.base_price,
+        is_veg: line.is_veg,
+        image_url: line.image_url,
+        modifier_groups: line.modifier_groups,
+    });
+
+    // Every loaded combo of the line's dish — what the repeat prompt lists.
+    const combosOf = (line: CartLine): CustomisableLine[] =>
+        items
+            .filter((l) => l.menu_item_id === line.menu_item_id)
+            .map((l) => ({ id: l.id, quantity: l.quantity, selected_options: l.selected_options }));
 
     const confirmRemove = () => {
         if (!pendingDelete) return;
@@ -210,7 +236,7 @@ export default function CustomerCart({ cart }: Props) {
                                     key={line.id}
                                     line={line}
                                     canAdd={!restaurantUnavailable}
-                                    onIncrement={() => updateLine(line.id, line.quantity + 1)}
+                                    onIncrement={() => customisation.increment(dishOf(line), combosOf(line))}
                                     onDecrement={() => updateLine(line.id, line.quantity - 1)}
                                     onRemove={() => setPendingDelete(line)}
                                 />
@@ -283,6 +309,8 @@ export default function CustomerCart({ cart }: Props) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {customisation.dialogs}
         </div>
     );
 }
