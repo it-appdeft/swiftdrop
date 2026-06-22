@@ -12,7 +12,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import AppLayout from '../../layouts/app-layout';
+import AppLayout from '@/layouts/app-layout';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -38,6 +38,9 @@ interface OrderItem {
 interface Order {
     id: string;
     reference: string;
+    restaurant: {
+        name: string;
+    };
     customer: { name: string; address: string; phone?: string | null };
     items: OrderItem[];
     subtotal: number;
@@ -47,7 +50,7 @@ interface Order {
     total: number;
     payment: PaymentMethod;
     status: OrderStatus;
-    placedAt: string | null; // ISO 8601
+    placedAt: string | null;
     note?: string | null;
 }
 
@@ -71,7 +74,6 @@ interface Counts {
 
 interface OrdersPageProps {
     orders: PaginatedOrders;
-    commissionRate: number;
     counts: Counts;
     [key: string]: unknown;
 }
@@ -188,14 +190,11 @@ function VegDot({ veg }: { veg?: boolean }) {
 
 function OrderDrawer({
     order,
-    commissionRate,
     onClose,
 }: {
     order: Order;
-    commissionRate: number;
     onClose: () => void;
 }) {
-    const commission = (order.total * commissionRate) / 100;
 
     return (
         <div className="fixed inset-0 z-40">
@@ -209,7 +208,7 @@ function OrderDrawer({
                 <header className="flex items-center justify-between border-b border-border px-5 py-4">
                     <div className="flex items-center gap-2">
                         <h2 className="text-base font-bold tracking-tight">
-                            {order.reference} · {order.customer.name}
+                            {order.reference} · {order.restaurant.name}
                         </h2>
                         <StatusBadge status={order.status} />
                     </div>
@@ -286,19 +285,20 @@ function OrderDrawer({
                         <div className="flex justify-between border-t border-border pt-2 text-base">
                             <dt className="font-bold">Total</dt>
                             <dd className="font-bold">{inr(order.total)}</dd>
-                        </div>
-                        {commissionRate > 0 && (
-                            <div className="flex justify-between text-xs">
-                                <dt className="text-muted-foreground">
-                                    Commission ({commissionRate}%)
-                                </dt>
-                                <dd className="text-rose-600">−{inr(commission)}</dd>
-                            </div>
-                        )}
+                        </div>                        
                     </dl>
                 </section>
 
                 <section className="space-y-3 px-5 py-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Restaurant
+                    </p>
+
+                    <div>
+                        <p className="text-base font-bold">
+                            {order.restaurant.name}
+                        </p>
+                    </div>
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                         Customer
                     </p>
@@ -334,13 +334,6 @@ function OrderDrawer({
                     </div>
                 </section>
 
-                {order.status === 'new' && (
-                    <div className="mx-5 mb-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                        <CheckCircle2 className="size-4 shrink-0" />
-                        A rider will be auto-assigned once you accept.
-                    </div>
-                )}
-
                 <section className="space-y-2 border-t border-border px-5 py-4">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                         Timeline
@@ -350,28 +343,11 @@ function OrderDrawer({
                             <span className="size-1.5 rounded-full bg-emerald-500" />
                             Order placed
                         </span>
-                        <span className="text-muted-foreground">Just now</span>
+                        <span className="text-muted-foreground"> {timeAgo(order.placedAt)} </span>
                     </div>
                 </section>
 
-                {order.status === 'new' && (
-                    <footer className="sticky bottom-0 mt-auto grid grid-cols-2 gap-2 border-t border-border bg-background px-5 py-3">
-                        <button
-                            type="button"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-background px-4 py-2.5 text-sm font-semibold text-rose-600 hover:border-rose-300 hover:bg-rose-50"
-                        >
-                            <XCircle className="size-4" />
-                            Reject
-                        </button>
-                        <button
-                            type="button"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
-                        >
-                            <CheckCircle2 className="size-4" />
-                            Accept
-                        </button>
-                    </footer>
-                )}
+                
             </aside>
         </div>
     );
@@ -380,7 +356,7 @@ function OrderDrawer({
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 export default function Orders() {
-    const { orders, commissionRate, counts } = usePage<OrdersPageProps>().props;
+    const { orders,counts } = usePage<OrdersPageProps>().props;
     const [tab, setTab] = useState<TabKey>('all');
     const [search, setSearch] = useState('');
     const [soundOn, setSoundOn] = useState(true);
@@ -390,10 +366,10 @@ export default function Orders() {
         setSearch(value);
 
         router.get(
-            route('restaurant.orders'),
+            route('admin.orders.index'),
             {
+                search: value,
                 status: tab === 'all' ? undefined : tab,
-                search,
             },
             {
                 preserveState: true,
@@ -419,15 +395,18 @@ export default function Orders() {
     const tabLabel = (k: TabKey) => (k === 'all' ? 'All' : STATUS_META[k].tabLabel);
 
     return (
-        <AppLayout active="orders">
-            <Head title="Orders — Swift Drop Partner" />
+        <AppLayout>
+            <Head title="Orders — Swift Drop Admin" />
 
             <div className="space-y-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Orders</h1>
+                        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                            Orders Management
+                        </h1>
+
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Real-time order queue across all channels.
+                            Monitor orders across all restaurants.
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -479,7 +458,7 @@ export default function Orders() {
                                         setTab(t);
 
                                         router.get(
-                                            route('restaurant.orders'),
+                                            route('admin.orders.index'),
                                             {
                                                 status: t === 'all' ? undefined : t,
                                                 search,
@@ -521,7 +500,7 @@ export default function Orders() {
                             type="search"
                             value={search}
                             onChange={(e) => handleSearch(e.target.value)}
-                            placeholder="Search order or customer"
+                            placeholder="Search order, restaurant or customer"
                             className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         />
                     </div>
@@ -533,6 +512,7 @@ export default function Orders() {
                             <thead className="bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 <tr>
                                     <th className="px-5 py-3">Order</th>
+                                    <th className="px-5 py-3">Restaurant</th>
                                     <th className="px-5 py-3">Customer</th>
                                     <th className="px-5 py-3">Items</th>
                                     <th className="px-5 py-3">Total</th>
@@ -545,7 +525,7 @@ export default function Orders() {
                                 {filtered.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={7}
+                                            colSpan={8}
                                             className="px-5 py-10 text-center text-sm text-muted-foreground"
                                         >
                                             No orders match this filter.
@@ -564,6 +544,11 @@ export default function Orders() {
                                                     </p>
                                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                                         {timeAgo(order.placedAt)}
+                                                    </p>
+                                                </td>
+                                                <td className="px-5 py-3 align-top">
+                                                    <p className="font-medium">
+                                                        {order.restaurant.name}
                                                     </p>
                                                 </td>
                                                 <td className="px-5 py-3 align-top font-medium">
@@ -597,7 +582,7 @@ export default function Orders() {
                             </tbody>
                         </table>
                     </div>
-                     <div className="flex items-center justify-between border-t border-border px-5 py-3">
+                    <div className="flex items-center justify-between border-t border-border px-5 py-3">
                         <p className="text-sm text-muted-foreground">
                             Showing page {orders.current_page} of {orders.last_page}
                         </p>
@@ -605,7 +590,7 @@ export default function Orders() {
                         <div className="flex gap-2">
                             {orders.current_page > 1 && (
                                 <Link
-                                    href={route('restaurant.orders', {
+                                    href={route('admin.orders.index', {
                                         page: orders.current_page - 1,
                                         search,
                                         status: tab === 'all' ? undefined : tab,
@@ -618,7 +603,7 @@ export default function Orders() {
 
                             {orders.current_page < orders.last_page && (
                                 <Link
-                                    href={route('restaurant.orders', {
+                                    href={route('admin.orders.index', {
                                         page: orders.current_page + 1,
                                         search,
                                         status: tab === 'all' ? undefined : tab,
@@ -636,7 +621,6 @@ export default function Orders() {
             {selectedOrder && (
                 <OrderDrawer
                     order={selectedOrder}
-                    commissionRate={commissionRate}
                     onClose={() => setSelectedOrderId(null)}
                 />
             )}

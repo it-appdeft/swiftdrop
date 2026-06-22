@@ -6,6 +6,7 @@ use App\Contracts\Customer\CheckoutServiceInterface;
 use App\Contracts\Customer\CustomerCartServiceInterface;
 use App\DTO\Customer\CheckoutData;
 use App\DTO\Customer\CouponEvaluation;
+use App\Enums\OrderStatusEnum;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\CustomerAddress;
@@ -216,7 +217,7 @@ class CheckoutService implements CheckoutServiceInterface
             $order = Order::create([
                 'user_id' => $user->id,
                 'restaurant_id' => $restaurant->id,
-                'status' => 'placed',
+                'status' => OrderStatusEnum::PLACED,
                 'subtotal' => $subtotal,
                 'delivery_fee' => $deliveryFee,
                 'discount_amount' => $itemDiscount,
@@ -225,6 +226,11 @@ class CheckoutService implements CheckoutServiceInterface
                 'address_id' => $address->id,
                 'special_instructions' => $instructions,
                 'placed_at' => now(),
+            ]);
+
+            $order->statusHistories()->create([
+                'status' => OrderStatusEnum::PLACED,
+                'updated_by' => $user->id,
             ]);
 
             foreach ($cart->items as $item) {

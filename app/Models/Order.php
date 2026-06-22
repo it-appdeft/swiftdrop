@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OrderStatusEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -43,6 +44,7 @@ class Order extends Model
     protected function casts(): array
     {
         return [
+            'status' => OrderStatusEnum::class,
             'subtotal' => 'decimal:2',
             'delivery_fee' => 'decimal:2',
             'discount_amount' => 'decimal:2',
@@ -110,5 +112,10 @@ class Order extends Model
     public function review(): HasOne
     {
         return $this->hasOne(ReviewAndRating::class);
+    }
+
+    public function statusHistories()
+    {
+        return $this->hasMany(OrderStatusHistory::class);
     }
 }
