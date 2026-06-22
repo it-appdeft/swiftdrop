@@ -393,7 +393,7 @@ export default function Orders() {
             route('restaurant.orders'),
             {
                 status: tab === 'all' ? undefined : tab,
-                search,
+                search: value,
             },
             {
                 preserveState: true,

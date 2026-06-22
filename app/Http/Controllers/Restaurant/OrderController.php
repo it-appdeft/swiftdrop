@@ -84,16 +84,16 @@ class OrderController extends Controller
             ],
             'commissionRate' => (float) ($restaurant?->commission_rate ?? 0),
             'counts' => [
-                'all' => Order::count(),
-                'new' => Order::where('status', OrderStatusEnum::PLACED)->count(),
-                'preparing' => Order::whereIn('status', [
+                'all' => $restaurant->orders()->count(),
+                'new' => $restaurant->orders()->where('status', OrderStatusEnum::PLACED)->count(),
+                'preparing' => $restaurant->orders()->whereIn('status', [
                     OrderStatusEnum::ACCEPTED,
                     OrderStatusEnum::PREPARING,
                 ])->count(),
-                'ready' => Order::where('status', OrderStatusEnum::READY_FOR_PICKUP)->count(),
-                'out_for_delivery' => Order::where('status', OrderStatusEnum::OUT_FOR_DELIVERY)->count(),
-                'completed' => Order::where('status', OrderStatusEnum::DELIVERED)->count(),
-                'cancelled' => Order::where('status', OrderStatusEnum::CANCELLED)->count(),
+                'ready' => $restaurant->orders()->where('status', OrderStatusEnum::READY_FOR_PICKUP)->count(),
+                'out_for_delivery' => $restaurant->orders()->where('status', OrderStatusEnum::OUT_FOR_DELIVERY)->count(),
+                'completed' => $restaurant->orders()->where('status', OrderStatusEnum::DELIVERED)->count(),
+                'cancelled' => $restaurant->orders()->where('status', OrderStatusEnum::CANCELLED)->count(),
             ],
         ]);
     }
