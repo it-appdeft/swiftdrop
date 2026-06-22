@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DriverController;
 use App\Http\Controllers\Admin\FoodTypeController;
 use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\RestaurantController;
+use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 
@@ -77,4 +78,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('food-types/{id}/edit', [FoodTypeController::class, 'edit'])->name('food-types.edit');
     Route::post('food-types/{id}', [FoodTypeController::class, 'update'])->name('food-types.update');
     Route::delete('food-types/{id}', [FoodTypeController::class, 'destroy'])->name('food-types.destroy');
+
+    // Orders
+    Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
 });

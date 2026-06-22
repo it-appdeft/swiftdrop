@@ -1,5 +1,5 @@
 import type { NavGroup, NavItem } from '@/types';
-import { Car, LayoutGrid, Settings, SlidersHorizontal, Store, Ticket, Users, UtensilsCrossed } from 'lucide-react';
+import { Car, LayoutGrid, Settings, SlidersHorizontal, Store, Ticket, Users, UtensilsCrossed, ShoppingBag } from 'lucide-react';
 
 export const primaryNavigation: NavGroup[] = [
     {
@@ -17,6 +17,7 @@ export const primaryNavigation: NavGroup[] = [
             { title: 'Restaurants', url: '/admin/restaurants', icon: Store },
             { title: 'Food Types', url: '/admin/food-types', icon: UtensilsCrossed },
             { title: 'Coupons', url: '/admin/coupons', icon: Ticket },
+            { title: 'Orders', url: '/admin/orders', icon: ShoppingBag },
         ],
     },
     {
