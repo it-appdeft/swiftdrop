@@ -92,6 +92,10 @@ interface SharedProps {
     deletionReasons?: ServerDeletionReason[];
     orders?: PastOrder[];
     pagination?: OrdersMeta;
+    legal?: {
+        privacy_policy: string;
+        terms_and_conditions: string;
+    };
     flash?: {
         status?: string;
         otp?: { target: string; expires_in: number; test_code: string | null } | null;
@@ -2434,34 +2438,21 @@ function DeleteAccountDialog({
 
 // ─── Section: Privacy & Terms ──────────────────────────────────────────────────
 
-function PrivacyPolicySection() {
+/** Renders a stored legal document (rich-text HTML from platform_config). */
+function LegalSection({ title, content }: { title: string; content: string }) {
+    const hasContent = content.trim().length > 0;
     return (
         <>
-            <h2 className="text-lg font-bold tracking-tight">Privacy Policy</h2>
-            <div className="bg-muted/40 text-muted-foreground mt-4 space-y-3 rounded-xl p-4 text-xs leading-relaxed">
-                <p>
-                    This Privacy Policy describes how SwiftDrop collects, uses, and shares your personal information when you use our website or
-                    mobile application.
-                </p>
-                <p>
-                    At SwiftDrop, we are committed to protecting your privacy and ensuring that your personal data is handled in a safe and
-                    responsible manner.
-                </p>
-            </div>
-        </>
-    );
-}
-
-function TermsSection() {
-    return (
-        <>
-            <h2 className="text-lg font-bold tracking-tight">Terms &amp; Conditions</h2>
-            <div className="bg-muted/40 text-muted-foreground mt-4 space-y-3 rounded-xl p-4 text-xs leading-relaxed">
-                <p>By using SwiftDrop, you agree to be bound by these Terms &amp; Conditions. Please read them carefully before placing an order.</p>
-                <p>
-                    We may update these terms from time to time. Continued use of the service after changes are posted constitutes acceptance of the
-                    new terms.
-                </p>
+            <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+            <div className="bg-muted/40 text-muted-foreground mt-4 rounded-xl p-4 text-sm leading-relaxed">
+                {hasContent ? (
+                    <div
+                        className="space-y-2 [&_a]:text-primary [&_a]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+                        dangerouslySetInnerHTML={{ __html: content }}
+                    />
+                ) : (
+                    <p>Content will be available soon.</p>
+                )}
             </div>
         </>
     );
@@ -2470,15 +2461,28 @@ function TermsSection() {
 // ─── Section: Help ─────────────────────────────────────────────────────────────
 
 function HelpSection() {
-    const [orderId, setOrderId] = useState('#SWDI3232');
-    const [issue, setIssue] = useState('');
-    const [details, setDetails] = useState('');
+    const form = useForm({
+        order_reference: '',
+        subject: '',
+        description: '',
+    });
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(route('customer.support-tickets.store'), {
+            preserveScroll: true,
+            // Success toast is fired globally from the controller's flash message
+            // (see app.tsx → router.on('success')); here we just reset the form.
+            onSuccess: () => form.reset(),
+            onError: () => toast.error('Please review the form and try again.'),
+        });
+    };
 
     return (
         <>
             <h2 className="text-lg font-bold tracking-tight">Help</h2>
 
-            <div className="bg-muted/40 mt-4 rounded-2xl p-5">
+            <form onSubmit={submit} className="bg-muted/40 mt-4 rounded-2xl p-5">
                 <h3 className="text-lg font-bold">Report An Issue</h3>
                 <p className="text-muted-foreground mt-1 text-xs">
                     If you are experiencing any issue, please let us know. We will try to solve as soon as possible.
@@ -2491,10 +2495,12 @@ function HelpSection() {
                         </label>
                         <input
                             type="text"
-                            value={orderId}
-                            onChange={(e) => setOrderId(e.target.value)}
+                            value={form.data.order_reference}
+                            onChange={(e) => form.setData('order_reference', e.target.value)}
+                            placeholder="#SWDI3232"
                             className="border-input bg-background focus:border-primary focus:ring-primary/30 h-10 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-none"
                         />
+                        {form.errors.order_reference && <p className="text-xs text-rose-500">{form.errors.order_reference}</p>}
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-muted-foreground text-xs font-medium">
@@ -2502,11 +2508,12 @@ function HelpSection() {
                         </label>
                         <input
                             type="text"
-                            value={issue}
-                            onChange={(e) => setIssue(e.target.value)}
+                            value={form.data.subject}
+                            onChange={(e) => form.setData('subject', e.target.value)}
                             placeholder="Enter title for the issue"
                             className="border-input bg-background focus:border-primary focus:ring-primary/30 h-10 w-full rounded-md border px-3 text-sm focus:ring-2 focus:outline-none"
                         />
+                        {form.errors.subject && <p className="text-xs text-rose-500">{form.errors.subject}</p>}
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-muted-foreground text-xs font-medium">
@@ -2514,20 +2521,22 @@ function HelpSection() {
                         </label>
                         <textarea
                             rows={5}
-                            value={details}
-                            onChange={(e) => setDetails(e.target.value)}
+                            value={form.data.description}
+                            onChange={(e) => form.setData('description', e.target.value)}
                             placeholder="Describe the issue in details..."
                             className="border-input bg-background focus:border-primary focus:ring-primary/30 w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                         />
+                        {form.errors.description && <p className="text-xs text-rose-500">{form.errors.description}</p>}
                     </div>
                     <button
-                        type="button"
-                        className="bg-primary text-primary-foreground h-11 w-full rounded-md text-sm font-semibold hover:opacity-90"
+                        type="submit"
+                        disabled={form.processing}
+                        className="bg-primary text-primary-foreground h-11 w-full rounded-md text-sm font-semibold hover:opacity-90 disabled:opacity-60"
                     >
-                        Submit Issue
+                        {form.processing ? 'Submitting…' : 'Submit Issue'}
                     </button>
                 </div>
-            </div>
+            </form>
         </>
     );
 }
@@ -2561,7 +2570,7 @@ function ProfileHeader({ name, email, photo, onEdit }: { name: string; email: st
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function CustomerProfile() {
-    const { auth, customer, deletionReasons, orders: serverOrders, pagination } = usePage<SharedProps>().props;
+    const { auth, customer, deletionReasons, orders: serverOrders, pagination, legal } = usePage<SharedProps>().props;
     const orders = serverOrders ?? [];
     const ordersMeta: OrdersMeta = pagination ?? {
         current_page: 1,
@@ -2604,12 +2613,11 @@ export default function CustomerProfile() {
             case 'settings':
                 return <SettingsSection onDeleteAccount={() => setDeleteOpen(true)} />;
             case 'privacy':
-                return <PrivacyPolicySection />;
+                return <LegalSection title="Privacy Policy" content={legal?.privacy_policy ?? ''} />;
             case 'terms':
-                return <TermsSection />;
+                return <LegalSection title="Terms & Conditions" content={legal?.terms_and_conditions ?? ''} />;
             case 'help':
-                return <OrderHistorySection initialOrders={orders} initialMeta={ordersMeta} />;
-            // return <HelpSection />;
+                return <HelpSection />;
         }
     };
 

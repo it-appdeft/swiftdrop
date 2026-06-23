@@ -70,7 +70,7 @@ const NAV: NavEntry[] = [
     // { key: 'hours', label: 'Operating Hours', icon: Clock },
     // { key: 'documents', label: 'Documents', icon: FileText },
     // { key: 'notifications', label: 'Notifications', icon: Bell },
-    // { key: 'support', label: 'Support', icon: HelpCircle },
+    { key: 'support', label: 'Support', icon: HelpCircle, href: route('restaurant.support') },
     { key: 'settings', label: 'Settings', icon: ClipboardList, href: route('restaurant.settings') },
 ];
 

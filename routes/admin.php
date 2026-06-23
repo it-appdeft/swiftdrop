@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\FoodTypeController;
 use App\Http\Controllers\Admin\PlatformSettingsController;
 use App\Http\Controllers\Admin\RestaurantController;
 use App\Http\Controllers\Admin\OrderController;
+use App\Http\Controllers\Admin\SupportTicketController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use Illuminate\Support\Facades\Route;
 
@@ -81,4 +82,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     // Orders
     Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+
+    // Support Tickets (customer + restaurant)
+    Route::get('support-tickets', [SupportTicketController::class, 'index'])->name('support-tickets.index');
+    Route::patch('support-tickets/{ticket}/status', [SupportTicketController::class, 'updateStatus'])->name('support-tickets.status');
 });

@@ -21,6 +21,8 @@ class UpdatePlatformSettingsRequest extends FormRequest
             'free_delivery_threshold_gbp' => ['required', 'numeric', 'min:0', 'max:1000'],
             'order_tax_rate_percent' => ['required', 'numeric', 'min:0', 'max:100'],
             'delivery_request_timeout_seconds' => ['required', 'integer', 'min:5', 'max:300'],
+            'privacy_policy' => ['nullable', 'string', 'max:20000'],
+            'terms_and_conditions' => ['nullable', 'string', 'max:20000'],
         ];
     }
 }

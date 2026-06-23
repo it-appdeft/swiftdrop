@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\Customer\CustomerProfileController;
 use App\Http\Controllers\Api\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Api\Customer\CustomerSearchController;
 use App\Http\Controllers\Api\DeletionReasonController;
+use App\Http\Controllers\Api\LegalContentController;
+use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
 use App\Http\Controllers\Api\VehicleTypeController;
@@ -16,6 +18,13 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('vehicle-types', [VehicleTypeController::class, 'index']);
 Route::get('deletion-reasons', [DeletionReasonController::class, 'index']);
+
+// Public legal copy (sourced from platform_config).
+Route::controller(LegalContentController::class)->prefix('legal')->group(function () {
+    Route::get('/', 'index');
+    Route::get('privacy-policy', 'privacyPolicy');
+    Route::get('terms-and-conditions', 'terms');
+});
 
 Route::prefix('auth')->controller(ApiAuthController::class)->group(function () {
     Route::post('send-otp', 'sendOtp');
@@ -81,6 +90,13 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
         Route::post('{addressId}/set-default', 'setDefaultAddress');
         Route::post('{addressId}/select', 'setSelectedAddress');
     });
+});
+
+// Shared support tickets — both customers and drivers raise/list tickets here
+// (the mobile "Help Center" form). Source is derived from the user's role.
+Route::middleware('auth:sanctum')->controller(SupportTicketController::class)->prefix('support-tickets')->group(function () {
+    Route::get('/', 'index');
+    Route::post('/', 'store');
 });
 
 Route::middleware('auth:sanctum')->prefix('driver')->group(function () {

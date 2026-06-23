@@ -34,6 +34,7 @@ class CustomerProfileController extends Controller
     public function __construct(
         protected CustomerProfileServiceInterface $profile,
         protected OtpFlowServiceInterface $otpFlow,
+        protected \App\Services\Platform\PlatformConfigService $platformConfig,
     ) {
     }
 
@@ -109,6 +110,17 @@ class CustomerProfileController extends Controller
             'deletionReasons' => $deletionReasons,
             'orders' => $this->mapOrders($orders),
             'pagination' => $this->meta($orders),
+            // Legal copy (Privacy / Terms tabs) sourced from platform_config so
+            // the wording stays editable from the admin console. Stored as the
+            // rich-text HTML produced by the editor.
+            'legal' => [
+                'privacy_policy' => $this->platformConfig->get(
+                    \App\Services\Platform\PlatformConfigService::KEY_PRIVACY_POLICY, '',
+                ),
+                'terms_and_conditions' => $this->platformConfig->get(
+                    \App\Services\Platform\PlatformConfigService::KEY_TERMS_AND_CONDITIONS, '',
+                ),
+            ],
         ]);
     }
 
