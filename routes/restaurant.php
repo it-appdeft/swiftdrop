@@ -5,6 +5,7 @@ use App\Http\Controllers\Restaurant\MenuManagementController;
 use App\Http\Controllers\Restaurant\ModifierController;
 use App\Http\Controllers\Restaurant\OrderController;
 use App\Http\Controllers\Restaurant\SettingsController;
+use App\Http\Controllers\Restaurant\SupportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
@@ -15,6 +16,10 @@ Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
         Route::patch('accepting-orders', [DashboardController::class, 'toggleAcceptingOrders'])
             ->name('accepting-orders.toggle');
         Route::get('orders', [OrderController::class, 'index'])->name('orders');
+
+        // Support — contact channels + "Raise a ticket" form.
+        Route::get('support', [SupportController::class, 'index'])->name('support');
+        Route::post('support', [SupportController::class, 'store'])->name('support.store');
 
         /*
          * ─── Menu Management ────────────────────────────────────────

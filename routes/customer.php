@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\Customer\CustomerFavoriteController;
 use App\Http\Controllers\Web\Customer\CustomerProfileController;
 use App\Http\Controllers\Web\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Web\Customer\CustomerSearchController;
+use App\Http\Controllers\Web\Customer\SupportTicketController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +54,9 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
     Route::post('checkout/apply-coupon', [CheckoutController::class, 'applyCoupon'])->name('checkout.apply-coupon');
     Route::post('checkout/cooking-request', [CheckoutController::class, 'cookingRequest'])->name('checkout.cooking-request');
     Route::post('checkout', [CheckoutController::class, 'store'])->name('checkout.place');
+
+    // Support — the "Report An Issue" form on the profile Help tab.
+    Route::post('support-tickets', [SupportTicketController::class, 'store'])->name('support-tickets.store');
 
     Route::controller(CustomerProfileController::class)->group(function () {
         Route::get('profile', 'show')->name('profile');

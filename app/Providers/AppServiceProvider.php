@@ -95,6 +95,10 @@ class AppServiceProvider extends ServiceProvider
             \App\Contracts\Driver\DriverDashboardServiceInterface::class,
             \App\Services\Driver\DriverDashboardService::class,
         );
+        $this->app->bind(
+            \App\Contracts\Support\SupportTicketServiceInterface::class,
+            \App\Services\Support\SupportTicketService::class,
+        );
         $this->app->singleton(\App\Services\Files\ImageUploadService::class);
         $this->app->singleton(\App\Services\Platform\PlatformConfigService::class);
     }

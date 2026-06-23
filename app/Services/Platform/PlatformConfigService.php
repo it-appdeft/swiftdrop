@@ -29,6 +29,12 @@ class PlatformConfigService
     // it's offered to the next driver — the countdown shown on the request card.
     public const KEY_DELIVERY_REQUEST_TIMEOUT_SECONDS = 'delivery_request_timeout_seconds';
 
+    // Legal copy surfaced in the customer profile (Privacy / Terms tabs) and the
+    // public legal API. Stored as plain text with blank lines between paragraphs.
+    public const KEY_PRIVACY_POLICY = 'privacy_policy';
+
+    public const KEY_TERMS_AND_CONDITIONS = 'terms_and_conditions';
+
     /** @var array<string, string>|null */
     protected ?array $cache = null;
 
@@ -49,6 +55,23 @@ class PlatformConfigService
         $raw = $this->get($key);
 
         return $raw === null ? $default : (float) $raw;
+    }
+
+    /**
+     * Split a stored text document (e.g. privacy policy) into trimmed,
+     * non-empty paragraphs — blank lines are the separator.
+     *
+     * @return array<int, string>
+     */
+    public function paragraphs(string $key, string $default = ''): array
+    {
+        $content = (string) $this->get($key, $default);
+
+        return collect(preg_split('/\n\s*\n/', $content))
+            ->map(fn (string $p) => trim($p))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /** @return array<string, string> */

@@ -23,6 +23,16 @@ class PlatformConfigSeeder extends Seeder
             ['key' => 'order_tax_rate_percent', 'value' => '5.00', 'description' => 'Taxes & charges applied to the item subtotal (%)'],
             ['key' => 'customer_dashboard_radius_miles', 'value' => '5', 'description' => 'Search radius (miles) used when a customer has a default address'],
             ['key' => 'customer_dashboard_fallback_limit', 'value' => '12', 'description' => 'Number of latest restaurants shown when no customer address is set'],
+            [
+                'key' => 'privacy_policy',
+                'value' => '<p>This Privacy Policy describes how SwiftDrop collects, uses, and shares your personal information when you use our website or mobile application.</p><p>At SwiftDrop, we are committed to protecting your privacy and ensuring that your personal data is handled in a safe and responsible manner.</p>',
+                'description' => 'Privacy Policy rich-text (HTML) shown in the customer profile and legal API; editable from Platform Settings',
+            ],
+            [
+                'key' => 'terms_and_conditions',
+                'value' => '<p>By using SwiftDrop, you agree to be bound by these Terms &amp; Conditions. Please read them carefully before placing an order.</p><p>We may update these terms from time to time. Continued use of the service after changes are posted constitutes acceptance of the new terms.</p>',
+                'description' => 'Terms & Conditions rich-text (HTML) shown in the customer profile and legal API; editable from Platform Settings',
+            ],
         ];
 
         foreach ($configs as $config) {
