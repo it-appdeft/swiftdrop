@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Auth\AuthController as ApiAuthController;
+use App\Http\Controllers\Api\Customer\ActiveOrderController;
 use App\Http\Controllers\Api\Customer\CheckoutController;
 use App\Http\Controllers\Api\Customer\CustomerCartController;
 use App\Http\Controllers\Api\Customer\CustomerDashboardController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\Api\Customer\CustomerFavoriteController;
 use App\Http\Controllers\Api\Customer\CustomerProfileController;
 use App\Http\Controllers\Api\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Api\Customer\CustomerSearchController;
+use App\Http\Controllers\Api\Customer\OrderTrackingController;
 use App\Http\Controllers\Api\DeletionReasonController;
 use App\Http\Controllers\Api\LegalContentController;
 use App\Http\Controllers\Api\SupportTicketController;
@@ -72,6 +74,18 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
         Route::post('/apply-coupon', 'applyCoupon');
         Route::post('/cooking-request', 'cookingRequest');
         Route::post('/', 'store');
+    });
+
+    // Every order still in flight (placed → out_for_delivery) — backs the
+    // persistent "active order" bar; usable from any screen, poll-based.
+    Route::get('orders/active', [ActiveOrderController::class, 'index']);
+
+    // Post-checkout tracking — `status` is polled every 5s by the client
+    // instead of a realtime channel; `cancel` only succeeds while the order
+    // is still unaccepted (see Order::isCancellable()).
+    Route::controller(OrderTrackingController::class)->prefix('orders/{order}')->group(function () {
+        Route::get('status', 'status')->whereUuid('order');
+        Route::post('cancel', 'cancel')->whereUuid('order');
     });
 
     Route::controller(CustomerProfileController::class)->prefix('profile')->group(function () {

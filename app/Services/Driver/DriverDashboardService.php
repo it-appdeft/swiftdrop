@@ -3,6 +3,7 @@
 namespace App\Services\Driver;
 
 use App\Contracts\Driver\DriverDashboardServiceInterface;
+use App\Enums\OrderStatusEnum;
 use App\Exceptions\InvalidInputException;
 use App\Exceptions\ResourceNotFoundException;
 use App\Models\Delivery;
@@ -74,7 +75,13 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             ->whereNull('driver_id')
             ->with(['order.restaurant.uploads', 'order.address'])
             ->latest('id')
-            ->get();
+            ->get()
+            // Only offer a delivery to drivers within the admin-tunable radius of
+            // the restaurant (see RestaurantOrderService::accept(), which creates
+            // the delivery in the first place). The pool is small, so filtering
+            // in PHP after eager-loading the restaurant is simplest.
+            ->filter(fn (Delivery $delivery) => $this->withinAssignmentRadius($profile, $delivery))
+            ->values();
     }
 
     public function setAvailability(User $user, string $availability): DriverProfile
@@ -153,12 +160,28 @@ class DriverDashboardService implements DriverDashboardServiceInterface
         if ($delivery->status !== 'pending_assignment' || $delivery->driver_id !== null) {
             throw InvalidInputException::make('This delivery is no longer available.', 'delivery');
         }
+        if (! $this->withinAssignmentRadius($profile, $delivery)) {
+            throw InvalidInputException::make("You're outside the delivery range for this order.", 'delivery');
+        }
 
         $delivery->forceFill([
             'driver_id' => $profile->id,
             'status' => 'assigned',
             'assignment_attempts' => $delivery->assignment_attempts + 1,
         ])->save();
+
+        // A driver is now on the order — mint the handover code the customer
+        // reads out on delivery, and move the order into its out-for-delivery
+        // phase (logged to order_status_histories like every other transition).
+        $order = $delivery->order;
+        $order->forceFill([
+            'delivery_code' => (string) random_int(1000, 9999),
+            'status' => OrderStatusEnum::OUT_FOR_DELIVERY,
+        ])->save();
+        $order->statusHistories()->create([
+            'status' => OrderStatusEnum::OUT_FOR_DELIVERY,
+            'updated_by' => $profile->user_id,
+        ]);
 
         return $delivery;
     }
@@ -172,6 +195,33 @@ class DriverDashboardService implements DriverDashboardServiceInterface
         }
 
         return $delivery;
+    }
+
+    /**
+     * Whether the driver's last known location is within the admin-configured
+     * radius of the delivery's restaurant. Fails closed — an unassignable
+     * distance (missing driver location, or a restaurant with no coordinates)
+     * is treated as out of range rather than shown/accepted by default.
+     */
+    private function withinAssignmentRadius(DriverProfile $profile, Delivery $delivery): bool
+    {
+        if ($profile->current_lat === null || $profile->current_lng === null) {
+            return false;
+        }
+
+        $restaurant = $delivery->order?->restaurant;
+        if (! $restaurant) {
+            return false;
+        }
+
+        $distance = $restaurant->distanceMilesFrom((float) $profile->current_lat, (float) $profile->current_lng);
+        if ($distance === null) {
+            return false;
+        }
+
+        $radius = $this->config->float(PlatformConfigService::KEY_DRIVER_ASSIGNMENT_RADIUS_MILES, 5.0);
+
+        return $distance <= $radius;
     }
 
     private function minutesOnline(DriverProfile $profile): int

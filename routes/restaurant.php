@@ -16,6 +16,10 @@ Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
         Route::patch('accepting-orders', [DashboardController::class, 'toggleAcceptingOrders'])
             ->name('accepting-orders.toggle');
         Route::get('orders', [OrderController::class, 'index'])->name('orders');
+        Route::patch('orders/{order}/accept', [OrderController::class, 'accept'])
+            ->whereUuid('order')->name('orders.accept');
+        Route::patch('orders/{order}/reject', [OrderController::class, 'reject'])
+            ->whereUuid('order')->name('orders.reject');
 
         // Support — contact channels + "Raise a ticket" form.
         Route::get('support', [SupportController::class, 'index'])->name('support');

@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Restaurant;
 
+use App\Contracts\Restaurant\RestaurantOrderServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Restaurant;
 use App\Models\User;
 use App\Enums\OrderStatusEnum;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,6 +22,11 @@ use Inertia\Response;
  */
 class OrderController extends Controller
 {
+    public function __construct(
+        protected RestaurantOrderServiceInterface $orders,
+    ) {
+    }
+
     public function index(Request $request): Response
     {
         $restaurant = $this->restaurantFor($request->user());
@@ -50,7 +57,7 @@ class OrderController extends Controller
 
                 'completed' => $query->where('status', OrderStatusEnum::DELIVERED),
 
-                'cancelled' => $query->where('status', OrderStatusEnum::CANCELLED),
+                'cancelled' => $query->whereIn('status', [OrderStatusEnum::CANCELLED, OrderStatusEnum::REJECTED]),
 
                 default => null,
             };
@@ -93,7 +100,7 @@ class OrderController extends Controller
                 'ready' => $restaurant->orders()->where('status', OrderStatusEnum::READY_FOR_PICKUP)->count(),
                 'out_for_delivery' => $restaurant->orders()->where('status', OrderStatusEnum::OUT_FOR_DELIVERY)->count(),
                 'completed' => $restaurant->orders()->where('status', OrderStatusEnum::DELIVERED)->count(),
-                'cancelled' => $restaurant->orders()->where('status', OrderStatusEnum::CANCELLED)->count(),
+                'cancelled' => $restaurant->orders()->whereIn('status', [OrderStatusEnum::CANCELLED, OrderStatusEnum::REJECTED])->count(),
             ],
         ]);
     }
@@ -146,6 +153,32 @@ class OrderController extends Controller
             $address->city,
             $address->postcode,
         ])->filter()->implode(', ');
+    }
+
+    /**
+     * Accept a newly-placed order into the kitchen. `RestaurantOrderService`
+     * enforces ownership + the `placed`-only guard and throws
+     * ResourceNotFoundException / InvalidInputException otherwise — both
+     * render themselves via the centralized exception handler.
+     */
+    public function accept(Request $request, string $order): RedirectResponse
+    {
+        $restaurant = $this->restaurantFor($request->user());
+        abort_unless($restaurant !== null, 403, 'No restaurant profile attached to this account.');
+
+        $this->orders->accept($restaurant, $order);
+
+        return back()->with('status', 'Order accepted.');
+    }
+
+    public function reject(Request $request, string $order): RedirectResponse
+    {
+        $restaurant = $this->restaurantFor($request->user());
+        abort_unless($restaurant !== null, 403, 'No restaurant profile attached to this account.');
+
+        $this->orders->reject($restaurant, $order, $request->string('reason')->toString() ?: null);
+
+        return back()->with('status', 'Order rejected.');
     }
 
     protected function restaurantFor(?User $user): ?Restaurant

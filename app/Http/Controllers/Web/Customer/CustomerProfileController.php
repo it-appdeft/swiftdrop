@@ -166,6 +166,7 @@ class CustomerProfileController extends Controller
 
                 return [
                     'id' => $order->id,
+                    'uuid' => $order->uuid,
                     'restaurant' => $restaurant?->name ?? 'Restaurant',
                     'location' => $restaurant?->city ?? $restaurant?->full_address ?? '',
                     'image' => $restaurant?->banner_url ?? $restaurant?->logo_url,

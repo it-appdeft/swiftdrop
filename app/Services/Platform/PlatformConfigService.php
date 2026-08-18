@@ -29,6 +29,21 @@ class PlatformConfigService
     // it's offered to the next driver — the countdown shown on the request card.
     public const KEY_DELIVERY_REQUEST_TIMEOUT_SECONDS = 'delivery_request_timeout_seconds';
 
+    // Max distance (miles) from the restaurant within which an online driver is
+    // offered a newly-accepted order — see RestaurantOrderService::accept()
+    // (creates the delivery) and DriverDashboardService::pendingDeliveries()
+    // (the range check itself).
+    public const KEY_DRIVER_ASSIGNMENT_RADIUS_MILES = 'driver_assignment_radius_miles';
+
+    // Average delivery speed used to convert restaurant→customer distance into
+    // a travel-time estimate (see RestaurantOrderService::estimateDelivery()).
+    public const KEY_DRIVER_AVERAGE_SPEED_MPH = 'driver_average_speed_mph';
+
+    // Fallback kitchen prep time (minutes) when a restaurant hasn't set its own
+    // (restaurant_delivery_settings.estimated_prep_time_min or
+    // restaurant_service_settings.avg_prep_time_min).
+    public const KEY_DEFAULT_PREP_TIME_MINUTES = 'default_prep_time_minutes';
+
     // Legal copy surfaced in the customer profile (Privacy / Terms tabs) and the
     // public legal API. Stored as plain text with blank lines between paragraphs.
     public const KEY_PRIVACY_POLICY = 'privacy_policy';

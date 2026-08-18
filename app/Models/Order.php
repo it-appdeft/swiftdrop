@@ -32,6 +32,7 @@ class Order extends Model
         'special_instructions',
         'cancellation_reason',
         'cancelled_by',
+        'delivery_code',
         'placed_at',
         'accepted_at',
         'preparing_at',
@@ -58,6 +59,16 @@ class Order extends Model
             'delivered_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Whether the customer can still cancel this order themselves — only
+     * while it's sitting unaccepted (any later status means the restaurant,
+     * or a driver, is already acting on it).
+     */
+    public function isCancellable(): bool
+    {
+        return $this->status === OrderStatusEnum::PLACED;
     }
 
     protected static function booted(): void

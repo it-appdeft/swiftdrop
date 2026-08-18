@@ -62,16 +62,17 @@ class CheckoutController extends Controller
 
     public function store(PlaceOrderRequest $request): RedirectResponse
     {
-        $this->checkout->place(
+        $order = $this->checkout->place(
             $request->user(),
             $request->addressId(),
             $request->couponCode(),
             $request->specialInstructions(),
         );
 
-        // Flash a dedicated key so the dashboard can show a success modal
-        // (see customer/pages/dashboard.tsx). We avoid 'status' here so the
+        // Flash the order's uuid so the dashboard can show a success modal
+        // that links straight to the tracking page (see
+        // customer/pages/dashboard.tsx). We avoid 'status' here so the
         // global toast listener in app.tsx doesn't fire a duplicate toast.
-        return redirect()->route('customer.dashboard')->with('order_placed', true);
+        return redirect()->route('customer.dashboard')->with('order_placed', $order->uuid);
     }
 }

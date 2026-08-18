@@ -92,8 +92,20 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\Customer\CustomerFavoriteService::class,
         );
         $this->app->bind(
+            \App\Contracts\Customer\OrderTrackingServiceInterface::class,
+            \App\Services\Customer\OrderTrackingService::class,
+        );
+        $this->app->bind(
+            \App\Contracts\Customer\ActiveOrderServiceInterface::class,
+            \App\Services\Customer\ActiveOrderService::class,
+        );
+        $this->app->bind(
             \App\Contracts\Driver\DriverDashboardServiceInterface::class,
             \App\Services\Driver\DriverDashboardService::class,
+        );
+        $this->app->bind(
+            \App\Contracts\Restaurant\RestaurantOrderServiceInterface::class,
+            \App\Services\Restaurant\RestaurantOrderService::class,
         );
         $this->app->bind(
             \App\Contracts\Support\SupportTicketServiceInterface::class,

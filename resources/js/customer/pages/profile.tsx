@@ -123,6 +123,7 @@ const SIDEBAR_ITEMS: { key: SidebarKey; label: string; icon: React.ComponentType
 /** Past order shape supplied by CustomerProfileController@show. */
 interface PastOrder {
     id: number;
+    uuid: string;
     restaurant: string;
     location: string;
     image: string | null;
@@ -1162,13 +1163,20 @@ const ORDER_STATUS: Record<string, { label: string; className: string }> = {
     out_for_delivery: { label: 'Out for delivery', className: 'text-sky-600' },
     delivered: { label: 'Delivered', className: 'text-emerald-700' },
     cancelled: { label: 'Cancelled', className: 'text-rose-600' },
+    rejected: { label: 'Rejected', className: 'text-rose-600' },
 };
 
 function OrderCard({ order }: { order: PastOrder }) {
     const badge = ORDER_STATUS[order.status] ?? { label: order.status, className: 'text-muted-foreground' };
 
     return (
-        <article className="border-border bg-background rounded-2xl border p-5">
+        <article
+            role="link"
+            tabIndex={0}
+            onClick={() => router.visit(route('customer.orders.show', order.uuid))}
+            onKeyDown={(e) => e.key === 'Enter' && router.visit(route('customer.orders.show', order.uuid))}
+            className="border-border bg-background cursor-pointer rounded-2xl border p-5 transition hover:border-emerald-200 hover:bg-emerald-50/30"
+        >
             <header className="flex items-start gap-4">
                 {order.image ? (
                     <img src={order.image} alt="" className="size-14 shrink-0 rounded-xl object-cover" loading="lazy" />
@@ -1206,6 +1214,7 @@ function OrderCard({ order }: { order: PastOrder }) {
 
             <button
                 type="button"
+                onClick={(e) => e.stopPropagation()}
                 className="bg-primary text-primary-foreground mt-5 w-75 rounded-md py-3 text-sm font-semibold transition hover:opacity-90"
             >
                 Reorder
@@ -1226,13 +1235,7 @@ function OrderCard({ order }: { order: PastOrder }) {
     );
 }
 
-function OrderHistorySection({
-    initialOrders,
-    initialMeta,
-}: {
-    initialOrders: PastOrder[];
-    initialMeta: OrdersMeta;
-}) {
+function OrderHistorySection({ initialOrders, initialMeta }: { initialOrders: PastOrder[]; initialMeta: OrdersMeta }) {
     const [search, setSearch] = useState('');
     const [orders, setOrders] = useState<PastOrder[]>(initialOrders);
     const [meta, setMeta] = useState<OrdersMeta>(initialMeta);
@@ -1729,8 +1732,7 @@ interface FavItem {
     rating: number | null;
 }
 
-const favCsrf = (): string =>
-    (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+const favCsrf = (): string => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
 
 /**
  * Generic paginated favourites loader — fetches `/customer/favorites/{type}`
@@ -1851,9 +1853,7 @@ function FavoritesSection() {
             {tab === 'restaurants' ? (
                 <>
                     {restaurants.loaded && restaurants.items.length === 0 ? (
-                        <p className="bg-muted/40 text-muted-foreground mt-4 rounded-lg py-10 text-center text-sm">
-                            No favourite restaurants yet.
-                        </p>
+                        <p className="bg-muted/40 text-muted-foreground mt-4 rounded-lg py-10 text-center text-sm">No favourite restaurants yet.</p>
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                             {restaurants.items.map((r) => (
@@ -1884,9 +1884,7 @@ function FavoritesSection() {
                                     <div className="flex items-center justify-between p-3">
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-semibold">{r.name}</p>
-                                            <p className="text-muted-foreground text-[11px]">
-                                                20-30 min{r.city ? ` · ${r.city}` : ''}
-                                            </p>
+                                            <p className="text-muted-foreground text-[11px]">20-30 min{r.city ? ` · ${r.city}` : ''}</p>
                                         </div>
                                         <button
                                             type="button"
@@ -1915,10 +1913,7 @@ function FavoritesSection() {
                         <div className="mt-4 space-y-4">
                             {itemGroups.map((g) => (
                                 <div key={g.id} className="border-border bg-background rounded-2xl border">
-                                    <Link
-                                        href={`/customer/restaurants/${g.id}`}
-                                        className="flex items-center justify-between p-3 hover:text-primary"
-                                    >
+                                    <Link href={`/customer/restaurants/${g.id}`} className="hover:text-primary flex items-center justify-between p-3">
                                         <p className="text-sm font-semibold">{g.name}</p>
                                         <span className="text-muted-foreground">›</span>
                                     </Link>
@@ -1927,7 +1922,12 @@ function FavoritesSection() {
                                             <div key={item.id} className="border-border flex gap-3 rounded-lg border p-2">
                                                 <div className="relative size-20 shrink-0">
                                                     {item.image_url ? (
-                                                        <img src={item.image_url} alt={item.name} className="size-full rounded-md object-cover" loading="lazy" />
+                                                        <img
+                                                            src={item.image_url}
+                                                            alt={item.name}
+                                                            className="size-full rounded-md object-cover"
+                                                            loading="lazy"
+                                                        />
                                                     ) : (
                                                         <div className="bg-muted/40 size-full rounded-md" />
                                                     )}
@@ -1987,15 +1987,7 @@ function FavoritesSection() {
     );
 }
 
-function FavLoadMore({
-    loading,
-    hasMore,
-    sentinelRef,
-}: {
-    loading: boolean;
-    hasMore: boolean;
-    sentinelRef: React.RefObject<HTMLDivElement | null>;
-}) {
+function FavLoadMore({ loading, hasMore, sentinelRef }: { loading: boolean; hasMore: boolean; sentinelRef: React.RefObject<HTMLDivElement | null> }) {
     if (!hasMore && !loading) return null;
     return (
         <div ref={sentinelRef} className="flex items-center justify-center py-6">
@@ -2447,7 +2439,7 @@ function LegalSection({ title, content }: { title: string; content: string }) {
             <div className="bg-muted/40 text-muted-foreground mt-4 rounded-xl p-4 text-sm leading-relaxed">
                 {hasContent ? (
                     <div
-                        className="space-y-2 [&_a]:text-primary [&_a]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+                        className="[&_a]:text-primary space-y-2 [&_a]:underline [&_h1]:text-xl [&_h1]:font-bold [&_h2]:text-lg [&_h2]:font-bold [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
                         dangerouslySetInnerHTML={{ __html: content }}
                     />
                 ) : (

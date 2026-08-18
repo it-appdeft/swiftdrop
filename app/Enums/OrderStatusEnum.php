@@ -22,7 +22,8 @@ enum OrderStatusEnum: string
             self::READY_FOR_PICKUP => 'ready',
             self::OUT_FOR_DELIVERY => 'out_for_delivery',
             self::DELIVERED => 'completed',
-            self::CANCELLED => 'cancelled',
+            self::CANCELLED,
+            self::REJECTED => 'cancelled',
         };
     }
 }

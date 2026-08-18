@@ -27,6 +27,9 @@ interface Props {
         free_delivery_threshold_gbp: number;
         order_tax_rate_percent: number;
         delivery_request_timeout_seconds: number;
+        driver_assignment_radius_miles: number;
+        driver_average_speed_mph: number;
+        default_prep_time_minutes: number;
         privacy_policy: string;
         terms_and_conditions: string;
     };
@@ -41,6 +44,9 @@ export default function PlatformSettingsEdit({ settings }: Props) {
         free_delivery_threshold_gbp: String(settings.free_delivery_threshold_gbp),
         order_tax_rate_percent: String(settings.order_tax_rate_percent),
         delivery_request_timeout_seconds: String(settings.delivery_request_timeout_seconds),
+        driver_assignment_radius_miles: String(settings.driver_assignment_radius_miles),
+        driver_average_speed_mph: String(settings.driver_average_speed_mph),
+        default_prep_time_minutes: String(settings.default_prep_time_minutes),
         privacy_policy: settings.privacy_policy ?? '',
         terms_and_conditions: settings.terms_and_conditions ?? '',
     });
@@ -88,9 +94,7 @@ export default function PlatformSettingsEdit({ settings }: Props) {
                                 onClick={() => setTab(key)}
                                 className={
                                     '-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition ' +
-                                    (active
-                                        ? 'border-primary text-primary'
-                                        : 'text-muted-foreground hover:text-foreground border-transparent')
+                                    (active ? 'border-primary text-primary' : 'text-muted-foreground hover:text-foreground border-transparent')
                                 }
                             >
                                 <Icon className="size-4" />
@@ -102,136 +106,183 @@ export default function PlatformSettingsEdit({ settings }: Props) {
 
                 <form onSubmit={submit} className="space-y-6">
                     <div className={tab === 'general' ? 'space-y-6' : 'hidden'}>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Customer dashboard</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <FormField
-                                label="Delivery radius (miles)"
-                                error={errors.customer_dashboard_radius_miles}
-                                hint="Restaurants further than this from a customer's default address are hidden."
-                                required
-                            >
-                                <Input
-                                    type="number"
-                                    step="0.5"
-                                    min="0.5"
-                                    max="200"
-                                    value={data.customer_dashboard_radius_miles}
-                                    onChange={(e) => setData('customer_dashboard_radius_miles', e.target.value)}
-                                />
-                            </FormField>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Customer dashboard</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <FormField
+                                    label="Delivery radius (miles)"
+                                    error={errors.customer_dashboard_radius_miles}
+                                    hint="Restaurants further than this from a customer's default address are hidden."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        step="0.5"
+                                        min="0.5"
+                                        max="200"
+                                        value={data.customer_dashboard_radius_miles}
+                                        onChange={(e) => setData('customer_dashboard_radius_miles', e.target.value)}
+                                    />
+                                </FormField>
 
-                            <FormField
-                                label="Fallback restaurant limit"
-                                error={errors.customer_dashboard_fallback_limit}
-                                hint="How many of the latest restaurants to show when the customer has no saved address yet."
-                                required
-                            >
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    max="100"
-                                    value={data.customer_dashboard_fallback_limit}
-                                    onChange={(e) => setData('customer_dashboard_fallback_limit', e.target.value)}
-                                />
-                            </FormField>
-                        </CardContent>
-                    </Card>
+                                <FormField
+                                    label="Fallback restaurant limit"
+                                    error={errors.customer_dashboard_fallback_limit}
+                                    hint="How many of the latest restaurants to show when the customer has no saved address yet."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max="100"
+                                        value={data.customer_dashboard_fallback_limit}
+                                        onChange={(e) => setData('customer_dashboard_fallback_limit', e.target.value)}
+                                    />
+                                </FormField>
+                            </CardContent>
+                        </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Delivery &amp; charges</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <FormField
-                                label="Base delivery fee (£)"
-                                error={errors.base_delivery_fee_gbp}
-                                hint="Flat amount added to every delivery before the per-mile charge."
-                                required
-                            >
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    value={data.base_delivery_fee_gbp}
-                                    onChange={(e) => setData('base_delivery_fee_gbp', e.target.value)}
-                                />
-                            </FormField>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Delivery &amp; charges</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <FormField
+                                    label="Base delivery fee (£)"
+                                    error={errors.base_delivery_fee_gbp}
+                                    hint="Flat amount added to every delivery before the per-mile charge."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        value={data.base_delivery_fee_gbp}
+                                        onChange={(e) => setData('base_delivery_fee_gbp', e.target.value)}
+                                    />
+                                </FormField>
 
-                            <FormField
-                                label="Delivery fee per mile (£)"
-                                error={errors.delivery_fee_per_mile_gbp}
-                                hint="Charged per mile between the customer address and the restaurant."
-                                required
-                            >
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    value={data.delivery_fee_per_mile_gbp}
-                                    onChange={(e) => setData('delivery_fee_per_mile_gbp', e.target.value)}
-                                />
-                            </FormField>
+                                <FormField
+                                    label="Delivery fee per mile (£)"
+                                    error={errors.delivery_fee_per_mile_gbp}
+                                    hint="Charged per mile between the customer address and the restaurant."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        value={data.delivery_fee_per_mile_gbp}
+                                        onChange={(e) => setData('delivery_fee_per_mile_gbp', e.target.value)}
+                                    />
+                                </FormField>
 
-                            <FormField
-                                label="Free delivery threshold (£)"
-                                error={errors.free_delivery_threshold_gbp}
-                                hint="Orders with an item subtotal at or above this get free delivery."
-                                required
-                            >
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="1000"
-                                    value={data.free_delivery_threshold_gbp}
-                                    onChange={(e) => setData('free_delivery_threshold_gbp', e.target.value)}
-                                />
-                            </FormField>
+                                <FormField
+                                    label="Free delivery threshold (£)"
+                                    error={errors.free_delivery_threshold_gbp}
+                                    hint="Orders with an item subtotal at or above this get free delivery."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="1000"
+                                        value={data.free_delivery_threshold_gbp}
+                                        onChange={(e) => setData('free_delivery_threshold_gbp', e.target.value)}
+                                    />
+                                </FormField>
 
-                            <FormField
-                                label="Taxes & charges (%)"
-                                error={errors.order_tax_rate_percent}
-                                hint="Applied to the item subtotal and shown as 'Taxes & Charges' at checkout."
-                                required
-                            >
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    value={data.order_tax_rate_percent}
-                                    onChange={(e) => setData('order_tax_rate_percent', e.target.value)}
-                                />
-                            </FormField>
-                        </CardContent>
-                    </Card>
+                                <FormField
+                                    label="Taxes & charges (%)"
+                                    error={errors.order_tax_rate_percent}
+                                    hint="Applied to the item subtotal and shown as 'Taxes & Charges' at checkout."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        value={data.order_tax_rate_percent}
+                                        onChange={(e) => setData('order_tax_rate_percent', e.target.value)}
+                                    />
+                                </FormField>
+                            </CardContent>
+                        </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Driver operations</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <FormField
-                                label="Delivery request timeout (seconds)"
-                                error={errors.delivery_request_timeout_seconds}
-                                hint="How long a driver has to accept or reject an incoming delivery request before it's offered to the next driver — the countdown shown on the request card."
-                                required
-                            >
-                                <Input
-                                    type="number"
-                                    min="5"
-                                    max="300"
-                                    value={data.delivery_request_timeout_seconds}
-                                    onChange={(e) => setData('delivery_request_timeout_seconds', e.target.value)}
-                                />
-                            </FormField>
-                        </CardContent>
-                    </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Driver operations</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <FormField
+                                    label="Delivery request timeout (seconds)"
+                                    error={errors.delivery_request_timeout_seconds}
+                                    hint="How long a driver has to accept or reject an incoming delivery request before it's offered to the next driver — the countdown shown on the request card."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        min="5"
+                                        max="300"
+                                        value={data.delivery_request_timeout_seconds}
+                                        onChange={(e) => setData('delivery_request_timeout_seconds', e.target.value)}
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    label="Driver assignment radius (miles)"
+                                    error={errors.driver_assignment_radius_miles}
+                                    hint="When a restaurant accepts an order, only online drivers within this distance of the restaurant are offered the delivery."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        step="0.5"
+                                        min="0.5"
+                                        max="100"
+                                        value={data.driver_assignment_radius_miles}
+                                        onChange={(e) => setData('driver_assignment_radius_miles', e.target.value)}
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    label="Average delivery speed (mph)"
+                                    error={errors.driver_average_speed_mph}
+                                    hint="Used to turn the restaurant→customer distance into a travel-time estimate for the order status bar."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        step="1"
+                                        min="1"
+                                        max="60"
+                                        value={data.driver_average_speed_mph}
+                                        onChange={(e) => setData('driver_average_speed_mph', e.target.value)}
+                                    />
+                                </FormField>
+
+                                <FormField
+                                    label="Default prep time (minutes)"
+                                    error={errors.default_prep_time_minutes}
+                                    hint="Fallback kitchen prep time when a restaurant hasn't set its own in onboarding."
+                                    required
+                                >
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max="180"
+                                        value={data.default_prep_time_minutes}
+                                        onChange={(e) => setData('default_prep_time_minutes', e.target.value)}
+                                    />
+                                </FormField>
+                            </CardContent>
+                        </Card>
                     </div>
 
                     {/* Terms & Privacy tab — two halves, side by side */}
@@ -244,10 +295,7 @@ export default function PlatformSettingsEdit({ settings }: Props) {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <FormField
-                                    label="Privacy Policy content"
-                                    error={errors.privacy_policy}
-                                >
+                                <FormField label="Privacy Policy content" error={errors.privacy_policy}>
                                     <RichTextEditor
                                         value={data.privacy_policy}
                                         onChange={(html) => setData('privacy_policy', html)}
@@ -265,10 +313,7 @@ export default function PlatformSettingsEdit({ settings }: Props) {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <FormField
-                                    label="Terms & Conditions content"
-                                    error={errors.terms_and_conditions}
-                                >
+                                <FormField label="Terms & Conditions content" error={errors.terms_and_conditions}>
                                     <RichTextEditor
                                         value={data.terms_and_conditions}
                                         onChange={(html) => setData('terms_and_conditions', html)}
