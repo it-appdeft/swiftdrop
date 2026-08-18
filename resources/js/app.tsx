@@ -9,6 +9,8 @@ import { Toaster } from '@/components/ui/toast';
 import { initializeTheme } from '@/hooks/use-appearance';
 import { toast } from '@/hooks/use-toast';
 
+import { ActiveOrderBar } from './customer/components/active-order-bar';
+
 declare global {
     const route: typeof routeFn;
 }
@@ -51,6 +53,11 @@ createInertiaApp({
             <>
                 <App {...props} />
                 <Toaster />
+                {/* Global, not per-page: polls its own endpoint and tracks
+                    navigation itself (see active-order-bar.tsx) so it can
+                    float over any customer screen without every page having
+                    to remember to render it. */}
+                <ActiveOrderBar />
             </>,
         );
     },

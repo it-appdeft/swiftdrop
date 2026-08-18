@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\Customer\ActiveOrderController;
 use App\Http\Controllers\Web\Customer\CheckoutController;
 use App\Http\Controllers\Web\Customer\CustomerCartController;
 use App\Http\Controllers\Web\Customer\CustomerDashboardController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Web\Customer\CustomerFavoriteController;
 use App\Http\Controllers\Web\Customer\CustomerProfileController;
 use App\Http\Controllers\Web\Customer\CustomerRestaurantController;
 use App\Http\Controllers\Web\Customer\CustomerSearchController;
+use App\Http\Controllers\Web\Customer\OrderTrackingController;
 use App\Http\Controllers\Web\Customer\SupportTicketController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -54,6 +56,20 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
     Route::post('checkout/apply-coupon', [CheckoutController::class, 'applyCoupon'])->name('checkout.apply-coupon');
     Route::post('checkout/cooking-request', [CheckoutController::class, 'cookingRequest'])->name('checkout.cooking-request');
     Route::post('checkout', [CheckoutController::class, 'store'])->name('checkout.place');
+
+    // Every order still in flight — backs <ActiveOrderBar>, mounted globally
+    // in app.tsx so it can show on any customer screen. Declared before
+    // orders/{order} below (whereUuid already guards it, but this keeps the
+    // static route unambiguous).
+    Route::get('orders/active', [ActiveOrderController::class, 'index'])->name('orders.active');
+
+    // Order tracking: `show` renders the page, `status` is polled every 5s
+    // for live updates, `cancel` only succeeds while still unaccepted.
+    Route::controller(OrderTrackingController::class)->prefix('orders/{order}')->name('orders.')->group(function () {
+        Route::get('/', 'show')->whereUuid('order')->name('show');
+        Route::get('status', 'status')->whereUuid('order')->name('status');
+        Route::post('cancel', 'cancel')->whereUuid('order')->name('cancel');
+    });
 
     // Support — the "Report An Issue" form on the profile Help tab.
     Route::post('support-tickets', [SupportTicketController::class, 'store'])->name('support-tickets.store');

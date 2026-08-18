@@ -73,8 +73,10 @@ class HandleInertiaRequests extends Middleware
                 'status' => fn () => $request->session()->get('status'),
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
-                // Sentinel flag for one-shot success modals (e.g. order placed).
-                'order_placed' => fn () => (bool) $request->session()->get('order_placed', false),
+                // One-shot success modal after checkout (see Web\Customer\
+                // CheckoutController::store()) — the flashed value is the new
+                // order's uuid, so the dashboard can link straight to tracking.
+                'order_placed' => fn () => $request->session()->get('order_placed'),
             ],
         ]);
     }

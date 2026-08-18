@@ -33,6 +33,9 @@ class PlatformSettingsController extends Controller
                 'free_delivery_threshold_gbp' => $this->config->float(PlatformConfigService::KEY_FREE_DELIVERY_THRESHOLD, 25.0),
                 'order_tax_rate_percent' => $this->config->float(PlatformConfigService::KEY_ORDER_TAX_RATE, 5.0),
                 'delivery_request_timeout_seconds' => $this->config->int(PlatformConfigService::KEY_DELIVERY_REQUEST_TIMEOUT_SECONDS, 30),
+                'driver_assignment_radius_miles' => $this->config->float(PlatformConfigService::KEY_DRIVER_ASSIGNMENT_RADIUS_MILES, 5.0),
+                'driver_average_speed_mph' => $this->config->float(PlatformConfigService::KEY_DRIVER_AVERAGE_SPEED_MPH, 18.0),
+                'default_prep_time_minutes' => $this->config->int(PlatformConfigService::KEY_DEFAULT_PREP_TIME_MINUTES, 20),
                 // Legal copy — raw text; blank lines separate paragraphs.
                 'privacy_policy' => $this->config->get(PlatformConfigService::KEY_PRIVACY_POLICY, ''),
                 'terms_and_conditions' => $this->config->get(PlatformConfigService::KEY_TERMS_AND_CONDITIONS, ''),

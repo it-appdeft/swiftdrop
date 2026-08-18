@@ -16,7 +16,11 @@ class DriverDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** An approved, fully set-up driver (offline by default). */
+    /**
+     * An approved, fully set-up driver (offline by default), parked right by
+     * the restaurant `delivery()` uses (51.5, -0.12) — i.e. in range unless a
+     * test explicitly overrides current_lat/current_lng further away.
+     */
     private function driver(array $overrides = []): DriverProfile
     {
         $user = User::factory()->create();
@@ -30,6 +34,8 @@ class DriverDashboardTest extends TestCase
             'availability' => 'offline',
             'approval_status' => 'approved',
             'setup_step' => DriverProfile::SETUP_STEP_DOCUMENTS,
+            'current_lat' => 51.5,
+            'current_lng' => -0.12,
         ], $overrides));
     }
 
@@ -123,6 +129,43 @@ class DriverDashboardTest extends TestCase
         $this->getJson('/api/driver/delivery-requests')
             ->assertOk()
             ->assertJsonCount(0, 'data');
+    }
+
+    public function test_driver_outside_the_assignment_radius_does_not_see_the_request(): void
+    {
+        // ~34 miles north of the restaurant at (51.5, -0.12) — well past the
+        // 5-mile default (no platform_config row seeded in this test).
+        $driver = $this->driver(['availability' => 'online', 'current_lat' => 52.0, 'current_lng' => -0.12]);
+        $this->delivery();
+        Sanctum::actingAs($driver->user);
+
+        $this->getJson('/api/driver/delivery-requests')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_driver_with_no_known_location_does_not_see_the_request(): void
+    {
+        // Fails closed: an unknown location can't be verified as in-range.
+        $driver = $this->driver(['availability' => 'online', 'current_lat' => null, 'current_lng' => null]);
+        $this->delivery();
+        Sanctum::actingAs($driver->user);
+
+        $this->getJson('/api/driver/delivery-requests')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_driver_outside_the_assignment_radius_cannot_accept_the_delivery(): void
+    {
+        $driver = $this->driver(['current_lat' => 52.0, 'current_lng' => -0.12]);
+        $delivery = $this->delivery();
+        Sanctum::actingAs($driver->user);
+
+        $this->postJson("/api/driver/deliveries/{$delivery->id}/respond", ['action' => 'accept'])
+            ->assertStatus(422);
+
+        $this->assertDatabaseHas('deliveries', ['id' => $delivery->id, 'driver_id' => null, 'status' => 'pending_assignment']);
     }
 
     public function test_approved_driver_can_go_online(): void

@@ -154,28 +154,17 @@ function ExploreSection({ items, selectedId }: { items: FoodType[]; selectedId: 
                                 className={
                                     'flex size-20 items-center justify-center overflow-hidden rounded-full bg-amber-50 transition sm:size-24 ' +
                                     (active
-                                        ? 'ring-3 ring-emerald-500 ring-offset-2 ring-offset-background'
-                                        : 'ring-0 hover:ring-2 hover:ring-emerald-300 hover:ring-offset-2 hover:ring-offset-background')
+                                        ? 'ring-offset-background ring-3 ring-emerald-500 ring-offset-2'
+                                        : 'hover:ring-offset-background ring-0 hover:ring-2 hover:ring-emerald-300 hover:ring-offset-2')
                                 }
                             >
                                 {item.image_url ? (
-                                    <img
-                                        src={item.image_url}
-                                        alt={item.name}
-                                        className="h-full w-full object-cover"
-                                        loading="lazy"
-                                    />
+                                    <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
                                 ) : (
                                     <UtensilsCrossed className="size-8 text-amber-600 sm:size-10" />
                                 )}
                             </span>
-                            <span
-                                className={
-                                    'text-sm font-medium ' + (active ? 'text-emerald-700' : 'text-foreground')
-                                }
-                            >
-                                {item.name}
-                            </span>
+                            <span className={'text-sm font-medium ' + (active ? 'text-emerald-700' : 'text-foreground')}>{item.name}</span>
                         </button>
                     );
                 })}
@@ -204,9 +193,7 @@ function SetAddressPrompt() {
                     </span>
                     <div>
                         <h3 className="text-base font-bold text-emerald-900">Set a delivery address</h3>
-                        <p className="mt-0.5 text-sm text-emerald-800/80">
-                            Add an address to see Top Picks and restaurants near you.
-                        </p>
+                        <p className="mt-0.5 text-sm text-emerald-800/80">Add an address to see Top Picks and restaurants near you.</p>
                     </div>
                 </div>
                 <Link
@@ -243,7 +230,7 @@ function TopPicksSection({ picks }: { picks: DashboardRestaurant[] }) {
                                 aria-label="Previous"
                                 onClick={prev}
                                 disabled={start === 0}
-                                className="flex size-9 items-center justify-center rounded-full border border-zinc-300 bg-background text-zinc-700 transition hover:bg-[#F6F8FA] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="bg-background flex size-9 items-center justify-center rounded-full border border-zinc-300 text-zinc-700 transition hover:bg-[#F6F8FA] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <ChevronLeft className="size-4" />
                             </button>
@@ -252,7 +239,7 @@ function TopPicksSection({ picks }: { picks: DashboardRestaurant[] }) {
                                 aria-label="Next"
                                 onClick={next}
                                 disabled={start >= maxStart}
-                                className="flex size-9 items-center justify-center rounded-full border border-zinc-300 bg-background text-zinc-700 transition hover:bg-[#F6F8FA] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="bg-background flex size-9 items-center justify-center rounded-full border border-zinc-300 text-zinc-700 transition hover:bg-[#F6F8FA] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <ChevronRight className="size-4" />
                             </button>
@@ -295,9 +282,7 @@ function TopPickCard({ restaurant: r }: { restaurant: DashboardRestaurant }) {
                     loading="lazy"
                 />
             ) : (
-                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
-                    {r.name.charAt(0)}
-                </div>
+                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">{r.name.charAt(0)}</div>
             )}
             {unavailable ? <UnavailableOverlay label={label} opensAt={opensAt} /> : null}
         </div>
@@ -307,7 +292,7 @@ function TopPickCard({ restaurant: r }: { restaurant: DashboardRestaurant }) {
         <div className="flex items-center justify-between pt-3">
             <div className="min-w-0">
                 <p className={'truncate text-base font-semibold ' + (unavailable ? 'text-muted-foreground' : '')}>{r.name}</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                <p className="text-muted-foreground mt-0.5 truncate text-xs">
                     20-30 min
                     {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
                 </p>
@@ -318,7 +303,7 @@ function TopPickCard({ restaurant: r }: { restaurant: DashboardRestaurant }) {
                 ) : null}
             </div>
             {r.rating !== null ? (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground">
+                <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold">
                     <Star className="size-3 fill-current" /> {r.rating.toFixed(1)}
                     <span className="font-normal text-emerald-700/70">({r.total_reviews})</span>
                 </span>
@@ -369,24 +354,16 @@ function CuisinesAndPromoSection() {
 
             <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
                 {PROMOS.map((p, i) => (
-                    <div
-                        key={i}
-                        className={`relative flex h-56 items-center overflow-hidden ${p.accent} px-8 sm:h-64`}
-                    >
+                    <div key={i} className={`relative flex h-56 items-center overflow-hidden ${p.accent} px-8 sm:h-64`}>
                         <div className="relative z-10 flex max-w-[55%] flex-col justify-between">
                             <div>
-                                <p className="text-2xl font-bold text-foreground">{p.title}</p>
-                                <p className="mt-2 text-base font-medium text-foreground/80">{p.subtitle}</p>
-                                <p className="text-base font-medium text-foreground/80">{p.offer}</p>
+                                <p className="text-foreground text-2xl font-bold">{p.title}</p>
+                                <p className="text-foreground/80 mt-2 text-base font-medium">{p.subtitle}</p>
+                                <p className="text-foreground/80 text-base font-medium">{p.offer}</p>
                             </div>
-                            <p className="mt-8 text-sm font-medium text-foreground/70">{p.meta}</p>
+                            <p className="text-foreground/70 mt-8 text-sm font-medium">{p.meta}</p>
                         </div>
-                        <img
-                            src={p.image}
-                            alt=""
-                            className="absolute right-0 top-0 h-full w-1/2 object-cover"
-                            loading="lazy"
-                        />
+                        <img src={p.image} alt="" className="absolute top-0 right-0 h-full w-1/2 object-cover" loading="lazy" />
                     </div>
                 ))}
             </div>
@@ -417,9 +394,7 @@ function AllRestaurantsSection({
     const [loadingMore, setLoadingMore] = useState(false);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-    const [favorited, setFavorited] = useState<Set<number>>(
-        () => new Set(initialRestaurants.filter((r) => r.is_favorited).map((r) => r.id)),
-    );
+    const [favorited, setFavorited] = useState<Set<number>>(() => new Set(initialRestaurants.filter((r) => r.is_favorited).map((r) => r.id)));
 
     useEffect(() => {
         setRestaurants(initialRestaurants);
@@ -509,7 +484,7 @@ function AllRestaurantsSection({
                         )}
                     </h2>
                     {!usingFallback && address ? (
-                        <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <p className="text-muted-foreground mt-1 inline-flex items-center gap-1.5 text-xs">
                             <MapPin className="size-3.5" />
                             Within {radiusMiles} mi of {address.label ?? address.city ?? 'your saved address'}
                         </p>
@@ -527,7 +502,7 @@ function AllRestaurantsSection({
             </div>
 
             {restaurants.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-background p-10 text-center text-sm text-muted-foreground">
+                <div className="bg-background text-muted-foreground rounded-xl border border-dashed p-10 text-center text-sm">
                     {usingFallback
                         ? 'Set a delivery address to see restaurants near you.'
                         : selectedFoodType
@@ -538,12 +513,7 @@ function AllRestaurantsSection({
                 <>
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 md:grid-cols-3">
                         {restaurants.map((r) => (
-                            <RestaurantCard
-                                key={r.id}
-                                restaurant={r}
-                                isFavorited={favorited.has(r.id)}
-                                onToggleFavorite={() => toggle(r.id)}
-                            />
+                            <RestaurantCard key={r.id} restaurant={r} isFavorited={favorited.has(r.id)} onToggleFavorite={() => toggle(r.id)} />
                         ))}
                     </div>
 
@@ -579,7 +549,7 @@ function HoursStatus({ isOpenNow, today }: { isOpenNow: boolean; today: TodayHou
         );
     }
     return (
-        <span className="inline-flex items-center gap-1 text-muted-foreground">
+        <span className="text-muted-foreground inline-flex items-center gap-1">
             <Clock className="size-3.5" />
             Closed{today.is_open && today.open_from ? ` · opens ${today.open_from}` : ''}
         </span>
@@ -632,9 +602,7 @@ function availabilityOf(r: OrderState): Availability {
 function UnavailableOverlay({ label, opensAt }: { label: string; opensAt: string | null }) {
     return (
         <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/30">
-            <span className="rounded-full bg-red-600 px-4 py-1 text-xs font-bold uppercase tracking-wide text-white shadow">
-                {label}
-            </span>
+            <span className="rounded-full bg-red-600 px-4 py-1 text-xs font-bold tracking-wide text-white uppercase shadow">{label}</span>
             {opensAt ? <span className="text-xs font-semibold text-white drop-shadow">Opens at {opensAt}</span> : null}
         </span>
     );
@@ -664,26 +632,21 @@ function RestaurantCard({
                 <img
                     src={(r.cover_url ?? r.logo_url)!}
                     alt={r.name}
-                    className={
-                        'h-full w-full object-cover transition ' +
-                        (unavailable ? 'grayscale' : 'group-hover:scale-105')
-                    }
+                    className={'h-full w-full object-cover transition ' + (unavailable ? 'grayscale' : 'group-hover:scale-105')}
                     loading="lazy"
                 />
             ) : (
-                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">
-                    {r.name.charAt(0)}
-                </div>
+                <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-zinc-400">{r.name.charAt(0)}</div>
             )}
             {unavailable ? (
                 <UnavailableOverlay label={label} opensAt={opensAt} />
             ) : (
-                <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
+                <span className="absolute bottom-3 left-3 rounded-md bg-rose-500 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-white uppercase shadow">
                     20% OFF select items
                 </span>
             )}
             {r.rating !== null ? (
-                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
+                <span className="absolute top-3 right-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-xs font-semibold text-emerald-700 shadow">
                     <Star className="size-3 fill-current text-amber-500" /> {r.rating.toFixed(1)}
                 </span>
             ) : null}
@@ -694,7 +657,7 @@ function RestaurantCard({
         <div className="flex items-center justify-between pt-3">
             <div className="min-w-0">
                 <p className={'truncate text-base font-semibold ' + (unavailable ? 'text-muted-foreground' : '')}>{r.name}</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                <p className="text-muted-foreground mt-0.5 truncate text-xs">
                     20-30 min
                     {r.distance_miles !== null ? ` · ${r.distance_miles} mi` : r.city ? ` · ${r.city}` : ''}
                 </p>
@@ -713,10 +676,7 @@ function RestaurantCard({
                     e.stopPropagation();
                     onToggleFavorite();
                 }}
-                className={
-                    'shrink-0 transition ' +
-                    (isFavorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')
-                }
+                className={'shrink-0 transition ' + (isFavorited ? 'text-rose-500' : 'text-muted-foreground hover:text-rose-500')}
             >
                 <Heart className={'size-5 ' + (isFavorited ? 'fill-current' : '')} />
             </button>
@@ -741,21 +701,22 @@ function RestaurantCard({
     );
 }
 
-export { RestaurantCard, HoursStatus, availabilityOf, UnavailableOverlay };
+export { availabilityOf, HoursStatus, RestaurantCard, UnavailableOverlay };
 export type { DashboardRestaurant, TodayHours };
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function CustomerHome({ dashboard }: DashboardProps) {
     // Show a brief success modal when landing here from a just-placed order.
-    // The flash is one-shot server-side; we mirror it locally so we can also
-    // auto-dismiss after ~2.5 s (or on user click).
-    const flash = (usePage().props as { flash?: { order_placed?: boolean } }).flash;
+    // The flash carries the new order's uuid (one-shot, server-side) so the
+    // modal can both auto-dismiss after ~2.5 s and link to the tracking page.
+    const flash = (usePage().props as { flash?: { order_placed?: string } }).flash;
     const [orderPlacedOpen, setOrderPlacedOpen] = useState(false);
+    const placedOrderUuid = flash?.order_placed ?? null;
 
     useEffect(() => {
-        if (flash?.order_placed) setOrderPlacedOpen(true);
-    }, [flash?.order_placed]);
+        if (placedOrderUuid) setOrderPlacedOpen(true);
+    }, [placedOrderUuid]);
 
     useEffect(() => {
         if (!orderPlacedOpen) return;
@@ -764,16 +725,13 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
     }, [orderPlacedOpen]);
 
     return (
-        <div className="flex min-h-screen flex-col bg-background">
+        <div className="bg-background flex min-h-screen flex-col">
             <Head title="Home" />
 
             <CustomerHeader />
 
             <main className="flex-1">
-                <ExploreSection
-                    items={dashboard.food_types}
-                    selectedId={dashboard.selected_food_type?.id ?? null}
-                />
+                <ExploreSection items={dashboard.food_types} selectedId={dashboard.selected_food_type?.id ?? null} />
                 {dashboard.using_fallback ? <SetAddressPrompt /> : null}
                 <TopPicksSection picks={dashboard.top_picks} />
                 <CuisinesAndPromoSection />
@@ -787,7 +745,7 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
                 />
             </main>
 
-            <OrderPlacedDialog open={orderPlacedOpen} onClose={() => setOrderPlacedOpen(false)} />
+            <OrderPlacedDialog open={orderPlacedOpen} orderUuid={placedOrderUuid} onClose={() => setOrderPlacedOpen(false)} />
         </div>
     );
 }
@@ -796,7 +754,7 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
  * One-shot success modal shown when the user lands on the dashboard after
  * placing an order. Self-dismisses on a timer in the parent.
  */
-function OrderPlacedDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function OrderPlacedDialog({ open, orderUuid, onClose }: { open: boolean; orderUuid: string | null; onClose: () => void }) {
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[400px]">
@@ -806,8 +764,18 @@ function OrderPlacedDialog({ open, onClose }: { open: boolean; onClose: () => vo
                     </span>
                     <h2 className="text-foreground mt-6 text-xl font-bold">Order Placed Successfully</h2>
                     <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-                        Your order has been confirmed and<br />is being prepared.
+                        Your order has been confirmed and
+                        <br />
+                        is being prepared.
                     </p>
+                    {orderUuid && (
+                        <Link
+                            href={route('customer.orders.show', orderUuid)}
+                            className="bg-primary text-primary-foreground mt-6 w-full rounded-md py-3 text-sm font-semibold transition hover:opacity-90"
+                        >
+                            Track Order
+                        </Link>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>
