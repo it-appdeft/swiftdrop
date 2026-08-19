@@ -91,6 +91,7 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     Route::controller(CustomerProfileController::class)->prefix('profile')->group(function () {
         Route::get('/', 'show');
         Route::get('orders', 'orders');
+        Route::get('order/{order}', 'orderDetail');
         Route::put('/', 'update');
         Route::post('delete/initiate', 'initiateDeletion');
         Route::delete('/', 'deleteAccount');
