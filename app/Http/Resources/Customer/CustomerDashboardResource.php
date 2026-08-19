@@ -16,6 +16,7 @@ class CustomerDashboardResource extends JsonResource
 
         return [
             'food_types' => FoodTypeResource::collection($data->foodTypes)->resolve($request),
+            'banners' => BannerResource::collection($data->banners)->resolve($request),
             'top_picks' => DashboardRestaurantResource::collection($data->topPicks)->resolve($request),
             'restaurants' => DashboardRestaurantResource::collection($data->restaurants)->resolve($request),
             'pagination' => $data->restaurantsMeta,

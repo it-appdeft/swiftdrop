@@ -28,6 +28,8 @@ interface CustomerDashboardServiceInterface
     /** The customer's active delivery address (selected → default → newest). */
     public function selectedAddress(?User $user): ?CustomerAddress;
 
+    /** Retrieve all active banners. */
+    public function banners(): Collection;
     /**
      * First N food items for the Explore strip — no location check.
      *

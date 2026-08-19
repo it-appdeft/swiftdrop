@@ -202,6 +202,15 @@ export interface FoodType {
     updated_at: string;
 }
 
+export interface Banner {
+    id: number;
+    title: string;
+    status: 'active' | 'inactive';
+    image_url: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
 export type UserStatus = 'active' | 'suspended' | 'pending_approval';

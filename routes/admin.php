@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DocumentController;
@@ -71,6 +72,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('coupons/{id}', [CouponController::class, 'update'])->name('coupons.update');
     Route::delete('coupons/{id}', [CouponController::class, 'destroy'])->name('coupons.destroy');
     Route::patch('coupons/{id}/status', [CouponController::class, 'updateStatus'])->name('coupons.status');
+
+    // Banners
+    Route::get('banners', [BannerController::class, 'index'])->name('banners.index');
+    Route::get('banners/create', [BannerController::class, 'create'])->name('banners.create');
+    Route::post('banners', [BannerController::class, 'store'])->name('banners.store');
+    Route::get('banners/{id}/edit', [BannerController::class, 'edit'])->name('banners.edit');
+    Route::put('banners/{id}', [BannerController::class, 'update'])->name('banners.update');
+    Route::delete('banners/{id}', [BannerController::class, 'destroy'])->name('banners.destroy');
+    Route::patch('banners/{id}/status', [BannerController::class, 'updateStatus'])->name('banners.status');
 
     // Food Items
     Route::get('food-types', [FoodTypeController::class, 'index'])->name('food-types.index');

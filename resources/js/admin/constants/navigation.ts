@@ -15,6 +15,7 @@ export const primaryNavigation: NavGroup[] = [
             { title: 'Customers', url: '/admin/customers', icon: Users },
             { title: 'Drivers', url: '/admin/drivers', icon: Car },
             { title: 'Restaurants', url: '/admin/restaurants', icon: Store },
+            { title: 'Banners', url: '/admin/banners', icon: UtensilsCrossed },
             { title: 'Food Types', url: '/admin/food-types', icon: UtensilsCrossed },
             { title: 'Coupons', url: '/admin/coupons', icon: Ticket },
             { title: 'Orders', url: '/admin/orders', icon: ShoppingBag },

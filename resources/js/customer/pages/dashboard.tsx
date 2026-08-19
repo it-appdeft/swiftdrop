@@ -14,6 +14,13 @@ interface FoodType {
     image_url: string | null;
 }
 
+interface Banner {
+    id: number;
+    title: string;
+    status: 'active' | 'inactive';
+    image_url: string | null;
+}
+
 interface TodayHours {
     is_open: boolean;
     open_from: string | null;
@@ -58,6 +65,7 @@ interface RestaurantsMeta {
 interface DashboardProps {
     dashboard: {
         food_types: FoodType[];
+        banners: Banner[];
         top_picks: DashboardRestaurant[];
         restaurants: DashboardRestaurant[];
         pagination: RestaurantsMeta;
@@ -91,25 +99,7 @@ const CUISINES = [
     { label: 'Mexican', image: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=200&h=200&fit=crop' },
     { label: 'Italian', image: 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=200&h=200&fit=crop' },
 ];
-
-const PROMOS = [
-    {
-        title: 'Kooker',
-        subtitle: 'Special Birthday',
-        offer: 'Offer Up To -25%',
-        meta: 'Up To 3 Delivery Promo',
-        accent: 'bg-pink-100',
-        image: 'https://images.unsplash.com/photo-1535141192574-5d4897c12636?w=600&h=600&fit=crop',
-    },
-    {
-        title: 'Kooker',
-        subtitle: 'Special Birthday',
-        offer: 'Offer Up To -25%',
-        meta: 'Up To 3 Delivery Promo',
-        accent: 'bg-amber-100',
-        image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=600&h=600&fit=crop',
-    },
-];
+// ─── Static cuisine data ────────────────────────────────────────────────────
 
 // Sections in the Figma run edge-to-edge with sharp corners and alternate
 // between white and light-gray fills (not rounded cards floating on a gray
@@ -333,39 +323,64 @@ function TopPickCard({ restaurant: r }: { restaurant: DashboardRestaurant }) {
  * not two stacked sections. Keep them grouped here so the visual rhythm
  * matches.
  */
-function CuisinesAndPromoSection() {
+function BannerSection({ banners }: { banners: Banner[] }) {
+    const [current, setCurrent] = useState(0);
+    const maxStart = Math.max(0, banners.length - 2);
+    const previous = () => setCurrent((index) => (index === 0 ? maxStart : index - 1));
+    const next = () => setCurrent((index) => (index >= maxStart ? 0 : index + 1));
+
+    useEffect(() => {
+        if (maxStart === 0) return;
+
+        const timer = window.setInterval(() => {
+            setCurrent((index) => (index >= maxStart ? 0 : index + 1));
+        }, 5000);
+        return () => window.clearInterval(timer);
+    }, [maxStart]);
+
+    if (banners.length === 0) return null;
+
     return (
         <Section tone="white">
-            <SectionHeader title="Explore Cuisines" />
-            {/* <div className="flex gap-7 overflow-x-auto pb-1 sm:gap-8">
-                {CUISINES.map((c, i) => (
-                    <button
-                        key={`${c.label}-${i}`}
-                        type="button"
-                        className="flex shrink-0 flex-col items-center gap-2.5 text-center"
-                    >
-                        <span className="size-20 overflow-hidden rounded-full sm:size-24">
-                            <img src={c.image} alt={c.label} className="h-full w-full object-cover" loading="lazy" />
-                        </span>
-                        <span className="text-sm font-medium">{c.label}</span>
-                    </button>
-                ))}
-            </div> */}
-
-            <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                {PROMOS.map((p, i) => (
-                    <div key={i} className={`relative flex h-56 items-center overflow-hidden ${p.accent} px-8 sm:h-64`}>
-                        <div className="relative z-10 flex max-w-[55%] flex-col justify-between">
-                            <div>
-                                <p className="text-foreground text-2xl font-bold">{p.title}</p>
-                                <p className="text-foreground/80 mt-2 text-base font-medium">{p.subtitle}</p>
-                                <p className="text-foreground/80 text-base font-medium">{p.offer}</p>
-                            </div>
-                            <p className="text-foreground/70 mt-8 text-sm font-medium">{p.meta}</p>
+            <div className="relative overflow-hidden">
+                <div
+                    className="flex transition-transform duration-1000 ease-in-out"
+                    style={{ transform: `translateX(-${current * 50}%)` }}
+                >
+                    {banners.map((banner) => (
+                        <div key={banner.id} className="w-1/2 shrink-0 px-2 first:pl-0 last:pr-0">
+                            {banner.image_url ? (
+                                <img
+                                    src={banner.image_url}
+                                    alt={banner.title}
+                                    className="h-56 w-full object-cover sm:h-72"
+                                    loading="lazy"
+                                />
+                            ) : null}
                         </div>
-                        <img src={p.image} alt="" className="absolute top-0 right-0 h-full w-1/2 object-cover" loading="lazy" />
-                    </div>
-                ))}
+                    ))}
+                </div>
+
+                {banners.length > 1 ? (
+                    <>
+                        <button
+                            type="button"
+                            aria-label="Previous banner"
+                            onClick={previous}
+                            className="absolute top-1/2 left-3 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition hover:bg-black/65"
+                        >
+                            <ChevronLeft className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            aria-label="Next banner"
+                            onClick={next}
+                            className="absolute top-1/2 right-3 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white transition hover:bg-black/65"
+                        >
+                            <ChevronRight className="size-4" />
+                        </button>
+                    </>
+                ) : null}
             </div>
         </Section>
     );
@@ -734,7 +749,7 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
                 <ExploreSection items={dashboard.food_types} selectedId={dashboard.selected_food_type?.id ?? null} />
                 {dashboard.using_fallback ? <SetAddressPrompt /> : null}
                 <TopPicksSection picks={dashboard.top_picks} />
-                <CuisinesAndPromoSection />
+                <BannerSection banners={dashboard.banners} />
                 <AllRestaurantsSection
                     initialRestaurants={dashboard.restaurants}
                     initialMeta={dashboard.pagination}

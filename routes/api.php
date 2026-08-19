@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     // Home screen — four granular endpoints (the app composes these instead of
     // one combined dashboard payload): profile (selected address), food-types,
     // top-picks and restaurants (paginated, below).
+    Route::get('banners', [CustomerDashboardController::class, 'banners']);
     Route::get('food-types', [CustomerDashboardController::class, 'foodTypes']);
     Route::get('top-picks', [CustomerDashboardController::class, 'topPicks']);
 
