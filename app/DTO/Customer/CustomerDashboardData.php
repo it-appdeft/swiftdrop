@@ -3,6 +3,7 @@
 namespace App\DTO\Customer;
 
 use App\Models\CustomerAddress;
+use App\Models\Banner;
 use App\Models\FoodType;
 use Illuminate\Support\Collection;
 
@@ -15,12 +16,14 @@ class CustomerDashboardData
 {
     /**
      * @param  Collection<int, FoodType>  $foodTypes   First 20, no location check.
+    * @param  Collection<int, Banner>  $banners   Active customer-facing banners.
      * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float, is_favorited: bool}>  $topPicks     5 bookable + near + high-rated.
      * @param  Collection<int, array{restaurant: \App\Models\Restaurant, distance_miles: ?float, is_favorited: bool}>  $restaurants  Paginated page.
      * @param  array<string, mixed>  $restaurantsMeta  Pagination meta (incl. links) for the restaurants list.
      */
     public function __construct(
         public readonly Collection $foodTypes,
+        public readonly Collection $banners,
         public readonly Collection $topPicks,
         public readonly Collection $restaurants,
         public readonly ?CustomerAddress $address,

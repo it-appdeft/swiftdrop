@@ -5,6 +5,7 @@ namespace App\Services\Customer;
 use App\Contracts\Customer\CustomerDashboardServiceInterface;
 use App\Contracts\Customer\CustomerFavoriteServiceInterface;
 use App\DTO\Customer\CustomerDashboardData;
+use App\Models\Banner;
 use App\Models\CustomerAddress;
 use App\Models\FoodType;
 use App\Models\Restaurant;
@@ -66,6 +67,7 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
 
         return new CustomerDashboardData(
             foodTypes: $this->foodTypes(),
+            banners: $this->banners(),
             topPicks: $this->topPicks($user, foodTypeId: $foodTypeId),
             restaurants: $restaurants,
             address: $address,
@@ -80,6 +82,16 @@ class CustomerDashboardService implements CustomerDashboardServiceInterface
     public function selectedAddress(?User $user): ?CustomerAddress
     {
         return $this->defaultAddressFor($user);
+    }
+
+    /** Retrieve all active banners with their stored image attachments. */
+    public function banners(): Collection
+    {
+        return Banner::query()
+            ->where('status', 'active')
+            ->with('uploads')
+            ->orderByDesc('created_at')
+            ->get();
     }
 
     /**

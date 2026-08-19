@@ -1,0 +1,249 @@
+import { Head, Link, router } from '@inertiajs/react';
+import { Image, ImageOff, MoreHorizontal, Plus, Search } from 'lucide-react';
+import { useCallback, useState } from 'react';
+
+import { PageContainer } from '@/components/layout/page-container';
+import { PageHeader } from '@/components/layout/page-header';
+import { DataTable, type DataTableColumn } from '@/components/shared/data-table';
+import { EmptyState } from '@/components/shared/empty-state';
+import { SectionHeading } from '@/components/shared/section-heading';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
+import type { BreadcrumbItem } from '@/types';
+import type { Banner, Paginated } from '@/types/admin';
+import { formatRelative, decodePaginationLabel } from '@/utils/format';
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Admin', href: '/admin/dashboard' },
+    { title: 'Banners', href: '/admin/banners' },
+];
+
+interface Props {
+    items: Paginated<Banner>;
+    filters: { search?: string };
+}
+
+export default function BannersIndex({ items, filters }: Props) {
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [confirm, setConfirm] = useState<Banner | null>(null);
+    const [deleting, setDeleting] = useState(false);
+
+    const applyFilters = useCallback(
+        (overrides: Record<string, string>) => {
+            router.get('/admin/banners', { search, ...overrides }, { preserveState: true, replace: true });
+        },
+        [search],
+    );
+
+    const handleDelete = () => {
+        if (!confirm) return;
+        setDeleting(true);
+        router.delete(`/admin/banners/${confirm.id}`, {
+            preserveScroll: true,
+            onFinish: () => {
+                setDeleting(false);
+                setConfirm(null);
+            },
+        });
+    };
+
+    const toggleStatus = (row: Banner) => {
+        router.patch(
+            `/admin/banners/${row.id}/status`,
+            { status: row.status === 'active' ? 'inactive' : 'active' },
+            { preserveScroll: true },
+        );
+    };
+
+    const columns: DataTableColumn<Banner>[] = [
+        {
+            id: 'image',
+            header: 'Image',
+            width: '88px',
+            cell: (row) =>
+                row.image_url ? (
+                    <img
+                        src={row.image_url}
+                        alt={row.title}
+                        className="size-12 rounded-md border border-border/60 object-cover"
+                    />
+                ) : (
+                    <div className="flex size-12 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground">
+                        <ImageOff className="size-4" />
+                    </div>
+                ),
+        },
+        {
+            id: 'title',
+            header: 'Title',
+            cell: (row) => <span className="text-sm font-medium">{row.title}</span>,
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            cell: (row) => (
+                <Badge
+                    variant={row.status === 'active' ? 'success' : 'danger'}
+                    dot
+                    className="w-fit justify-start"
+                >
+                    {row.status === 'active' ? 'Active' : 'Inactive'}
+                </Badge>
+            ),
+        },
+        {
+            id: 'created',
+            header: 'Created',
+            align: 'right',
+            cell: (row) => <span className="text-sm text-muted-foreground">{formatRelative(row.created_at)}</span>,
+        },
+        {
+            id: 'actions',
+            header: '',
+            align: 'right',
+            width: '48px',
+            cell: (row) => (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon-sm" aria-label="Row actions">
+                            <MoreHorizontal />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                            <Link href={`/admin/banners/${row.id}/edit`}>Edit</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => toggleStatus(row)}>
+                            {row.status === 'active' ? 'Deactivate' : 'Activate'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                setConfirm(row);
+                            }}
+                        >
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            ),
+        },
+    ];
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Banners" />
+
+            <PageContainer>
+                <PageHeader
+                    eyebrow="Admin"
+                    title="Banners"
+                    description="Manage the banners shown to customers."
+                    actions={
+                        <Button size="sm" leftIcon={<Plus />} asChild>
+                            <Link href="/admin/banners/create">Add item</Link>
+                        </Button>
+                    }
+                />
+
+                <section className="mt-2">
+                    <SectionHeading
+                        title="All items"
+                        description={`${items.total} item${items.total !== 1 ? 's' : ''} total`}
+                    />
+
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by title…"
+                                className="pl-9"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && applyFilters({ search })}
+                            />
+                        </div>
+                    </div>
+
+                    <DataTable<Banner>
+                        data={items.data}
+                        columns={columns}
+                        rowKey={(row) => row.id}
+                        empty={
+                            <EmptyState
+                                icon={<Image />}
+                                title="No banners yet"
+                                description="Add your first banner to get started."
+                                action={
+                                    <Button leftIcon={<Plus />} asChild>
+                                        <Link href="/admin/banners/create">Add item</Link>
+                                    </Button>
+                                }
+                            />
+                        }
+                        footer={
+                            items.last_page > 1 ? (
+                                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                    <span>
+                                        Showing {items.from}–{items.to} of {items.total}
+                                    </span>
+                                    <div className="flex gap-1">
+                                        {items.links.map((link, i) => (
+                                            <Button
+                                                key={i}
+                                                size="xs"
+                                                variant={link.active ? 'default' : 'outline'}
+                                                disabled={!link.url}
+                                                onClick={() => link.url && router.visit(link.url, { preserveState: true })}
+                                            >
+                                                {decodePaginationLabel(link.label)}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null
+                        }
+                    />
+                </section>
+            </PageContainer>
+
+            <Dialog open={!!confirm} onOpenChange={(open) => !open && setConfirm(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete banner?</DialogTitle>
+                        <DialogDescription>
+                            This will permanently remove <strong>{confirm?.title}</strong> and its image. This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfirm(null)} disabled={deleting}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleDelete} loading={deleting}>
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </AppLayout>
+    );
+}

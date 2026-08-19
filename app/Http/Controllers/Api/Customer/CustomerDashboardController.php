@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Customer;
 use App\Contracts\Customer\CustomerDashboardServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\Discovery\RestaurantDiscoveryRequest;
+use App\Http\Resources\Customer\BannerResource;
 use App\Http\Resources\Customer\DashboardRestaurantResource;
 use App\Http\Resources\Customer\FoodTypeResource;
 use App\Traits\ApiResponse;
@@ -28,6 +29,17 @@ class CustomerDashboardController extends Controller
     public function __construct(
         protected CustomerDashboardServiceInterface $dashboard,
     ) {
+    }
+
+    /** Retrieve banners for the home screen. */
+    public function banners(Request $request): JsonResponse
+    {
+        $banners = $this->dashboard->banners();
+
+        return $this->success(
+            data: BannerResource::collection($banners)->resolve($request),
+            message: 'Banners retrieved.',
+        );
     }
 
     /** First 20 food items (Explore strip) — no location check. */
