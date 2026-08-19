@@ -79,6 +79,26 @@ class CustomerProfileController extends Controller
         );
     }
 
+    public function orderDetail(Order $order): JsonResponse
+    {
+        $order->load([
+            'restaurant',
+            'address',
+            'items.menuItem',
+            'items.modifiers',
+            'delivery',
+            'review',
+            'payment',
+        ]);
+
+        return $this->success(
+            data: [
+                'order' => $order,
+            ],
+            message: 'Order detail.',
+        );
+    }
+
     public function update(UpdateProfileRequest $request): JsonResponse
     {
         $user = auth('sanctum')->user();
