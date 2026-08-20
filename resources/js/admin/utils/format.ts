@@ -45,7 +45,7 @@ export const formatRelative = (value: Date | string) => {
         [Number.POSITIVE_INFINITY, 'year'],
     ];
 
-    let elapsed = diff;
+    const elapsed = diff;
     for (const [limit, unit] of ranges) {
         if (Math.abs(elapsed) < limit) {
             const divisor = unit === 'second' ? 1 : unit === 'minute' ? 60 : unit === 'hour' ? 3600 : unit === 'day' ? 86400 : unit === 'week' ? 604800 : unit === 'month' ? 2629800 : 31557600;
