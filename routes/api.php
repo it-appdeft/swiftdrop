@@ -81,6 +81,9 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     // persistent "active order" bar; usable from any screen, poll-based.
     Route::get('orders/active', [ActiveOrderController::class, 'index']);
 
+    // Fetch the list of cancellation reasons (for the cancel dialog)
+    Route::get('order/cancel-options', [OrderTrackingController::class, 'cancelOptions']);
+
     // Post-checkout tracking — `status` is polled every 5s by the client
     // instead of a realtime channel; `cancel` only succeeds while the order
     // is still unaccepted (see Order::isCancellable()).

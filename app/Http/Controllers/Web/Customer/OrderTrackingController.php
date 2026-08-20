@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Customer;
 
 use App\Contracts\Customer\OrderTrackingServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Models\OrderCancellationOption;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,6 +29,7 @@ class OrderTrackingController extends Controller
     {
         return Inertia::render('customer/orders/track', [
             'tracking' => $this->tracking->status(Auth::user(), $order),
+            'reasons' => OrderCancellationOption::query()->pluck('name')->toArray(),
         ]);
     }
 

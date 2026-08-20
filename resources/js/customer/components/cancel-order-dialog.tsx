@@ -15,11 +15,13 @@ export function CancelOrderDialog({
     onCancel,
     onConfirm,
     busy = false,
+    reasons = REASONS,
 }: {
     open: boolean;
     onCancel: () => void;
     onConfirm: (reason: string) => void;
     busy?: boolean;
+    reasons?: string[];
 }) {
     const [selected, setSelected] = useState<string | null>(null);
     const [otherText, setOtherText] = useState('');
@@ -47,7 +49,7 @@ export function CancelOrderDialog({
                 </DialogHeader>
 
                 <div className="mt-2 divide-y divide-zinc-100 overflow-hidden rounded-xl border border-zinc-100">
-                    {REASONS.map((r) => (
+                    {reasons.map((r) => (
                         <button
                             key={r}
                             type="button"

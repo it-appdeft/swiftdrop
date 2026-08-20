@@ -92,7 +92,7 @@ function csrfToken(): string {
     return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
 }
 
-export default function OrderTrack({ tracking }: { tracking: TrackingPayload }) {
+export default function OrderTrack({ tracking, reasons }: { tracking: TrackingPayload; reasons: string[] }) {
     const [data, setData] = useState<TrackingPayload>(tracking);
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelling, setCancelling] = useState(false);
@@ -307,7 +307,7 @@ export default function OrderTrack({ tracking }: { tracking: TrackingPayload }) 
                 </div>
             </main>
 
-            <CancelOrderDialog open={cancelOpen} onCancel={() => setCancelOpen(false)} onConfirm={handleCancel} busy={cancelling} />
+            <CancelOrderDialog open={cancelOpen} onCancel={() => setCancelOpen(false)} onConfirm={handleCancel} busy={cancelling} reasons={reasons} />
         </div>
     );
 }
