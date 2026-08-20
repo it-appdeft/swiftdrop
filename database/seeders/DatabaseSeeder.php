@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             FoodTypeSeeder::class,
             BannerSeeder::class,
             MenuAndModifierSeeder::class,
+            OrderCancellationOptionSeeder::class,
         ]);
     }
 }
