@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Customer;
 
 use App\Contracts\Customer\OrderTrackingServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Models\OrderCancellationOption;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,6 +42,14 @@ class OrderTrackingController extends Controller
         return $this->success(
             data: $this->tracking->cancel($request->user(), $order, $reason),
             message: 'Order cancelled.',
+        );
+    }
+
+    public function cancelOptions(): JsonResponse
+    {
+        return $this->success(
+            data: OrderCancellationOption::query()->pluck('name')->toArray(),
+            message: 'Order cancellation options retrieved.',
         );
     }
 }
