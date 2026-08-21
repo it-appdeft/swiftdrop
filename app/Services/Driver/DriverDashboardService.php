@@ -36,6 +36,11 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             ->whereDate('delivered_at', $today)
             ->count();
 
+        $activeDelivery = $profile->deliveries()
+            ->whereIn('status', ['assigned', 'picked_up'])
+            ->latest('id')
+            ->first();
+
         return [
             'availability' => $profile->availability,
             'is_online' => $profile->availability === 'online',
@@ -50,6 +55,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
                 'currency' => 'GBP',
             ],
             'deliveries_today' => $deliveriesToday,
+            'active_delivery' => $activeDelivery,
             'time_online_minutes' => $this->minutesOnline($profile),
             // Admin-tunable countdown the request card shows before the offer
             // rolls to the next driver.
