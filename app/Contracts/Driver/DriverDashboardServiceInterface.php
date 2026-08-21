@@ -45,4 +45,6 @@ interface DriverDashboardServiceInterface
      * releases it so it can be offered to the next driver.
      */
     public function respondToDelivery(User $user, int $deliveryId, string $action): Delivery;
+
+    public function getDeliveryTracking(User $user, int $deliveryId): array;
 }

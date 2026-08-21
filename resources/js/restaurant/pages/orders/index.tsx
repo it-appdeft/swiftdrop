@@ -120,8 +120,12 @@ function itemsSummary(items: OrderItem[]): string {
     return items.map((i) => `${i.name}×${i.qty}`).join(', ');
 }
 
-function StatusBadge({ status }: { status: OrderStatus }) {
-    const meta = STATUS_META[status];
+function StatusBadge({ status }: { status: string }) {
+    const meta = STATUS_META[status as OrderStatus] ?? {
+        label: status.replaceAll('_', ' '),
+        chipClass: 'bg-zinc-100 text-zinc-700',
+        tabLabel: status,
+    };
     return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${meta.chipClass}`}>{meta.label}</span>;
 }
 
