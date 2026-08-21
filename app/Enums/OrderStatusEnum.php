@@ -8,6 +8,8 @@ enum OrderStatusEnum: string
     case ACCEPTED = 'accepted';
     case REJECTED = 'rejected';
     case PREPARING = 'preparing';
+    case REACHED_RESTAURANT = 'reached_restaurant';
+    case DRIVER_ASSIGNED = 'driver_assigned';
     case READY_FOR_PICKUP = 'ready_for_pickup';
     case OUT_FOR_DELIVERY = 'out_for_delivery';
     case DELIVERED = 'delivered';
@@ -19,6 +21,8 @@ enum OrderStatusEnum: string
             self::PLACED => 'new',
             self::ACCEPTED,
             self::PREPARING => 'preparing',
+            self::REACHED_RESTAURANT => 'reached_restaurant',
+            self::DRIVER_ASSIGNED => 'driver_assigned',
             self::READY_FOR_PICKUP => 'ready',
             self::OUT_FOR_DELIVERY => 'out_for_delivery',
             self::DELIVERED => 'completed',
