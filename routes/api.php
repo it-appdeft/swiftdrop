@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\LegalContentController;
 use App\Http\Controllers\Api\SupportTicketController;
 use App\Http\Controllers\Api\Driver\DriverDashboardController;
 use App\Http\Controllers\Api\Driver\DriverProfileController;
+use App\Http\Controllers\Api\Driver\OrderStatusController;
 use App\Http\Controllers\Api\VehicleTypeController;
 use Illuminate\Support\Facades\Route;
 
@@ -130,6 +131,8 @@ Route::middleware('auth:sanctum')->prefix('driver')->group(function () {
         Route::get('deliveries/{delivery}/tracking', 'tracking')->whereNumber('delivery');
     });
 
+    Route::controller(OrderStatusController::class)->group(function () {
+        Route::post('deliveries/{delivery}/status', 'statusUpdate')->whereNumber('delivery');
     });
 
     Route::controller(DriverProfileController::class)->prefix('profile')->group(function () {
