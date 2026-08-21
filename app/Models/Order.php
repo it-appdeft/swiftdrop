@@ -33,6 +33,7 @@ class Order extends Model
         'cancellation_reason',
         'cancelled_by',
         'delivery_code',
+        'pick_up_code',
         'placed_at',
         'accepted_at',
         'preparing_at',

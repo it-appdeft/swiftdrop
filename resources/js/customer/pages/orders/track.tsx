@@ -7,7 +7,17 @@ import { CustomerHeader } from '../../components/customer-header';
 
 // ─── Server-supplied types (see OrderTrackingService::payload()) ──────────────
 
-type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'rejected';
+type OrderStatus =
+    | 'placed'
+    | 'accepted'
+    | 'preparing'
+    | 'reached_restaurant'
+    | 'driver_assigned'
+    | 'ready_for_pickup'
+    | 'out_for_delivery'
+    | 'delivered'
+    | 'cancelled'
+    | 'rejected';
 
 interface TrackingOrder {
     uuid: string;
@@ -49,7 +59,7 @@ interface TrackingItem {
 }
 
 interface TrackingDelivery {
-    status: 'pending_assignment' | 'assigned' | 'picked_up' | 'delivered' | 'failed';
+    status: 'pending_assignment' | 'assigned' | 'driver_assigned' | 'reached_restaurant' | 'picked_up' | 'delivered' | 'failed';
     eta_minutes: number | null;
     driver: { name: string; photo: string | null } | null;
 }
@@ -70,6 +80,8 @@ const STATUS_META: Record<OrderStatus, { label: string; caption: string; barPct:
     placed: { label: 'Awaiting Confirmation', caption: 'The restaurant is reviewing your order.', barPct: 10, tone: 'live' },
     accepted: { label: 'Order Placed', caption: 'The restaurant has accepted your order.', barPct: 25, tone: 'live' },
     preparing: { label: 'Preparing Your Order', caption: 'Your food is being prepared.', barPct: 45, tone: 'live' },
+    reached_restaurant: { label: 'Preparing Your Order', caption: 'Your delivery partner is at the restaurant.', barPct: 55, tone: 'live' },
+    driver_assigned: { label: 'Driver Assigned', caption: 'A delivery partner is assigned to your order.', barPct: 60, tone: 'live' },
     ready_for_pickup: { label: 'Assigning Delivery Partner', caption: 'Looking for a nearby driver.', barPct: 60, tone: 'live' },
     out_for_delivery: { label: 'Out For Delivery', caption: 'Your order is on the way.', barPct: 85, tone: 'live' },
     delivered: { label: 'Order Delivered', caption: 'Hope you enjoy your meal!', barPct: 100, tone: 'done' },
@@ -80,6 +92,8 @@ const STATUS_META: Record<OrderStatus, { label: string; caption: string; barPct:
 const DELIVERY_CAPTION: Record<TrackingDelivery['status'], string> = {
     pending_assignment: 'Looking for a nearby driver.',
     assigned: 'Your driver is heading to the restaurant.',
+    driver_assigned: 'Your driver has been assigned to your order.',
+    reached_restaurant: 'Your driver has arrived at the restaurant.',
     picked_up: 'Your driver has picked up your order.',
     delivered: 'Delivered.',
     failed: 'We ran into a problem delivering this order.',
@@ -157,7 +171,12 @@ export default function OrderTrack({ tracking, reasons }: { tracking: TrackingPa
         }
     };
 
-    const meta = STATUS_META[data.order.status];
+    const meta = STATUS_META[data.order.status] ?? {
+        label: 'Order In Progress',
+        caption: 'Your order is being processed.',
+        barPct: 50,
+        tone: 'live' as const,
+    };
     const banner = meta.tone === 'cancelled' ? 'bg-rose-600' : meta.tone === 'done' ? 'bg-emerald-600' : 'bg-emerald-600';
     const caption = data.delivery && data.order.status === 'out_for_delivery' ? DELIVERY_CAPTION[data.delivery.status] : meta.caption;
 

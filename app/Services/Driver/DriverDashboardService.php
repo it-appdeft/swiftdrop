@@ -74,6 +74,9 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             ->where('status', 'pending_assignment')
             ->whereNull('driver_id')
             ->with(['order.restaurant.uploads', 'order.address'])
+            ->whereHas('order', function ($query) {
+                $query->where('placed_at', '>=', Carbon::now()->subMinutes(10));
+            })
             ->latest('id')
             ->get()
             // Only offer a delivery to drivers within the admin-tunable radius of
@@ -176,10 +179,11 @@ class DriverDashboardService implements DriverDashboardServiceInterface
         $order = $delivery->order;
         $order->forceFill([
             'delivery_code' => (string) random_int(1000, 9999),
-            'status' => OrderStatusEnum::OUT_FOR_DELIVERY,
+            'status' => OrderStatusEnum::DRIVER_ASSIGNED,
+            'pick_up_code' => (string) random_int(1000, 9999)
         ])->save();
         $order->statusHistories()->create([
-            'status' => OrderStatusEnum::OUT_FOR_DELIVERY,
+            'status' => OrderStatusEnum::DRIVER_ASSIGNED,
             'updated_by' => $profile->user_id,
         ]);
 
