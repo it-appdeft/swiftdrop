@@ -95,4 +95,17 @@ class DriverDashboardController extends Controller
             message: $request->action() === 'accept' ? 'Delivery accepted.' : 'Delivery rejected.',
         );
     }
+
+    public function tracking(int $delivery): JsonResponse
+    {
+        $tracking = $this->dashboard->getDeliveryTracking(
+            auth('sanctum')->user(),
+            $delivery,
+        );
+
+        return $this->success(
+            data: $tracking,
+            message: 'Delivery tracking retrieved.',
+        );
+    }
 }

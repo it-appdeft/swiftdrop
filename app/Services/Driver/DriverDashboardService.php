@@ -152,6 +152,43 @@ class DriverDashboardService implements DriverDashboardServiceInterface
         });
     }
 
+    public function getDeliveryTracking(User $user, int $deliveryId): array
+    {
+        $profile = $this->profileOrFail($user);
+
+        /** @var Delivery|null $delivery */
+        $delivery = Delivery::query()
+            ->with(['order.restaurant.uploads', 'order.address'])
+            ->where('driver_id', $profile->id)
+            ->find($deliveryId);
+
+        if (! $delivery) {
+            throw ResourceNotFoundException::for('Delivery', 'delivery');
+        }
+
+        return [
+            'delivery_id' => $delivery->id,
+            'status' => $delivery->status,
+            'order' => [
+                'id' => $delivery->order->id,
+                'placed_at' => optional($delivery->order->placed_at ?? $delivery->order->created_at)->toIso8601String(),
+                'status' => $delivery->order->status->boardStatus(),
+                'restaurant' => [
+                    'name' => $delivery->order->restaurant?->name,
+                    'address' => $delivery->order->restaurant?->address,
+                    'lat' => $delivery->order->restaurant?->lat !== null ? (float) $delivery->order->restaurant?->lat : null,
+                    'lng' => $delivery->order->restaurant?->lng !== null ? (float) $delivery->order->restaurant?->lng : null,
+                ],
+                'dropoff_address' => [
+                    'line_1' => $delivery->order?->address?->address_line_1,
+                    'line_2' => $delivery->order?->address?->address_line_2,
+                    'city' => $delivery->order?->address?->city,
+                    'postcode' => $delivery->order?->address?->postcode,
+                ],
+            ],
+        ];
+    }
+
     // ─── Internals ──────────────────────────────────────────────────────────
 
     private function acceptDelivery(DriverProfile $profile, Delivery $delivery): Delivery

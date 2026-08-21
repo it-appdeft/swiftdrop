@@ -127,6 +127,9 @@ Route::middleware('auth:sanctum')->prefix('driver')->group(function () {
         Route::post('availability', 'toggleAvailability');
         Route::post('location', 'updateLocation');
         Route::post('deliveries/{delivery}/respond', 'respondToDelivery')->whereNumber('delivery');
+        Route::get('deliveries/{delivery}/tracking', 'tracking')->whereNumber('delivery');
+    });
+
     });
 
     Route::controller(DriverProfileController::class)->prefix('profile')->group(function () {
