@@ -47,4 +47,6 @@ interface DriverDashboardServiceInterface
     public function respondToDelivery(User $user, int $deliveryId, string $action): Delivery;
 
     public function getDeliveryTracking(User $user, int $deliveryId): array;
+
+    public function getActiveOrder(User $user): array;
 }

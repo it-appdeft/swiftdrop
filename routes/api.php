@@ -129,6 +129,7 @@ Route::middleware('auth:sanctum')->prefix('driver')->group(function () {
         Route::post('location', 'updateLocation');
         Route::post('deliveries/{delivery}/respond', 'respondToDelivery')->whereNumber('delivery');
         Route::get('deliveries/{delivery}/tracking', 'tracking')->whereNumber('delivery');
+        Route::get('deliveries/current-active', 'currentActive')->whereNumber('delivery');
     });
 
     Route::controller(OrderStatusController::class)->group(function () {

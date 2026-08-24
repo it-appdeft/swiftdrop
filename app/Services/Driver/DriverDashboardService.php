@@ -36,11 +36,6 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             ->whereDate('delivered_at', $today)
             ->count();
 
-        $activeDelivery = $profile->deliveries()
-            ->whereIn('status', ['assigned', 'picked_up'])
-            ->latest('id')
-            ->first();
-
         return [
             'availability' => $profile->availability,
             'is_online' => $profile->availability === 'online',
@@ -55,7 +50,6 @@ class DriverDashboardService implements DriverDashboardServiceInterface
                 'currency' => 'GBP',
             ],
             'deliveries_today' => $deliveriesToday,
-            'active_delivery' => $activeDelivery,
             'time_online_minutes' => $this->minutesOnline($profile),
             // Admin-tunable countdown the request card shows before the offer
             // rolls to the next driver.
@@ -242,6 +236,26 @@ class DriverDashboardService implements DriverDashboardServiceInterface
         }
 
         return $delivery;
+    }
+
+    public function getActiveOrder(User $user): array
+    {
+        $profile = $this->profileOrFail($user);
+
+        $delivery = Delivery::query()
+            ->where('driver_id', $profile->id)
+            ->whereIn('status',['assigned','picked_up'])
+            ->latest()->first();
+
+        if (! $delivery) {
+            throw ResourceNotFoundException::for('Delivery', 'delivery');
+        }
+
+        return [
+            'delivery_id' => $delivery->id,
+            'order_id' => $delivery->order_id,
+            'status' => $delivery->status,
+        ];
     }
 
     /**
