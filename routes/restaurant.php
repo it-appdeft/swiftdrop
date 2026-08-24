@@ -20,6 +20,8 @@ Route::middleware(['auth', 'restaurant', 'restaurant.onboarded'])
             ->whereUuid('order')->name('orders.accept');
         Route::patch('orders/{order}/reject', [OrderController::class, 'reject'])
             ->whereUuid('order')->name('orders.reject');
+        Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])
+            ->whereUuid('order')->name('orders.status');
 
         // Support — contact channels + "Raise a ticket" form.
         Route::get('support', [SupportController::class, 'index'])->name('support');

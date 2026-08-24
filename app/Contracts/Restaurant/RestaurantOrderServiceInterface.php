@@ -19,4 +19,10 @@ interface RestaurantOrderServiceInterface
 
     /** Reject a newly-placed order — the customer sees it as cancelled. */
     public function reject(Restaurant $restaurant, string $uuid, ?string $reason = null): Order;
+
+    /**
+     * The kitchen side of the status progression — `status` is 'preparing'
+     * or 'ready_for_pickup'.
+     */
+    public function updateStatus(Restaurant $restaurant, string $uuid, string $status): Order;
 }

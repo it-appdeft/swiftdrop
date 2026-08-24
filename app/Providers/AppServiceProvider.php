@@ -104,6 +104,14 @@ class AppServiceProvider extends ServiceProvider
             \App\Services\Driver\DriverDashboardService::class,
         );
         $this->app->bind(
+            \App\Contracts\Driver\OrderStatusServiceInterface::class,
+            \App\Services\Driver\OrderStatusService::class,
+        );
+        $this->app->bind(
+            \App\Contracts\Order\OrderStatusTransitionServiceInterface::class,
+            \App\Services\Order\OrderStatusTransitionService::class,
+        );
+        $this->app->bind(
             \App\Contracts\Restaurant\RestaurantOrderServiceInterface::class,
             \App\Services\Restaurant\RestaurantOrderService::class,
         );

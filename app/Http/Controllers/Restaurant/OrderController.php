@@ -40,6 +40,8 @@ class OrderController extends Controller
                     'items.modifiers',
                     'items.menuItem:id,is_veg',
                     'items.menuItem.uploads' => fn ($q) => $q->where('collection', 'image'),
+                    'delivery.driver.user:id,mobile,country_code',
+                    'statusHistories' => fn ($q) => $q->oldest('id'),
                 ]) : collect();
 
         if ($request->filled('status')) {
@@ -134,9 +136,43 @@ class OrderController extends Controller
             'total'       => (float) $order->total,
             'payment'     => $order->payment?->method === 'cod' ? 'cod' : 'prepaid',
             'status'      => $order->status->boardStatus(),
+            // The underlying enum value — mostly for display/debugging now.
+            // Button gating below uses preparingAt/readyAt instead, since
+            // `status` can race ahead to driver_assigned (or further) before
+            // the kitchen has clicked through its own steps — the two tracks
+            // run independently (see OrderStatusTransitionService).
+            'rawStatus'   => $order->status->value,
             'placedAt'    => optional($order->placed_at ?? $order->created_at)->toIso8601String(),
             'note'        => $order->special_instructions,
+            // Handed to the driver on collection; only set once a driver has
+            // accepted the delivery (see DriverDashboardService::acceptDelivery()).
+            'pickUpCode'  => $order->pick_up_code,
+            // Kitchen's own progress, independent of the driver track — these
+            // gate the "Start preparing" / "Mark ready" actions.
+            'preparingAt' => optional($order->preparing_at)->toIso8601String(),
+            'readyAt'     => optional($order->ready_at)->toIso8601String(),
+            'driver'      => $this->formatDriver($order),
+            'history'     => $order->statusHistories->map(fn ($h) => [
+                'status' => $h->status->value,
+                'at'     => $h->created_at->toIso8601String(),
+            ])->all(),
         ])->all();
+    }
+
+    /** Driver assigned to the order's delivery, once one has accepted it. */
+    protected function formatDriver(Order $order): ?array
+    {
+        $driver = $order->delivery?->driver;
+        if ($driver === null) {
+            return null;
+        }
+
+        return [
+            'name'         => trim("{$driver->first_name} {$driver->last_name}") ?: 'Driver',
+            'phone'        => $driver->user?->canonical_mobile,
+            'vehicleType'  => $driver->vehicle_type,
+            'vehicleReg'   => $driver->vehicle_registration,
+        ];
     }
 
     /** One-line delivery address from the order's (nullable) saved address. */
@@ -179,6 +215,28 @@ class OrderController extends Controller
         $this->orders->reject($restaurant, $order, $request->string('reason')->toString() ?: null);
 
         return back()->with('status', 'Order rejected.');
+    }
+
+    /**
+     * The kitchen side of the status progression: preparing, then
+     * ready_for_pickup. out_for_delivery isn't settable here — it's stamped
+     * automatically once the driver's own app confirms pickup (see
+     * AutoAdvanceOrderToOutForDeliveryJob).
+     */
+    public function updateStatus(Request $request, string $order): RedirectResponse
+    {
+        $restaurant = $this->restaurantFor($request->user());
+        abort_unless($restaurant !== null, 403, 'No restaurant profile attached to this account.');
+
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:preparing,ready_for_pickup'],
+        ]);
+
+        $this->orders->updateStatus($restaurant, $order, $validated['status']);
+
+        $message = $validated['status'] === 'preparing' ? 'Order marked preparing.' : 'Order marked ready for pickup.';
+
+        return back()->with('status', $message);
     }
 
     protected function restaurantFor(?User $user): ?Restaurant

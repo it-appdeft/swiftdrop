@@ -3,6 +3,7 @@
 namespace App\Services\Driver;
 
 use App\Contracts\Driver\DriverDashboardServiceInterface;
+use App\Contracts\Order\OrderStatusTransitionServiceInterface;
 use App\Enums\OrderStatusEnum;
 use App\Exceptions\InvalidInputException;
 use App\Exceptions\ResourceNotFoundException;
@@ -19,6 +20,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
 {
     public function __construct(
         protected PlatformConfigService $config,
+        protected OrderStatusTransitionServiceInterface $transitions,
     ) {
     }
 
@@ -210,18 +212,17 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             'assignment_attempts' => $delivery->assignment_attempts + 1,
         ])->save();
 
-        // A driver is now on the order — mint the handover code the customer
-        // reads out on delivery, and move the order into its out-for-delivery
-        // phase (logged to order_status_histories like every other transition).
+        // A driver is now on the order — mint the handover codes (restaurant
+        // pickup + customer delivery) and move the order into its
+        // driver-assigned phase, logged to order_status_histories like every
+        // other transition. Runs in parallel with the kitchen: the restaurant
+        // doesn't have to have clicked preparing/ready_for_pickup yet — see
+        // OrderStatusTransitionService's ALLOWED_FROM['driver_assigned'] and
+        // its catch-up branch for those two milestones arriving "late".
         $order = $delivery->order;
-        $order->forceFill([
+        $this->transitions->transition($order, OrderStatusEnum::DRIVER_ASSIGNED, $profile->user_id, [
             'delivery_code' => (string) random_int(1000, 9999),
-            'status' => OrderStatusEnum::DRIVER_ASSIGNED,
-            'pick_up_code' => (string) random_int(1000, 9999)
-        ])->save();
-        $order->statusHistories()->create([
-            'status' => OrderStatusEnum::DRIVER_ASSIGNED,
-            'updated_by' => $profile->user_id,
+            'pick_up_code' => (string) random_int(1000, 9999),
         ]);
 
         return $delivery;
