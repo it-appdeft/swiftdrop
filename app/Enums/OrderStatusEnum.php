@@ -8,9 +8,10 @@ enum OrderStatusEnum: string
     case ACCEPTED = 'accepted';
     case REJECTED = 'rejected';
     case PREPARING = 'preparing';
-    case REACHED_RESTAURANT = 'reached_restaurant';
-    case DRIVER_ASSIGNED = 'driver_assigned';
     case READY_FOR_PICKUP = 'ready_for_pickup';
+    case DRIVER_ASSIGNED = 'driver_assigned';
+    case REACHED_RESTAURANT = 'reached_restaurant';
+    case PICKED_UP = 'picked_up';
     case OUT_FOR_DELIVERY = 'out_for_delivery';
     case DELIVERED = 'delivered';
     case CANCELLED = 'cancelled';
@@ -24,6 +25,10 @@ enum OrderStatusEnum: string
             self::REACHED_RESTAURANT => 'reached_restaurant',
             self::DRIVER_ASSIGNED => 'driver_assigned',
             self::READY_FOR_PICKUP => 'ready',
+            // Picked up is a transient state — AutoAdvanceOrderToOutForDeliveryJob
+            // flips it to OUT_FOR_DELIVERY ~10s later, so the board treats them
+            // the same in the meantime.
+            self::PICKED_UP,
             self::OUT_FOR_DELIVERY => 'out_for_delivery',
             self::DELIVERED => 'completed',
             self::CANCELLED,

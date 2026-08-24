@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { CheckCircle2, Filter, MapPin, Phone, Printer, Receipt, Search, Volume2, X, XCircle } from 'lucide-react';
+import { CheckCircle2, ChefHat, Filter, MapPin, Package, Phone, Printer, Receipt, Search, Volume2, X, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import AppLayout from '../../layouts/app-layout';
 
@@ -18,6 +18,18 @@ interface OrderItem {
     modifiers?: string[];
 }
 
+interface OrderDriver {
+    name: string;
+    phone?: string | null;
+    vehicleType?: string | null;
+    vehicleReg?: string | null;
+}
+
+interface HistoryEntry {
+    status: string;
+    at: string; // ISO 8601
+}
+
 interface Order {
     id: string;
     reference: string;
@@ -30,8 +42,23 @@ interface Order {
     total: number;
     payment: PaymentMethod;
     status: OrderStatus;
+    // The underlying order status (e.g. 'accepted', 'driver_assigned').
+    // Not used to gate the preparing/ready actions — the driver can be
+    // assigned before the kitchen clicks through its own steps, so this can
+    // race ahead of them. Use preparingAt/readyAt for that instead.
+    rawStatus: string;
     placedAt: string | null; // ISO 8601
     note?: string | null;
+    // Handed to the driver on collection; only set once a driver has
+    // accepted the delivery.
+    pickUpCode?: string | null;
+    driver?: OrderDriver | null;
+    history: HistoryEntry[];
+    // Kitchen's own progress, independent of the driver track — gates
+    // "Start preparing" / "Mark ready". Only out_for_delivery/delivered
+    // depend on the driver.
+    preparingAt: string | null; // ISO 8601
+    readyAt: string | null; // ISO 8601
 }
 
 interface PaginatedOrders {
@@ -91,6 +118,27 @@ const STATUS_META: Record<OrderStatus, { label: string; chipClass: string; tabLa
         tabLabel: 'Cancelled',
     },
 };
+
+// order_status_histories carries the raw order status (e.g. 'driver_assigned',
+// 'reached_restaurant') rather than the board status, so the timeline needs
+// its own, more granular label set.
+const HISTORY_LABELS: Record<string, string> = {
+    placed: 'Order placed',
+    accepted: 'Accepted',
+    rejected: 'Rejected',
+    preparing: 'Preparing',
+    ready_for_pickup: 'Ready for pickup',
+    driver_assigned: 'Driver assigned',
+    reached_restaurant: 'Driver reached restaurant',
+    picked_up: 'Picked up by driver',
+    out_for_delivery: 'Out for delivery',
+    delivered: 'Delivered',
+    cancelled: 'Cancelled',
+};
+
+function historyLabel(status: string): string {
+    return HISTORY_LABELS[status] ?? status.replaceAll('_', ' ');
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -153,17 +201,38 @@ function VegDot({ veg }: { veg?: boolean }) {
 
 function OrderDrawer({ order, commissionRate, onClose }: { order: Order; commissionRate: number; onClose: () => void }) {
     const commission = (order.total * commissionRate) / 100;
-    const [actioning, setActioning] = useState<'accept' | 'reject' | null>(null);
+    const [actioning, setActioning] = useState<'accept' | 'reject' | 'preparing' | 'ready-for-pickup' | null>(null);
 
-    // Accept/Reject just PATCH the order's status straight from the click —
-    // no client-side status juggling. The partial reload refreshes `orders`,
-    // the drawer re-renders with the new status, and this footer disappears
-    // on its own once `order.status` is no longer 'new'.
+    // Whether the kitchen steps (preparing/ready) are still actionable.
+    // They're independent of the driver track (rawStatus can race ahead to
+    // driver_assigned/reached_restaurant/picked_up before the kitchen has
+    // clicked through its own steps) — but once the order has actually left
+    // (out_for_delivery/delivered) or never happened (placed/rejected/
+    // cancelled), there's nothing left to mark.
+    const NOT_KITCHEN_MANAGEABLE = ['placed', 'rejected', 'cancelled', 'out_for_delivery', 'delivered'];
+    const canManageKitchen = !NOT_KITCHEN_MANAGEABLE.includes(order.rawStatus);
+
+    // Accept/Reject PATCH their own named routes. preparing/ready-for-pickup
+    // share a single `orders.status` route (status goes in the body) — no
+    // client-side status juggling either way. The partial reload refreshes
+    // `orders`, the drawer re-renders with the new status, and each footer
+    // disappears on its own once `order.preparingAt`/`readyAt` is set.
+    // out_for_delivery isn't triggered from here — it's stamped
+    // automatically once the driver's app confirms pickup.
     const respond = (action: 'accept' | 'reject') => {
         setActioning(action);
         router.patch(
             route(`restaurant.orders.${action}`, order.id),
             {},
+            { preserveScroll: true, preserveState: true, onFinish: () => setActioning(null) },
+        );
+    };
+
+    const advance = (status: 'preparing' | 'ready-for-pickup') => {
+        setActioning(status);
+        router.patch(
+            route('restaurant.orders.status', order.id),
+            { status: status === 'ready-for-pickup' ? 'ready_for_pickup' : status },
             { preserveScroll: true, preserveState: true, onFinish: () => setActioning(null) },
         );
     };
@@ -285,18 +354,55 @@ function OrderDrawer({ order, commissionRate, onClose }: { order: Order; commiss
                     </div>
                 )}
 
+                {order.driver && (
+                    <section className="border-border space-y-2 border-t px-5 py-4">
+                        <p className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">Driver</p>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-bold">{order.driver.name}</p>
+                                <p className="text-muted-foreground mt-0.5 text-xs">
+                                    {[order.driver.vehicleType, order.driver.vehicleReg].filter(Boolean).join(' · ') || '—'}
+                                </p>
+                            </div>
+                            {order.driver.phone && (
+                                <a
+                                    href={`tel:${order.driver.phone}`}
+                                    className="border-input bg-background hover:border-primary hover:text-primary inline-flex size-9 items-center justify-center rounded-full border"
+                                    aria-label={`Call ${order.driver.name}`}
+                                >
+                                    <Phone className="size-4" />
+                                </a>
+                            )}
+                        </div>
+                    </section>
+                )}
+
+                {order.pickUpCode && (
+                    <section className="border-border space-y-2 border-t px-5 py-4">
+                        <p className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">Hand-over code</p>
+                        <p className="text-muted-foreground text-xs">Check this against the driver's app before you hand the order over.</p>
+                        <p className="text-lg font-bold tracking-[0.3em] tabular-nums">{order.pickUpCode}</p>
+                    </section>
+                )}
+
                 <section className="border-border space-y-2 border-t px-5 py-4">
                     <p className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">Timeline</p>
-                    <div className="flex items-center justify-between text-sm">
-                        <span className="inline-flex items-center gap-2">
-                            <span className="size-1.5 rounded-full bg-emerald-500" />
-                            Order placed
-                        </span>
-                        <span className="text-muted-foreground">Just now</span>
-                    </div>
+                    {order.history.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">No status updates yet.</p>
+                    ) : (
+                        order.history.map((entry, idx) => (
+                            <div key={`${entry.status}-${idx}`} className="flex items-center justify-between text-sm">
+                                <span className="inline-flex items-center gap-2">
+                                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                                    {historyLabel(entry.status)}
+                                </span>
+                                <span className="text-muted-foreground">{timeAgo(entry.at)}</span>
+                            </div>
+                        ))
+                    )}
                 </section>
 
-                {order.status === 'new' && (
+                {order.rawStatus === 'placed' && (
                     <footer className="border-border bg-background sticky bottom-0 mt-auto grid grid-cols-2 gap-2 border-t px-5 py-3">
                         <button
                             type="button"
@@ -315,6 +421,34 @@ function OrderDrawer({ order, commissionRate, onClose }: { order: Order; commiss
                         >
                             <CheckCircle2 className="size-4" />
                             {actioning === 'accept' ? 'Accepting…' : 'Accept'}
+                        </button>
+                    </footer>
+                )}
+
+                {canManageKitchen && !order.preparingAt && (
+                    <footer className="border-border bg-background sticky bottom-0 mt-auto border-t px-5 py-3">
+                        <button
+                            type="button"
+                            onClick={() => advance('preparing')}
+                            disabled={actioning !== null}
+                            className="bg-primary text-primary-foreground inline-flex w-full items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+                        >
+                            <ChefHat className="size-4" />
+                            {actioning === 'preparing' ? 'Starting…' : 'Start preparing'}
+                        </button>
+                    </footer>
+                )}
+
+                {canManageKitchen && order.preparingAt && !order.readyAt && (
+                    <footer className="border-border bg-background sticky bottom-0 mt-auto border-t px-5 py-3">
+                        <button
+                            type="button"
+                            onClick={() => advance('ready-for-pickup')}
+                            disabled={actioning !== null}
+                            className="bg-primary text-primary-foreground inline-flex w-full items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-semibold hover:opacity-90 disabled:opacity-50"
+                        >
+                            <Package className="size-4" />
+                            {actioning === 'ready-for-pickup' ? 'Marking ready…' : 'Mark ready'}
                         </button>
                     </footer>
                 )}
