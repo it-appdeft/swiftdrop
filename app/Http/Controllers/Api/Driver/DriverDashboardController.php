@@ -108,4 +108,16 @@ class DriverDashboardController extends Controller
             message: 'Delivery tracking retrieved.',
         );
     }
+
+    public function currentActive(): JsonResponse
+    {
+        $activeOrder = $this->dashboard->getActiveOrder(
+            auth('sanctum')->user(),
+        );
+
+        return $this->success(
+            data: $activeOrder,
+            message: 'Active Order',
+        );
+    }
 }
