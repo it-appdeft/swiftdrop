@@ -1,10 +1,5 @@
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -23,10 +18,11 @@ import {
     UtensilsCrossed,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { CustomerHeader } from '../components/customer-header';
 import { DishModifierDialog, type ModifierDish, type ModifierGroup } from '../components/dish-modifier-dialog';
 import { RepeatCustomisationDialog, summariseSelection } from '../components/repeat-customisation-dialog';
+import { useActiveOrders } from '../context/active-orders-context';
 
 interface Dish {
     id: number;
@@ -161,8 +157,7 @@ const DESCRIPTION_TRUNCATE = 120;
  *  restaurant's rating (menu_items carry no own rating). */
 const MIN_RATING = 4.0;
 
-const CSRF = (): string =>
-    (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+const CSRF = (): string => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
 
 export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     const r = data.restaurant;
@@ -192,18 +187,12 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     // now that the API rolls its cart lines into the menu payload.
     const repeatLines = repeatDish?.cart_lines ?? [];
 
-
     const [favoriteDishIds, setFavoriteDishIds] = useState<Set<number>>(
-        () =>
-            new Set(
-                [...allCategoryItems, ...data.recommended]
-                    .filter((d) => d.is_favorited)
-                    .map((d) => d.id),
-            ),
+        () => new Set([...allCategoryItems, ...data.recommended].filter((d) => d.is_favorited).map((d) => d.id)),
     );
 
-    const [storeInfoOpen, setStoreInfoOpen] = useState(false);   
-   
+    const [storeInfoOpen, setStoreInfoOpen] = useState(false);
+
     /**
      * Apply the Veg/Non-Veg + Ratings 4.0+ filters server-side — re-runs the
      * detail query from page 1, carrying the keyword + the new filter set.
@@ -239,6 +228,12 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
     // Only reflect the cart on this page when it actually belongs to this
     // restaurant (a cart holds one restaurant at a time).
     const cartIsThisRestaurant = cart.item_count > 0 && cart.restaurant_id === r.id;
+
+    // The floating ActiveOrderBar (app.tsx) sticks to the same bottom-4 spot
+    // as the cart bar below — when the customer already has an order in
+    // flight, shift the cart bar up so both are visible and clickable
+    // instead of one covering the other.
+    const hasActiveOrder = useActiveOrders().length > 0;
 
     // The restaurant as a whole can't take orders — paused (not accepting) or
     // shut by its operating hours. Every dish then behaves like an unavailable
@@ -401,7 +396,12 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
             <Head title={r.name} />
             <CustomerHeader />
 
-            <main className={'mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 sm:py-8 ' + (cartIsThisRestaurant ? 'pb-28' : '')}>
+            <main
+                className={
+                    'mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 sm:py-8 ' +
+                    (cartIsThisRestaurant ? (hasActiveOrder ? 'pb-44' : 'pb-28') : '')
+                }
+            >
                 {restaurantUnavailable ? (
                     <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
                         {!r.is_accepting_orders
@@ -495,7 +495,6 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                 </section>
 
                 {/* "You searched for X" banner — shown when arriving via search */}
-                
 
                 {/* In-restaurant search (now always starts empty so the banner above carries the active query) */}
                 <form
@@ -568,30 +567,26 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                             Results for “{data.keyword}” ({recommended.length})
                         </h2>
                         <div className="mt-2 divide-y divide-zinc-100">{recommended.map((dish) => renderRow(dish, 'rec'))}</div>
-                    <hr className="my-8 border-zinc-200" />
-                    
+                        <hr className="my-8 border-zinc-200" />
                     </section>
                 ) : null}
 
                 {categories.map((category) => (
                     <section key={category.id} className="mt-8">
-                        <h2 className="text-foreground text-lg font-bold">
-                            {category.name}
-                        </h2>
+                        <h2 className="text-foreground text-lg font-bold">{category.name}</h2>
 
-                        <div className="mt-2 divide-y divide-zinc-100">
-                            {category.items.map((dish) =>
-                                renderRow(dish, `cat-${category.id}`)
-                            )}
-                        </div>
+                        <div className="mt-2 divide-y divide-zinc-100">{category.items.map((dish) => renderRow(dish, `cat-${category.id}`))}</div>
                     </section>
                 ))}
             </main>
 
-            {/* Sticky "cart added" bar — floating rounded card above the page edge */}
+            {/* Sticky "cart added" bar — floating rounded card above the page edge.
+                Shifted further up when the ActiveOrderBar (app.tsx) is also
+                floating at bottom-4, so the two stack instead of overlapping —
+                otherwise its higher z-index blocks "View Cart" from being clicked. */}
             {cartIsThisRestaurant ? (
-                <div className="pointer-events-none sticky bottom-4 z-20 px-4 sm:px-6">
-                    <div className="pointer-events-auto mx-auto flex max-w-[1600px] items-center gap-4 rounded-xl bg-emerald-600 px-4 py-3 text-white shadow-lg shadow-emerald-900/20 ring-1 ring-emerald-700/20 sm:px-5">
+                <div className={'pointer-events-none sticky z-20 px-4 sm:px-6 ' + (hasActiveOrder ? 'bottom-24' : 'bottom-4')}>
+                    <div className="pointer-events-auto mx-auto flex max-w-[1600px] items-center gap-4 rounded-xl bg-emerald-600 px-4 py-3 text-white shadow-lg ring-1 shadow-emerald-900/20 ring-emerald-700/20 sm:px-5">
                         <div className="size-11 shrink-0 overflow-hidden rounded-full bg-white/20 ring-2 ring-white/40">
                             {(cart.restaurant?.logo_url ?? r.logo_url) ? (
                                 <img
@@ -621,7 +616,6 @@ export default function CustomerRestaurant({ restaurant: data, cart }: Props) {
                     </div>
                 </div>
             ) : null}
-
 
             {openDish ? (
                 <DishModifierDialog
@@ -747,7 +741,7 @@ function MenuRow({
                 </div>
                 {/* Off-menu dish: shown grayed with no Add control. */}
                 {unavailable ? (
-                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-zinc-300 bg-white px-4 py-1 text-xs font-bold uppercase tracking-wide text-muted-foreground shadow-sm">
+                    <span className="text-muted-foreground absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md border border-zinc-300 bg-white px-4 py-1 text-xs font-bold tracking-wide uppercase shadow-sm">
                         Unavailable
                     </span>
                 ) : quantity === 0 ? (
@@ -836,21 +830,14 @@ function VegBadge({ isVeg }: { isVeg: boolean }) {
 
 /** Store-info modal — matches the design: rating + reviews chip, delivery / distance
  *  tiles, today's hours + a summary row, and an allergy notice card. */
-function StoreInfoDialog({
-    open,
-    onClose,
-    restaurant,
-}: {
-    open: boolean;
-    onClose: () => void;
-    restaurant: RestaurantHeader;
-}) {
+function StoreInfoDialog({ open, onClose, restaurant }: { open: boolean; onClose: () => void; restaurant: RestaurantHeader }) {
     const info = restaurant.store_info;
-    const todayLine = info.today && info.today.is_open && info.today.open_to
-        ? `Open until ${info.today.open_to}`
-        : info.today && !info.today.is_open
-          ? 'Closed today'
-          : 'Hours not available';
+    const todayLine =
+        info.today && info.today.is_open && info.today.open_to
+            ? `Open until ${info.today.open_to}`
+            : info.today && !info.today.is_open
+              ? 'Closed today'
+              : 'Hours not available';
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -863,9 +850,7 @@ function StoreInfoDialog({
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                             <h3 className="text-foreground text-2xl font-bold">{restaurant.name}</h3>
-                            {restaurant.cuisines ? (
-                                <p className="text-muted-foreground mt-1 text-sm">{restaurant.cuisines}</p>
-                            ) : null}
+                            {restaurant.cuisines ? <p className="text-muted-foreground mt-1 text-sm">{restaurant.cuisines}</p> : null}
                         </div>
                         <div className="text-right">
                             {restaurant.rating !== null ? (
@@ -897,9 +882,7 @@ function StoreInfoDialog({
 
                     <div className="bg-muted/40 mt-3 flex items-center justify-between rounded-xl px-3 py-3 text-sm">
                         <span className="text-foreground font-medium">{todayLine}</span>
-                        {info.hours_summary ? (
-                            <span className="text-muted-foreground text-xs">{info.hours_summary}</span>
-                        ) : null}
+                        {info.hours_summary ? <span className="text-muted-foreground text-xs">{info.hours_summary}</span> : null}
                     </div>
 
                     <div className="bg-muted/40 mt-3 rounded-xl p-3">
@@ -909,16 +892,14 @@ function StoreInfoDialog({
                             </span>
                             <div className="min-w-0">
                                 <p className="text-foreground text-sm font-semibold">Allergy requests unavailable</p>
-                                <p className="text-muted-foreground mt-0.5 text-xs">
-                                    This shop can't accommodate in-app food allergy requests.
-                                </p>
+                                <p className="text-muted-foreground mt-0.5 text-xs">This shop can't accommodate in-app food allergy requests.</p>
                             </div>
                         </div>
                     </div>
 
                     <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
-                        SwiftDrop cannot guarantee that any unpackaged products served in shops are allergen-free because shops may use
-                        shared equipment to store, prepare and serve them.
+                        SwiftDrop cannot guarantee that any unpackaged products served in shops are allergen-free because shops may use shared
+                        equipment to store, prepare and serve them.
                     </p>
 
                     {!info.hours_summary && info.hours.length > 0 ? (
@@ -929,9 +910,7 @@ function StoreInfoDialog({
                                     <li key={row.day} className="flex items-center justify-between">
                                         <span className="text-muted-foreground capitalize">{row.day}</span>
                                         <span className="text-foreground tabular-nums">
-                                            {row.is_open && row.open_from && row.open_to
-                                                ? `${row.open_from} – ${row.open_to}`
-                                                : 'Closed'}
+                                            {row.is_open && row.open_from && row.open_to ? `${row.open_from} – ${row.open_to}` : 'Closed'}
                                         </span>
                                     </li>
                                 ))}

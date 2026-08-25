@@ -9,9 +9,11 @@ use App\Exceptions\InvalidInputException;
 use App\Exceptions\ResourceNotFoundException;
 use App\Jobs\AutoAdvanceOrderToOutForDeliveryJob;
 use App\Models\Delivery;
+use App\Models\DriverEarning;
 use App\Models\DriverProfile;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\Platform\PlatformConfigService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -19,6 +21,7 @@ class OrderStatusService implements OrderStatusServiceInterface
 {
     public function __construct(
         protected OrderStatusTransitionServiceInterface $transitions,
+        protected PlatformConfigService $config,
     ) {
     }
 
@@ -80,6 +83,20 @@ class OrderStatusService implements OrderStatusServiceInterface
                 AutoAdvanceOrderToOutForDeliveryJob::dispatch($order->id)->delay(now()->addSeconds(10));
             } elseif (! $alreadyAtStatus && $status === 'delivered') {
                 $delivery->forceFill(['status' => 'delivered', 'delivered_at' => $now])->save();
+
+                // Credit the driver's earnings ledger — the delivery-history
+                // API and the dashboard's "today's earnings" figure both read
+                // from here. firstOrCreate guards a duplicate on any retry.
+                DriverEarning::firstOrCreate(
+                    ['delivery_id' => $delivery->id, 'type' => DriverEarning::TYPE_DELIVERY_FEE],
+                    [
+                        'driver_id' => $profile->id,
+                        'order_id' => $order->id,
+                        'amount' => $this->config->float(PlatformConfigService::KEY_BASE_DELIVERY_FEE, 1.99),
+                        'status' => DriverEarning::STATUS_PENDING,
+                        'earned_at' => $now,
+                    ],
+                );
             }
 
             return $delivery->fresh('order');

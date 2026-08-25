@@ -7,9 +7,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Driver\Dashboard\RespondToDeliveryRequest;
 use App\Http\Requests\Driver\Dashboard\ToggleAvailabilityRequest;
 use App\Http\Requests\Driver\Dashboard\UpdateLocationRequest;
+use App\Http\Resources\Driver\DeliveryHistoryResource;
 use App\Http\Resources\Driver\DeliveryRequestResource;
+use App\Support\PaginationMeta;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * Driver home screen: the dashboard snapshot, online/offline toggle, live
@@ -118,6 +121,24 @@ class DriverDashboardController extends Controller
         return $this->success(
             data: $activeOrder,
             message: 'Active Order',
+        );
+    }
+
+    public function history(Request $request): JsonResponse
+    {
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = max(1, min(50, (int) $request->query('per_page', 10)));
+
+        $deliveries = $this->dashboard->deliveryHistory(
+            auth('sanctum')->user(),
+            $page,
+            $perPage,
+        );
+
+        return $this->successPaginated(
+            DeliveryHistoryResource::collection($deliveries->getCollection()),
+            PaginationMeta::make($deliveries),
+            'Delivery history retrieved.',
         );
     }
 }

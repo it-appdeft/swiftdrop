@@ -10,6 +10,7 @@ import { initializeTheme } from '@/hooks/use-appearance';
 import { toast } from '@/hooks/use-toast';
 
 import { ActiveOrderBar } from './customer/components/active-order-bar';
+import { ActiveOrdersProvider } from './customer/context/active-orders-context';
 
 declare global {
     const route: typeof routeFn;
@@ -50,15 +51,18 @@ createInertiaApp({
         const root = createRoot(el);
 
         root.render(
-            <>
+            <ActiveOrdersProvider>
                 <App {...props} />
                 <Toaster />
-                {/* Global, not per-page: polls its own endpoint and tracks
-                    navigation itself (see active-order-bar.tsx) so it can
-                    float over any customer screen without every page having
-                    to remember to render it. */}
+                {/* Global, not per-page: reads the shared active-orders poll
+                    (see active-orders-context.tsx) and tracks navigation
+                    itself so it can float over any customer screen without
+                    every page having to remember to render it. Individual
+                    pages can read the same orders via useActiveOrders() to
+                    make room for this bar instead of being covered by it —
+                    see e.g. the restaurant page's "View Cart" bar. */}
                 <ActiveOrderBar />
-            </>,
+            </ActiveOrdersProvider>,
         );
     },
     progress: {

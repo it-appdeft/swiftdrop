@@ -183,7 +183,7 @@ class CustomerCartService implements CustomerCartServiceInterface
         // An emptied cart releases its restaurant lock so the customer can
         // start fresh somewhere else.
         if ($cart && ! $cart->items()->exists()) {
-            $cart->update(['restaurant_id' => null]);
+            $cart->update(['restaurant_id' => null, 'coupon_code' => null, 'special_instructions' => null]);
         }
 
         return $this->getCart($user);

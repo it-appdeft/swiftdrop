@@ -1,17 +1,7 @@
 import { router } from '@inertiajs/react';
 import { Bike, ChevronRight, ChevronUp, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-// ─── Server-supplied shape (see ActiveOrderService::payload()) ────────────────
-
-interface ActiveOrder {
-    uuid: string;
-    status: string;
-    is_accepted: boolean;
-    restaurant_name: string;
-    eta_minutes: number | null;
-    placed_at: string | null;
-}
+import { useActiveOrders, type ActiveOrder } from '../context/active-orders-context';
 
 const STATUS_CAPTION: Record<string, string> = {
     accepted: 'Preparing your order',
@@ -20,23 +10,21 @@ const STATUS_CAPTION: Record<string, string> = {
     out_for_delivery: 'Your order is on the way',
 };
 
-const POLL_INTERVAL_MS = 15000;
-
 /**
  * Persistent "active order" bar — mounted once, globally, in app.tsx (not on
- * a per-page basis) so it can float over any customer screen. Polls its own
- * JSON endpoint (shared with the mobile app via the same ActiveOrderService)
+ * a per-page basis) so it can float over any customer screen. Reads from
+ * {@link useActiveOrders} (polled once, globally — see active-orders-context)
  * rather than piggybacking on Inertia page props, since it has to survive
  * every navigation without every page having to remember to pass it down.
  */
 export function ActiveOrderBar() {
     const [pathname, setPathname] = useState(() => (typeof window === 'undefined' ? '' : window.location.pathname));
-    const [orders, setOrders] = useState<ActiveOrder[]>([]);
+    const orders = useActiveOrders();
     const [expanded, setExpanded] = useState(false);
 
-    // router.on(...) is imperative (no React context needed), so this works
-    // even though the bar is rendered as a sibling of <App>, outside Inertia's
-    // own page tree — see app.tsx.
+    // router.on(...) is imperative (no React context needed for this part),
+    // so this works even though the bar is rendered as a sibling of <App>,
+    // outside Inertia's own page tree — see app.tsx.
     useEffect(() => {
         return router.on('navigate', () => setPathname(window.location.pathname));
     }, []);
@@ -45,35 +33,6 @@ export function ActiveOrderBar() {
     // The order's own tracking page already shows this in full — no need to
     // float a duplicate summary bar over it.
     const onOwnTrackingPage = /^\/customer\/orders\/[^/]+\/?$/.test(pathname);
-
-    useEffect(() => {
-        if (!isCustomerArea) {
-            setOrders([]);
-            return;
-        }
-
-        let cancelled = false;
-        const fetchActive = async () => {
-            try {
-                const res = await fetch('/customer/orders/active', {
-                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                    credentials: 'same-origin',
-                });
-                if (!res.ok || cancelled) return;
-                const json = (await res.json()) as { orders: ActiveOrder[] };
-                if (!cancelled) setOrders(json.orders);
-            } catch {
-                // A missed poll isn't worth surfacing — the next tick retries.
-            }
-        };
-
-        fetchActive();
-        const id = window.setInterval(fetchActive, POLL_INTERVAL_MS);
-        return () => {
-            cancelled = true;
-            window.clearInterval(id);
-        };
-    }, [isCustomerArea]);
 
     if (!isCustomerArea || onOwnTrackingPage || orders.length === 0) return null;
 

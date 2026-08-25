@@ -11,7 +11,9 @@ use App\Models\Delivery;
 use App\Models\DriverEarning;
 use App\Models\DriverProfile;
 use App\Models\User;
+use App\Models\OrderStatusHistory;
 use App\Services\Platform\PlatformConfigService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -170,7 +172,6 @@ class DriverDashboardService implements DriverDashboardServiceInterface
 
         return [
             'delivery_id' => $delivery->id,
-            'status' => $delivery->status,
             'order' => [
                 'id' => $delivery->order->id,
                 'placed_at' => optional($delivery->order->placed_at ?? $delivery->order->created_at)->toIso8601String(),
@@ -247,6 +248,8 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             ->where('driver_id', $profile->id)
             ->whereIn('status',['assigned','picked_up'])
             ->latest()->first();
+        $orderStatus = OrderStatusHistory::where('order_id',$delivery->order_id)
+            ->latest()->value('status');
 
         if (! $delivery) {
             throw ResourceNotFoundException::for('Delivery', 'delivery');
@@ -255,8 +258,30 @@ class DriverDashboardService implements DriverDashboardServiceInterface
         return [
             'delivery_id' => $delivery->id,
             'order_id' => $delivery->order_id,
-            'status' => $delivery->status,
+            'status' => $orderStatus,
         ];
+    }
+
+    public function deliveryHistory(User $user, int $page, int $perPage): LengthAwarePaginator
+    {
+        $profile = $this->profileOrFail($user);
+
+        return Delivery::query()
+            ->where('driver_id', $profile->id)
+            ->where('status', 'delivered')
+            ->with([
+                'order.restaurant.uploads',
+                // Only the two milestones the history card needs (duration =
+                // delivered_at − the driver_assigned timestamp) — see
+                // DeliveryHistoryResource.
+                'order.statusHistories' => fn ($query) => $query->whereIn(
+                    'status',
+                    [OrderStatusEnum::DRIVER_ASSIGNED, OrderStatusEnum::DELIVERED],
+                ),
+                'earnings',
+            ])
+            ->orderByDesc('delivered_at')
+            ->paginate(perPage: $perPage, page: $page);
     }
 
     /**
