@@ -77,6 +77,7 @@ class OrderTrackingService implements OrderTrackingServiceInterface
 
         return [
             'order' => [
+                'id' => $order->id,
                 'uuid' => $order->uuid,
                 'status' => $order->status,
                 'cancellable' => $order->isCancellable(),
