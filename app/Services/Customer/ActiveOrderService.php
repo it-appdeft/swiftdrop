@@ -25,6 +25,7 @@ class ActiveOrderService implements ActiveOrderServiceInterface
     private function payload(Order $order): array
     {
         return [
+            'id'   => $order->id,
             'uuid' => $order->uuid,
             'status' => $order->status,
             // The customer-facing distinction the bar cares about isn't the
