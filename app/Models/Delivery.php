@@ -45,4 +45,9 @@ class Delivery extends Model
     {
         return $this->hasMany(DriverLocationLog::class);
     }
+
+    public function earnings(): HasMany
+    {
+        return $this->hasMany(DriverEarning::class);
+    }
 }

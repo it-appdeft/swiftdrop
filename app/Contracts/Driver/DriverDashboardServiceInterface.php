@@ -5,6 +5,7 @@ namespace App\Contracts\Driver;
 use App\Models\Delivery;
 use App\Models\DriverProfile;
 use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 /**
@@ -49,4 +50,13 @@ interface DriverDashboardServiceInterface
     public function getDeliveryTracking(User $user, int $deliveryId): array;
 
     public function getActiveOrder(User $user): array;
+
+    /**
+     * Completed deliveries for the driver's history tab, newest-delivered
+     * first. Each row is loaded with its order/restaurant and its earnings
+     * ledger entry.
+     *
+     * @return LengthAwarePaginator<int, Delivery>
+     */
+    public function deliveryHistory(User $user, int $page, int $perPage): LengthAwarePaginator;
 }
