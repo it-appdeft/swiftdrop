@@ -224,6 +224,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             'items' => $order?->items->map(fn ($item) => [
                 'name' => (string) $item->name,
                 'quantity' => (int) $item->quantity,
+                'price' => (int) $item->unit_price,
                 'modifiers' => $item->modifiers->map(fn ($m) => (string) $m->option_name)->all(),
             ])->all() ?? [],
             // Null until the customer has actually left one.
