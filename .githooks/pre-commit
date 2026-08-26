@@ -1,0 +1,100 @@
+#!/bin/sh
+
+set -e
+
+echo ""
+echo "========================================"
+echo "Running pre-commit checks..."
+echo "========================================"
+
+# --------------------------------------------------
+# 1. Check that .env is not being committed
+# --------------------------------------------------
+
+echo ""
+echo "Checking .env files..."
+
+if git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)\.env$' >/dev/null 2>&1; then
+    echo "❌ ERROR: .env file is staged for commit."
+    echo "Remove it using:"
+    echo "  git restore --staged .env"
+    echo ""
+    echo "Never commit environment-specific secrets."
+    exit 1
+fi
+
+echo "✅ .env check passed."
+
+
+# --------------------------------------------------
+# 2. Check .env.example for secrets
+# --------------------------------------------------
+
+echo ""
+echo "Checking .env.example for exposed secrets..."
+
+if [ -f ".env.example" ]; then
+
+    # Check common secret/token/key/password patterns.
+    if grep -nEi \
+        '(^|^[[:space:]]*)(API_KEY|API_SECRET|SECRET_KEY|ACCESS_KEY|ACCESS_TOKEN|AUTH_TOKEN|PRIVATE_KEY|CLIENT_SECRET|PASSWORD|DB_PASSWORD|STRIPE_SECRET|STRIPE_KEY|AWS_SECRET|AWS_ACCESS_KEY|GOOGLE_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY)[[:space:]]*=[[:space:]]*[^[:space:]#]+' \
+        .env.example \
+        | grep -vE '=[[:space:]]*(null|your[_-].*|your.*here|change[_-].*|example|example[_-].*|xxx+|<.*>|\$\{.*\})[[:space:]]*$' \
+        >/tmp/env-example-secrets 2>&1; then
+
+        echo "❌ ERROR: Possible secret found in .env.example:"
+        cat /tmp/env-example-secrets
+        echo ""
+        echo ".env.example should contain variable names/placeholders only."
+        exit 1
+    fi
+fi
+
+echo "✅ .env.example check passed."
+
+
+# --------------------------------------------------
+# 3. Check for console.log()
+# --------------------------------------------------
+
+echo ""
+echo "Checking for console.log()..."
+
+if git diff --cached --diff-filter=ACMR -- \
+    '*.js' '*.jsx' '*.ts' '*.tsx' \
+    | grep -E '^\+[^+].*console\.log[[:space:]]*\(' \
+    >/tmp/console-log-check 2>&1; then
+
+    echo "❌ ERROR: console.log() detected in staged changes:"
+    cat /tmp/console-log-check
+    echo ""
+    echo "Remove console.log() before committing."
+    exit 1
+fi
+
+echo "✅ console.log() check passed."
+
+
+# --------------------------------------------------
+# 4. PHP syntax check
+# --------------------------------------------------
+
+echo ""
+echo "Checking PHP syntax..."
+
+PHP_FILES=$(git diff --cached --name-only --diff-filter=ACMR -- '*.php')
+
+if [ -n "$PHP_FILES" ]; then
+    for FILE in $PHP_FILES; do
+        if [ -f "$FILE" ]; then
+            if ! php -l "$FILE" >/dev/null; then
+                echo "❌ PHP syntax error found in: $FILE"
+                exit 1
+            fi
+        fi
+    done
+fi
+
+echo "✅ PHP syntax check passed."
+
+exit 0

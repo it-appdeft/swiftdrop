@@ -16,7 +16,7 @@ class Order extends Model
      * delivery address must not be deleted. Terminal statuses (delivered,
      * cancelled) are excluded.
      */
-    public const ACTIVE_STATUSES = ['placed', 'accepted', 'preparing', 'ready_for_pickup', 'out_for_delivery'];
+    public const ACTIVE_STATUSES = ['placed', 'accepted', 'preparing', 'ready_for_pickup', 'driver_assigned', 'reached_restaurant', 'picked_up', 'out_for_delivery'];
 
     protected $fillable = [
         'uuid',
