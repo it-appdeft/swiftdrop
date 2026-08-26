@@ -4,6 +4,7 @@ namespace App\Services\Driver;
 
 use App\Contracts\Driver\DriverDashboardServiceInterface;
 use App\Contracts\Order\OrderStatusTransitionServiceInterface;
+use App\Enums\DeliveryStatusEnum;
 use App\Enums\OrderStatusEnum;
 use App\Exceptions\InvalidInputException;
 use App\Exceptions\ResourceNotFoundException;
@@ -37,7 +38,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             ->sum('amount');
 
         $deliveriesToday = $profile->deliveries()
-            ->where('status', 'delivered')
+            ->where('status', DeliveryStatusEnum::DELIVERED)
             ->whereDate('delivered_at', $today)
             ->count();
 
@@ -76,7 +77,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
         }
 
         return Delivery::query()
-            ->where('status', 'pending_assignment')
+            ->where('status', DeliveryStatusEnum::PENDING_ASSIGNMENT)
             ->whereNull('driver_id')
             ->with(['order.restaurant.uploads', 'order.address'])
             ->whereHas('order', function ($query) {
@@ -167,6 +168,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
                 'order.restaurant.uploads',
                 'order.address',
                 'order.items.modifiers',
+                'order.items.menuItem',
                 'order.review',
                 // Only the two milestones the duration needs — see
                 // DeliveryHistoryResource, which computes it the same way.
@@ -196,12 +198,15 @@ class DriverDashboardService implements DriverDashboardServiceInterface
 
         $deliveryFeeEarning = $earnings->firstWhere('type', DriverEarning::TYPE_DELIVERY_FEE);
 
+        $maxPrepTime = $delivery->order->items->max(fn ($item) => $item->menuItem?->prep_time ?? 0);
+
         return [
             'delivery_id' => $delivery->id,
             // Same short reference shown on the offer card and history list.
             'reference' => $order ? '#CON-'.str_pad((string) $order->id, 4, '0', STR_PAD_LEFT) : null,
             'status' => $order?->status->boardStatus(),
             'placed_at' => optional($order?->placed_at ?? $order?->created_at)->toIso8601String(),
+            'preparation_time' => $maxPrepTime,
             'distance_miles' => $delivery->distance_miles !== null ? (float) $delivery->distance_miles : null,
             'duration_minutes' => $durationMinutes,
             'restaurant' => $restaurant ? [
@@ -242,10 +247,10 @@ class DriverDashboardService implements DriverDashboardServiceInterface
     private function acceptDelivery(DriverProfile $profile, Delivery $delivery): Delivery
     {
         // Already mine → idempotent success. Taken by someone else → conflict.
-        if ($delivery->driver_id === $profile->id && $delivery->status === 'assigned') {
+        if ($delivery->driver_id === $profile->id && $delivery->status === DeliveryStatusEnum::ASSIGNED) {
             return $delivery;
         }
-        if ($delivery->status !== 'pending_assignment' || $delivery->driver_id !== null) {
+        if ($delivery->status !== DeliveryStatusEnum::PENDING_ASSIGNMENT || $delivery->driver_id !== null) {
             throw InvalidInputException::make('This delivery is no longer available.', 'delivery');
         }
         if (! $this->withinAssignmentRadius($profile, $delivery)) {
@@ -254,7 +259,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
 
         $delivery->forceFill([
             'driver_id' => $profile->id,
-            'status' => 'assigned',
+            'status' => DeliveryStatusEnum::ASSIGNED,
             'assignment_attempts' => $delivery->assignment_attempts + 1,
         ])->save();
 
@@ -278,7 +283,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
     {
         // Only meaningful while the offer is still open; releasing it leaves it
         // pending so the next driver can be offered the same delivery.
-        if ($delivery->status === 'pending_assignment') {
+        if ($delivery->status === DeliveryStatusEnum::PENDING_ASSIGNMENT) {
             $delivery->increment('assignment_attempts');
         }
 
@@ -291,7 +296,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
 
         $delivery = Delivery::query()
             ->where('driver_id', $profile->id)
-            ->whereIn('status',['assigned','picked_up'])
+            ->whereIn('status', [DeliveryStatusEnum::ASSIGNED, DeliveryStatusEnum::PICKED_UP])
             ->latest()->first();
         $orderStatus = OrderStatusHistory::where('order_id',$delivery->order_id)
             ->latest()->value('status');
@@ -313,7 +318,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
 
         return Delivery::query()
             ->where('driver_id', $profile->id)
-            ->where('status', 'delivered')
+            ->where('status', DeliveryStatusEnum::DELIVERED)
             ->with([
                 'order.restaurant.uploads',
                 // Only the two milestones the history card needs (duration =

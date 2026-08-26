@@ -21,6 +21,7 @@ class MenuItem extends Model
         'price',
         'is_available',
         'is_veg',
+        'prep_time',
         'allergens',
         'calories',
         'sort_order',

@@ -59,7 +59,7 @@ interface TrackingItem {
 }
 
 interface TrackingDelivery {
-    status: 'pending_assignment' | 'assigned' | 'driver_assigned' | 'reached_restaurant' | 'picked_up' | 'delivered' | 'failed';
+    status: 'pending_assignment' | 'driver_assigned' | 'reached_restaurant' | 'picked_up' | 'delivered' | 'failed';
     eta_minutes: number | null;
     driver: { name: string; photo: string | null } | null;
 }
@@ -91,7 +91,6 @@ const STATUS_META: Record<OrderStatus, { label: string; caption: string; barPct:
 
 const DELIVERY_CAPTION: Record<TrackingDelivery['status'], string> = {
     pending_assignment: 'Looking for a nearby driver.',
-    assigned: 'Your driver is heading to the restaurant.',
     driver_assigned: 'Your driver has been assigned to your order.',
     reached_restaurant: 'Your driver has arrived at the restaurant.',
     picked_up: 'Your driver has picked up your order.',

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DeliveryStatusEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,6 +25,7 @@ class Delivery extends Model
     protected function casts(): array
     {
         return [
+            'status' => DeliveryStatusEnum::class,
             'distance_miles' => 'decimal:2',
             'picked_up_at' => 'datetime',
             'delivered_at' => 'datetime',

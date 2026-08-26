@@ -4,6 +4,7 @@ namespace App\Services\Restaurant;
 
 use App\Contracts\Order\OrderStatusTransitionServiceInterface;
 use App\Contracts\Restaurant\RestaurantOrderServiceInterface;
+use App\Enums\DeliveryStatusEnum;
 use App\Enums\OrderStatusEnum;
 use App\Exceptions\InvalidInputException;
 use App\Exceptions\ResourceNotFoundException;
@@ -42,7 +43,7 @@ class RestaurantOrderService implements RestaurantOrderServiceInterface
             // firstOrCreate guards a duplicate on any retry/replay.
             [$distanceMiles, $etaMinutes] = $this->estimateDelivery($restaurant, $order->address);
             $order->delivery()->firstOrCreate([], [
-                'status' => 'pending_assignment',
+                'status' => DeliveryStatusEnum::PENDING_ASSIGNMENT,
                 'distance_miles' => $distanceMiles,
                 'eta_minutes' => $etaMinutes,
             ]);

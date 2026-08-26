@@ -114,6 +114,7 @@ class MenuManagementController extends Controller
                 'price'        => $data['price'],
                 'is_available' => $data['is_available'],
                 'is_veg'       => $data['is_veg'],
+                'prep_time'    => $data['prep_time'],
                 'sort_order'   => $this->nextItemSortOrder($restaurant),
             ]);
 
@@ -144,6 +145,7 @@ class MenuManagementController extends Controller
                 'price'        => $data['price'],
                 'is_available' => $data['is_available'],
                 'is_veg'       => $data['is_veg'],
+                'prep_time'    => $data['prep_time'],
             ])->save();
 
             $this->syncModifierGroups($item, $data['modifier_group_ids'] ?? []);
