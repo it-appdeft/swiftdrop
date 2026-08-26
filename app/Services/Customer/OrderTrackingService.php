@@ -12,15 +12,15 @@ use Illuminate\Support\Facades\DB;
 
 class OrderTrackingService implements OrderTrackingServiceInterface
 {
-    public function status(User $user, string $uuid): array
+    public function status(User $user, int $id): array
     {
-        return $this->payload($this->ownedOrder($user, $uuid));
+        return $this->payload($this->ownedOrder($user, $id));
     }
 
-    public function cancel(User $user, string $uuid, ?string $reason): array
+    public function cancel(User $user, int $id, ?string $reason): array
     {
-        $order = DB::transaction(function () use ($user, $uuid, $reason) {
-            $order = $this->ownedOrder($user, $uuid, lockForUpdate: true);
+        $order = DB::transaction(function () use ($user, $id, $reason) {
+            $order = $this->ownedOrder($user, $id, lockForUpdate: true);
 
             if (! $order->isCancellable()) {
                 throw InvalidInputException::make('This order can no longer be cancelled.', 'status');
@@ -48,10 +48,10 @@ class OrderTrackingService implements OrderTrackingServiceInterface
 
     // ─── Internals ──────────────────────────────────────────────────────────
 
-    private function ownedOrder(User $user, string $uuid, bool $lockForUpdate = false): Order
+    private function ownedOrder(User $user, int $id, bool $lockForUpdate = false): Order
     {
         $query = Order::query()
-            ->where('uuid', $uuid)
+            ->where('id', $id)
             ->where('user_id', $user->id)
             ->with(['restaurant', 'address', 'items.modifiers', 'payment', 'delivery.driver.user', 'statusHistories']);
 

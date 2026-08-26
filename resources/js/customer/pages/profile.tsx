@@ -1173,8 +1173,8 @@ function OrderCard({ order }: { order: PastOrder }) {
         <article
             role="link"
             tabIndex={0}
-            onClick={() => router.visit(route('customer.orders.show', order.uuid))}
-            onKeyDown={(e) => e.key === 'Enter' && router.visit(route('customer.orders.show', order.uuid))}
+            onClick={() => router.visit(route('customer.orders.show', order.id))}
+            onKeyDown={(e) => e.key === 'Enter' && router.visit(route('customer.orders.show', order.id))}
             className="border-border bg-background cursor-pointer rounded-2xl border p-5 transition hover:border-emerald-200 hover:bg-emerald-50/30"
         >
             <header className="flex items-start gap-4">

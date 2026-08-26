@@ -25,7 +25,7 @@ class OrderTrackingController extends Controller
     ) {
     }
 
-    public function show(string $order): Response
+    public function show(int $order): Response
     {
         return Inertia::render('customer/orders/track', [
             'tracking' => $this->tracking->status(Auth::user(), $order),
@@ -33,12 +33,12 @@ class OrderTrackingController extends Controller
         ]);
     }
 
-    public function status(string $order): JsonResponse
+    public function status(int $order): JsonResponse
     {
         return response()->json($this->tracking->status(Auth::user(), $order));
     }
 
-    public function cancel(Request $request, string $order): JsonResponse
+    public function cancel(Request $request, int $order): JsonResponse
     {
         $reason = $request->string('reason')->toString() ?: null;
 

@@ -88,9 +88,9 @@ Route::middleware('auth:sanctum')->prefix('customer')->group(function () {
     // Post-checkout tracking — `status` is polled every 5s by the client
     // instead of a realtime channel; `cancel` only succeeds while the order
     // is still unaccepted (see Order::isCancellable()).
-    Route::controller(OrderTrackingController::class)->prefix('orders/{order}')->group(function () {
-        Route::get('status', 'status')->whereUuid('order');
-        Route::post('cancel', 'cancel')->whereUuid('order');
+    Route::controller(OrderTrackingController::class)->prefix('orders/{order}')->whereNumber('order')->group(function () {
+        Route::get('status', 'status');
+        Route::post('cancel', 'cancel');
     });
 
     Route::controller(CustomerProfileController::class)->prefix('profile')->group(function () {

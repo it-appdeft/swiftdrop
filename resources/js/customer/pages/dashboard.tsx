@@ -723,15 +723,15 @@ export type { DashboardRestaurant, TodayHours };
 
 export default function CustomerHome({ dashboard }: DashboardProps) {
     // Show a brief success modal when landing here from a just-placed order.
-    // The flash carries the new order's uuid (one-shot, server-side) so the
+    // The flash carries the new order's id (one-shot, server-side) so the
     // modal can both auto-dismiss after ~2.5 s and link to the tracking page.
-    const flash = (usePage().props as { flash?: { order_placed?: string } }).flash;
+    const flash = (usePage().props as { flash?: { order_placed?: number } }).flash;
     const [orderPlacedOpen, setOrderPlacedOpen] = useState(false);
-    const placedOrderUuid = flash?.order_placed ?? null;
+    const placedOrderId = flash?.order_placed ?? null;
 
     useEffect(() => {
-        if (placedOrderUuid) setOrderPlacedOpen(true);
-    }, [placedOrderUuid]);
+        if (placedOrderId) setOrderPlacedOpen(true);
+    }, [placedOrderId]);
 
     useEffect(() => {
         if (!orderPlacedOpen) return;
@@ -760,7 +760,7 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
                 />
             </main>
 
-            <OrderPlacedDialog open={orderPlacedOpen} orderUuid={placedOrderUuid} onClose={() => setOrderPlacedOpen(false)} />
+            <OrderPlacedDialog open={orderPlacedOpen} orderId={placedOrderId} onClose={() => setOrderPlacedOpen(false)} />
         </div>
     );
 }
@@ -769,7 +769,7 @@ export default function CustomerHome({ dashboard }: DashboardProps) {
  * One-shot success modal shown when the user lands on the dashboard after
  * placing an order. Self-dismisses on a timer in the parent.
  */
-function OrderPlacedDialog({ open, orderUuid, onClose }: { open: boolean; orderUuid: string | null; onClose: () => void }) {
+function OrderPlacedDialog({ open, orderId, onClose }: { open: boolean; orderId: number | null; onClose: () => void }) {
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[400px]">
@@ -783,9 +783,9 @@ function OrderPlacedDialog({ open, orderUuid, onClose }: { open: boolean; orderU
                         <br />
                         is being prepared.
                     </p>
-                    {orderUuid && (
+                    {orderId && (
                         <Link
-                            href={route('customer.orders.show', orderUuid)}
+                            href={route('customer.orders.show', orderId)}
                             className="bg-primary text-primary-foreground mt-6 w-full rounded-md py-3 text-sm font-semibold transition hover:opacity-90"
                         >
                             Track Order

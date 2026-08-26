@@ -73,6 +73,7 @@ class CheckoutController extends Controller
         return $this->success(
             data: [
                 'order' => [
+                    'id' => $order->id,
                     'uuid' => $order->uuid,
                     'status' => $order->status,
                     'total' => (float) $order->total,
