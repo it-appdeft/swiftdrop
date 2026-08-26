@@ -19,7 +19,7 @@ interface OrderTrackingServiceInterface
      *
      * @return array<string, mixed>
      */
-    public function status(User $user, string $uuid): array;
+    public function status(User $user, int $id): array;
 
     /**
      * Cancel an order the customer still can — i.e. it hasn't been accepted
@@ -28,5 +28,5 @@ interface OrderTrackingServiceInterface
      *
      * @return array<string, mixed>
      */
-    public function cancel(User $user, string $uuid, ?string $reason): array;
+    public function cancel(User $user, int $id, ?string $reason): array;
 }

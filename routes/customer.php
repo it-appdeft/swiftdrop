@@ -59,16 +59,16 @@ Route::middleware(['auth', 'customer'])->prefix('customer')->name('customer.')->
 
     // Every order still in flight — backs <ActiveOrderBar>, mounted globally
     // in app.tsx so it can show on any customer screen. Declared before
-    // orders/{order} below (whereUuid already guards it, but this keeps the
+    // orders/{order} below (whereNumber already guards it, but this keeps the
     // static route unambiguous).
     Route::get('orders/active', [ActiveOrderController::class, 'index'])->name('orders.active');
 
     // Order tracking: `show` renders the page, `status` is polled every 5s
     // for live updates, `cancel` only succeeds while still unaccepted.
-    Route::controller(OrderTrackingController::class)->prefix('orders/{order}')->name('orders.')->group(function () {
-        Route::get('/', 'show')->whereUuid('order')->name('show');
-        Route::get('status', 'status')->whereUuid('order')->name('status');
-        Route::post('cancel', 'cancel')->whereUuid('order')->name('cancel');
+    Route::controller(OrderTrackingController::class)->prefix('orders/{order}')->whereNumber('order')->name('orders.')->group(function () {
+        Route::get('/', 'show')->name('show');
+        Route::get('status', 'status')->name('status');
+        Route::post('cancel', 'cancel')->name('cancel');
     });
 
     // Support — the "Report An Issue" form on the profile Help tab.

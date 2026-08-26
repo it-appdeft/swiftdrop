@@ -27,7 +27,7 @@ class OrderTrackingController extends Controller
      * Polled by the client (every 5s while the app is on the order screen)
      * to pick up status changes without a realtime channel.
      */
-    public function status(Request $request, string $order): JsonResponse
+    public function status(Request $request, int $order): JsonResponse
     {
         return $this->success(
             data: $this->tracking->status($request->user(), $order),
@@ -35,7 +35,7 @@ class OrderTrackingController extends Controller
         );
     }
 
-    public function cancel(Request $request, string $order): JsonResponse
+    public function cancel(Request $request, int $order): JsonResponse
     {
         $reason = $request->string('reason')->toString() ?: null;
 

@@ -20,7 +20,7 @@ type OrderStatus =
     | 'rejected';
 
 interface TrackingOrder {
-    uuid: string;
+    id: number;
     status: OrderStatus;
     cancellable: boolean;
     delivery_code: string | null;
@@ -114,7 +114,7 @@ export default function OrderTrack({ tracking, reasons }: { tracking: TrackingPa
 
     const fetchStatus = useCallback(async () => {
         try {
-            const res = await fetch(route('customer.orders.status', data.order.uuid), {
+            const res = await fetch(route('customer.orders.status', data.order.id), {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
             });
@@ -123,7 +123,7 @@ export default function OrderTrack({ tracking, reasons }: { tracking: TrackingPa
         } catch {
             // A missed poll isn't worth surfacing — the next tick retries.
         }
-    }, [data.order.uuid]);
+    }, [data.order.id]);
 
     // Poll every 5s while the order is still moving; stop once it's terminal.
     useEffect(() => {
@@ -144,7 +144,7 @@ export default function OrderTrack({ tracking, reasons }: { tracking: TrackingPa
     const handleCancel = async (reason: string) => {
         setCancelling(true);
         try {
-            const res = await fetch(route('customer.orders.cancel', data.order.uuid), {
+            const res = await fetch(route('customer.orders.cancel', data.order.id), {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
@@ -181,7 +181,7 @@ export default function OrderTrack({ tracking, reasons }: { tracking: TrackingPa
 
     return (
         <div className="bg-background flex min-h-screen flex-col">
-            <Head title={`Order #${data.order.uuid.slice(0, 8).toUpperCase()}`} />
+            <Head title={`Order #${data.order.id}`} />
             <CustomerHeader />
 
             <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
@@ -240,7 +240,7 @@ export default function OrderTrack({ tracking, reasons }: { tracking: TrackingPa
 
                                 <div className="border-border/70 mt-3 flex items-center justify-between border-t pt-3 text-sm">
                                     <span className="text-muted-foreground">Order ID</span>
-                                    <span className="font-mono font-semibold">#{data.order.uuid.slice(0, 8).toUpperCase()}</span>
+                                    <span className="font-mono font-semibold">#{data.order.id}</span>
                                 </div>
 
                                 <ul className="mt-2 space-y-1.5">

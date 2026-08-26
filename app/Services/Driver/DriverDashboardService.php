@@ -321,6 +321,7 @@ class DriverDashboardService implements DriverDashboardServiceInterface
             ->where('status', DeliveryStatusEnum::DELIVERED)
             ->with([
                 'order.restaurant.uploads',
+                'order.items.menuItem',
                 // Only the two milestones the history card needs (duration =
                 // delivered_at − the driver_assigned timestamp) — see
                 // DeliveryHistoryResource.

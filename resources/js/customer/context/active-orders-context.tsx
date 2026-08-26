@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 // ─── Server-supplied shape (see ActiveOrderService::payload()) ────────────────
 
 export interface ActiveOrder {
+    id: number;
     uuid: string;
     status: string;
     is_accepted: boolean;

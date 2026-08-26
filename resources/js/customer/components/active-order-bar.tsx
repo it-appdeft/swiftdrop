@@ -38,7 +38,7 @@ export function ActiveOrderBar() {
 
     const [primary, ...rest] = orders;
 
-    const goTo = (uuid: string) => router.visit(`/customer/orders/${uuid}`);
+    const goTo = (id: number) => router.visit(`/customer/orders/${id}`);
 
     return (
         <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
@@ -46,13 +46,13 @@ export function ActiveOrderBar() {
                 {expanded && rest.length > 0 && (
                     <div className="border-border bg-background mb-2 divide-y divide-zinc-100 overflow-hidden rounded-2xl border shadow-lg">
                         {rest.map((order) => (
-                            <OrderRow key={order.uuid} order={order} onClick={() => goTo(order.uuid)} compact />
+                            <OrderRow key={order.id} order={order} onClick={() => goTo(order.id)} compact />
                         ))}
                     </div>
                 )}
 
                 <div className="overflow-hidden rounded-2xl bg-emerald-600 text-white shadow-xl shadow-emerald-900/20">
-                    <button type="button" onClick={() => goTo(primary.uuid)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
+                    <button type="button" onClick={() => goTo(primary.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left">
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/15">
                             <Bike className="size-5" />
                         </span>
