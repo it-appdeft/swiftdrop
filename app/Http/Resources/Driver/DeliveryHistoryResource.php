@@ -27,6 +27,7 @@ class DeliveryHistoryResource extends JsonResource
             ?->created_at;
 
         $earning = $delivery->earnings->firstWhere('type', DriverEarning::TYPE_DELIVERY_FEE);
+        $maxPrepTime = $delivery->order->items->max(fn ($item) => $item->menuItem?->prep_time ?? 0);
 
         return [
             'delivery_id' => $delivery->id,
@@ -37,6 +38,7 @@ class DeliveryHistoryResource extends JsonResource
                 'name' => $restaurant->name,
                 'image' => $restaurant->banner_url ?? $restaurant->logo_url,
             ] : null,
+            'preparation_time' => $maxPrepTime,
             'distance_miles' => $delivery->distance_miles !== null ? (float) $delivery->distance_miles : null,
             'duration_minutes' => ($assignedAt && $delivery->delivered_at)
                 ? (int) round($assignedAt->diffInMinutes($delivery->delivered_at))

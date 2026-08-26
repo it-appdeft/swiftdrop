@@ -4,6 +4,7 @@ namespace App\Services\Driver;
 
 use App\Contracts\Driver\OrderStatusServiceInterface;
 use App\Contracts\Order\OrderStatusTransitionServiceInterface;
+use App\Enums\DeliveryStatusEnum;
 use App\Enums\OrderStatusEnum;
 use App\Exceptions\InvalidInputException;
 use App\Exceptions\ResourceNotFoundException;
@@ -76,13 +77,13 @@ class OrderStatusService implements OrderStatusServiceInterface
             // the only thing allowed to write here (see
             // OrderStatusTransitionService, which never touches this table).
             if (! $alreadyAtStatus && $status === 'picked_up') {
-                $delivery->forceFill(['status' => 'picked_up', 'picked_up_at' => $now])->save();
+                $delivery->forceFill(['status' => DeliveryStatusEnum::PICKED_UP, 'picked_up_at' => $now])->save();
 
                 // Stand-in for the restaurant confirming handover — see the
                 // job's docblock.
                 AutoAdvanceOrderToOutForDeliveryJob::dispatch($order->id)->delay(now()->addSeconds(10));
             } elseif (! $alreadyAtStatus && $status === 'delivered') {
-                $delivery->forceFill(['status' => 'delivered', 'delivered_at' => $now])->save();
+                $delivery->forceFill(['status' => DeliveryStatusEnum::DELIVERED, 'delivered_at' => $now])->save();
 
                 // Credit the driver's earnings ledger — the delivery-history
                 // API and the dashboard's "today's earnings" figure both read
